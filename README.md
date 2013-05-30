@@ -1,4 +1,4 @@
-sublime-xpath
-=============
+Sublime Text - XPath Plugin
+============
 
-Get XPath at cursor(s).
+Copy XPath at cursor(s) to clipboard.
