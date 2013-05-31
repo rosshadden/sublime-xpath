@@ -2,8 +2,6 @@ import sublime, sublime_plugin
 import re
 
 def buildPath(view, selection):
-	word = view.word(selection)
-
 	path = ['']
 	lines = []
 
@@ -55,7 +53,6 @@ class XpathCommand(sublime_plugin.TextCommand):
 					response += '\n'
 			sublime.set_clipboard(response)
 
-class XpathCommandListener(sublime_plugin.EventListener):
 	def on_text_command(self, view, command, args):
 		if(isXML(view) and command == "move"):
 			updateStatus(view)
