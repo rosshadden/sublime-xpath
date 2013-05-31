@@ -47,12 +47,13 @@ class XpathCommand(sublime_plugin.TextCommand):
 			response = ''
 			selections = view.sel()
 			for s,selection in enumerate(selections):
-				path = buildPath(selection)
+				path = buildPath(view, selection)
 				response += '/'.join(path)
 				if s != len(selections) - 1:
 					response += '\n'
 			sublime.set_clipboard(response)
 
+class XpathCommand(sublime_plugin.EventListener):
 	def on_text_command(self, view, command, args):
 		if(isXML(view) and command == "move"):
 			updateStatus(view)
