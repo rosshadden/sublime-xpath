@@ -15,17 +15,16 @@ def buildPath(view, selection):
 	for line in lines:
 		space = spaces.findall(line)
 		current = len(space[0]) if len(space) else 0
+		node = re.sub(r'\s*<(\w+)(\s.*)?>.*', r'\1', line)
 		if current == level:
 			path.pop()
-			path.append(line)
+			path.append(node)
 		elif current > level:
-			path.append(line)
+			path.append(node)
 			level = current
 		elif current < level:
 			path.pop()
 			level = current
-
-	path = map(lambda x: re.sub(r'\s*<(\w+)(\s.*)?>.*', r'\1', x), path)
 
 	return path
 
