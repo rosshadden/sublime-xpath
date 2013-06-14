@@ -38,8 +38,11 @@ def updateStatus(view):
 
 
 def isXML(view):
-    filename = re.sub(r'^.*/(\w+\.\w+)$', r'\1', view.file_name())
-    ext = re.sub(r'^\w+\.(\w+)$', r'\1', filename)
+    ext = re.sub(
+        r'.*\.(\w+)$',
+        r'\1',
+        view.file_name()
+    )
     return ext == 'xml'
 
 
