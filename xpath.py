@@ -18,6 +18,7 @@ def buildPath(view, selection):
         space = spaces.findall(line)
         current = len(space[0]) if len(space) else 0
         node = re.sub(r'\s*<\??([\w.]:)?([\w\-.]+)(\s.)?>.*', r'\2', line)
+        node = re.sub(r'\s*<(\S+)[^>]*>', r'\1', node)
         if current == level:
             path.pop()
             path.append(node)
@@ -59,9 +60,11 @@ class XpathCommand(sublime_plugin.TextCommand):
                 if s != len(selections) - 1:
                     response += '\n'
             sublime.set_clipboard(response)
+        else:
+            sublime.status_message('xpath not copied to clipboard - file must have xml extension')
 
 
 class XpathListener(sublime_plugin.EventListener):
     def on_text_command(self, view, command, args):
-        if(isXML(view) and command == "move"):
+        if isXML(view) and (command == "move" or command == "drag_select"):
             updateStatus(view)
