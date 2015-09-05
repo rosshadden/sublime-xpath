@@ -39,12 +39,8 @@ def updateStatus(view):
 
 
 def isXML(view):
-    ext = re.sub(
-        r'.*\.(\w+)$',
-        r'\1',
-        view.file_name()
-    )
-    return ext == 'xml'
+    currentSyntax = view.settings().get('syntax')
+    return currentSyntax == 'Packages/XML/XML.tmLanguage'
 
 
 class XpathCommand(sublime_plugin.TextCommand):
@@ -61,7 +57,7 @@ class XpathCommand(sublime_plugin.TextCommand):
                     response += '\n'
             sublime.set_clipboard(response)
         else:
-            sublime.status_message('xpath not copied to clipboard - file must have xml extension')
+            sublime.status_message('xpath not copied to clipboard - ensure syntax is set to xml')
 
 
 class XpathListener(sublime_plugin.EventListener):
