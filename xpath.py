@@ -35,7 +35,7 @@ def buildPath(view, selection):
 def updateStatus(view):
     path = buildPath(view, view.sel()[0])
     response = '/'.join(path)
-    sublime.status_message(response)
+    view.set_status('xpath', response)
 
 
 def isXML(view):
@@ -65,6 +65,13 @@ class XpathCommand(sublime_plugin.TextCommand):
 
 
 class XpathListener(sublime_plugin.EventListener):
-    def on_text_command(self, view, command, args):
-        if isXML(view) and (command == "move" or command == "drag_select"):
+    #def post_text_command(self, view, command_name, args):
+    def on_text_command(self, view, command_name, args):
+        if isXML(view) and (command_name == "move" or command_name == "drag_select"):
+            updateStatus(view)
+        #print command_name
+    #def on_selection_modified_async(self, view):
+        #print 'sel modified'
+    def on_activated_async(self, view):
+        if isXML(view):
             updateStatus(view)
