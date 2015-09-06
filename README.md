@@ -8,7 +8,6 @@ Note:  This currently requires properly indented XML.
 
 Planned features:
 
-- display xpath at new selection position, not old
 - work on html too
 - display xpath on load without requiring selection movement first
 - option for which attributes to show in the path (i.e. id)
