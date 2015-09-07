@@ -6,7 +6,7 @@ import re
 def buildPath(view, selection):
     path = ['']
     
-    tagRegions = view.find_by_selector('meta.tag.xml entity.name.tag.localname.xml')
+    tagRegions = view.find_by_selector('entity.name.tag.')
     selfEndingTag = False
     for region in tagRegions:
         if region.begin() > selection.end():
@@ -32,13 +32,14 @@ def buildPath(view, selection):
         path.pop();
     return path
 
-def isXML(view):
+def isSGML(view):
     currentSyntax = view.settings().get('syntax')
     XMLSyntax = 'Packages/XML/'
-    return currentSyntax.startswith(XMLSyntax)
+    HTMLSyntax = 'Packages/HTML/'
+    return currentSyntax.startswith(XMLSyntax) or currentSyntax.startswith(HTMLSyntax)
 
-def updateStatusIfXML(view):
-    if isXML(view):
+def updateStatusIfSGML(view):
+    if isSGML(view):
         updateStatus(view)
 
 def updateStatus(view):
@@ -50,7 +51,7 @@ class XpathCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         view = self.view
 
-        if isXML(view):
+        if isSGML(view):
             response = ''
             selections = view.sel()
             for s, selection in enumerate(selections):
@@ -60,9 +61,9 @@ class XpathCommand(sublime_plugin.TextCommand):
                     response += '\n'
             sublime.set_clipboard(response)
         else:
-            sublime.status_message('xpath not copied to clipboard - ensure syntax is set to xml')
+            sublime.status_message('xpath not copied to clipboard - ensure syntax is set to xml or html')
 
 
 class XpathListener(sublime_plugin.EventListener):
     def on_selection_modified_async(self, view):
-        updateStatusIfXML(view)
+        updateStatusIfSGML(view)
