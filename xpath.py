@@ -41,9 +41,12 @@ def buildPath(view, selection):
 
 def isSGML(view):
     currentSyntax = view.settings().get('syntax')
-    XMLSyntax = 'Packages/XML/'
-    HTMLSyntax = 'Packages/HTML/'
-    return currentSyntax.startswith(XMLSyntax) or currentSyntax.startswith(HTMLSyntax)
+    if currentSyntax is not None:
+        XMLSyntax = 'Packages/XML/'
+        HTMLSyntax = 'Packages/HTML/'
+        return currentSyntax.startswith(XMLSyntax) or currentSyntax.startswith(HTMLSyntax)
+    else:
+        return false
 
 def updateStatusIfSGML(view):
     if isSGML(view):
