@@ -13,14 +13,14 @@ def buildPath(view, selection):
         if region.begin() > selection.end():
             break;
         
-        firstChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
+        prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
         tagName = view.substr(region)
         
         if selfEndingTag:
             path.pop()
             levelCounters.pop()
-        if firstChar == '<':
-            # check last char before end of tag...
+        if prevChar == '<':
+            # check last char before end of tag, to see if it is self closing or not...
             tagScope = view.extract_scope(region.end())
             selfEndingTag = view.substr(tagScope)[-2] == '/'
             
@@ -28,7 +28,7 @@ def buildPath(view, selection):
             level = levelCounters[len(levelCounters) - 1].get(tagName)
             path.append(tagName + '[' + str(level) + ']')
             levelCounters.append({})
-        elif firstChar == '/':
+        elif prevChar == '/':
             if selection.end() > region.end():
                 path.pop()
                 levelCounters.pop()
@@ -60,14 +60,11 @@ class XpathCommand(sublime_plugin.TextCommand):
         view = self.view
 
         if isSGML(view):
-            response = ''
-            selections = view.sel()
-            for s, selection in enumerate(selections):
+            xpaths = []
+            for selection in view.sel():
                 path = buildPath(view, selection)
-                response += '/'.join(path)
-                if s != len(selections) - 1:
-                    response += os.linesep
-            sublime.set_clipboard(response)
+                xpaths.append('/'.join(path))
+            sublime.set_clipboard(os.linesep.join(xpaths))
             sublime.status_message('xpath(s) copied to clipboard')
         else:
             sublime.status_message('xpath not copied to clipboard - ensure syntax is set to xml or html')
