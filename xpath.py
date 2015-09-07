@@ -31,20 +31,19 @@ def buildPath(view, selection):
 
     return path
 
+def isXML(view):
+    currentSyntax = view.settings().get('syntax')
+    XMLSyntax = 'Packages/XML/'
+    return currentSyntax[0:len(XMLSyntax)] == XMLSyntax
+
 def updateStatusIfXML(view):
-    if isXml(view):
+    if isXML(view):
         updateStatus(view)
 
 def updateStatus(view):
     path = buildPath(view, view.sel()[0])
     response = '/'.join(path)
     view.set_status('xpath', response)
-
-
-def isXML(view):
-    currentSyntax = view.settings().get('syntax')
-    return currentSyntax == 'Packages/XML/XML.tmLanguage'
-
 
 class XpathCommand(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -66,4 +65,3 @@ class XpathCommand(sublime_plugin.TextCommand):
 class XpathListener(sublime_plugin.EventListener):
     def on_selection_modified_async(self, view):
         updateStatusIfXML(view)
-
