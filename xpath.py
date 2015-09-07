@@ -5,30 +5,30 @@ import re
 
 def buildPath(view, selection):
     path = ['']
-    lines = []
-
-    region = sublime.Region(0, selection.end())
-    for line in view.lines(region):
-        contents = view.substr(line)
-        lines.append(contents)
-
-    level = -1
-    spaces = re.compile('^\s+')
-    for line in lines:
-        space = spaces.findall(line)
-        current = len(space[0]) if len(space) else 0
-        node = re.sub(r'\s*<\??([\w.]:)?([\w\-.]+)(\s.)?>.*', r'\2', line)
-        node = re.sub(r'\s*<(\S+)[^>]*>', r'\1', node)
-        if current == level:
+    
+    tagRegions = view.find_by_selector('meta.tag.xml entity.name.tag.localname.xml')
+    selfEndingTag = False
+    for region in tagRegions:
+        if region.begin() > selection.end():
+            break;
+        
+        firstChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
+        tagName = view.substr(region)
+        
+        if selfEndingTag:
             path.pop()
-            path.append(node)
-        elif current > level:
-            path.append(node)
-            level = current
-        elif current < level:
-            path.pop()
-            level = current
-
+        if firstChar == '<':
+            # check last char before end tag...
+            tagScope = view.extract_scope(region.end())
+            selfEndingTag = view.substr(tagScope)[-2] == '/'
+            
+            path.append(tagName)
+        elif firstChar == '/':
+            if selection.end() > region.end():
+                path.pop()
+    
+    if selfEndingTag and tagScope.end() <= selection.begin():
+        path.pop();
     return path
 
 def isXML(view):
