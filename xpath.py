@@ -26,6 +26,7 @@ def buildPath(view, selection):
         elif firstChar == '/':
             if selection.end() > region.end():
                 path.pop()
+            selfEndingTag = False
     
     if selfEndingTag and tagScope.end() <= selection.begin():
         path.pop();
