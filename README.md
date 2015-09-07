@@ -7,5 +7,9 @@ Sublime Text 3 - XPath Plugin
 Planned features:
 
 - display xpath on load without requiring selection movement first
-- option for which attributes to show in the path (i.e. id)
+
+Potential improvements:
+- optionally show attributes in the path, allow user preference to specify which attributes (i.e. id)
 - efficiency improvements for multiple selections
+- efficiency improvements for small cursor movements (i.e. within same element)
+- efficiency improvements for repeated duplicate cursor relocation (i.e. optimise for reads by caching document structure)
