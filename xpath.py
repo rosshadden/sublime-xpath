@@ -76,3 +76,5 @@ class XpathCommand(sublime_plugin.TextCommand):
 class XpathListener(sublime_plugin.EventListener):
     def on_selection_modified_async(self, view):
         updateStatusIfSGML(view)
+    def on_activated_async(self, view):
+        updateStatusIfSGML(view)
