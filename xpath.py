@@ -34,7 +34,7 @@ def buildPath(view, selection):
 def isXML(view):
     currentSyntax = view.settings().get('syntax')
     XMLSyntax = 'Packages/XML/'
-    return currentSyntax[0:len(XMLSyntax)] == XMLSyntax
+    return currentSyntax.startswith(XMLSyntax)
 
 def updateStatusIfXML(view):
     if isXML(view):
