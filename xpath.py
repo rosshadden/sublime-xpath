@@ -5,6 +5,14 @@ import os
 changeCounters = {}
 XPaths = {}
 supportHTML = False
+settings = None
+
+def settingsChanged():
+    global changeCounters
+    global XPaths
+    changeCounters.clear()
+    XPaths.clear()
+    updateStatusIfSGML(sublime.active_window().active_view())
 
 def addPath(view, start, end, path):
     global XPaths
@@ -26,6 +34,13 @@ def buildPaths(view):
     tagRegions = view.find_by_selector('entity.name.tag.')
     position = 0
     
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    settings.clear_on_change('reparse')
+    settings.add_on_change('reparse', settingsChanged)
+    wanted_attributes = settings.get('attributes_to_include', [])
+    all_attributes = settings.get('show_all_attributes', "False") == "True"
+    
     for region in tagRegions:
         prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
         tagName = view.substr(region)
@@ -39,9 +54,40 @@ def buildPaths(view):
             
             position = tagScope.end()
             
+            attributes = []
+            if region.end() < tagScope.end():
+                attr_pos = region.end() + 1
+                attr_namespace = ''
+                attr_name = ''
+                while attr_pos < tagScope.end():
+                    scope_name = view.scope_name(attr_pos)
+                    scope_region = view.extract_scope(attr_pos)
+                    
+                    attr_pos = scope_region.end() + 1
+                    if 'entity.other.attribute-name' in scope_name:
+                        scope_text = view.substr(scope_region)
+                        if scope_text.endswith(':'):
+                            attr_namespace = scope_text#[0:-1]
+                            attr_pos -= 1
+                        elif scope_text.startswith(':'):
+                            attr_name = scope_text[1:]
+                        else:
+                            attr_name = scope_text
+                    elif 'string.quoted.' in scope_name:
+                        scope_text = view.substr(scope_region)
+                        if all_attributes or attr_name in wanted_attributes:
+                            attributes.append('@' + attr_namespace + attr_name + ' = ' + scope_text)
+                        attr_namespace = ''
+                        attr_name = ''
+            
+            if len(attributes) > 0:
+                attributes = '[' + ' and '.join(attributes) + ']'
+            else:
+                attributes = ''
+                
             levelCounters[len(levelCounters) - 1][tagName] = levelCounters[len(levelCounters) - 1].setdefault(tagName, firstIndexInXPath - 1) + 1
             level = levelCounters[len(levelCounters) - 1].get(tagName)
-            path.append(tagName + '[' + str(level) + ']')
+            path.append(tagName + '[' + str(level) + ']' + attributes)
             
             addPath(view, region.begin(), position, path)
             if selfEndingTag:
