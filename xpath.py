@@ -13,7 +13,8 @@ def buildPath(view, selection):
     tagRegions = view.find_by_selector('entity.name.tag.')
     selfEndingTag = False
     insideElement = False
-    prevStartTagOpenPos = -1
+    prevStartTagOpenPos = None
+    prevTagClosePos = None
     for region in tagRegions:
         if region.begin() > selection.end():
             break;
@@ -51,30 +52,34 @@ def buildPath(view, selection):
         insideElement = False
         levelCounters.pop() # technically not necessary because unused, but here for correctness
     
-    if insideElement:
-        xpathStart = prevStartTagOpenPos
-        if prevChar == '/':
-            xpathEnd = prevRegion.end()
+    if prevStartTagOpenPos is None:
+        xpathStart = 0
+        xpathEnd = 0
+    else:
+        if insideElement:
+            xpathStart = prevStartTagOpenPos
+            if prevChar == '/':
+                xpathEnd = prevRegion.end()
+            elif selfEndingTag:
+                xpathEnd = tagScope.end() - 1
+            else:
+                prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
+                if prevChar == '/':
+                    xpathEnd = region.end()
+                else:
+                    xpathEnd = region.begin() - 1
         elif selfEndingTag:
-            xpathEnd = tagScope.end() - 1
+            xpathStart = tagScope.end()
         else:
+            xpathStart = prevTagClosePos + 1
+        if not insideElement:
             prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
             if prevChar == '/':
                 xpathEnd = region.end()
-            else:
+            elif xpathStart > prevRegion.end():
                 xpathEnd = region.begin() - 1
-    elif selfEndingTag:
-        xpathStart = tagScope.end()
-    else:
-        xpathStart = prevTagClosePos + 1
-    if not insideElement:
-        prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
-        if prevChar == '/':
-            xpathEnd = region.end()
-        elif xpathStart > prevRegion.end():
-            xpathEnd = region.begin() - 1
-        else:
-            xpathEnd = prevRegion.end()
+            else:
+                xpathEnd = prevRegion.end()
     
     return [[xpathStart, xpathEnd], path]
 
