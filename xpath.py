@@ -2,127 +2,115 @@ import sublime
 import sublime_plugin
 import os
 
-changeCounter = None
-currentXPathRange = None
+changeCounters = {}
+XPaths = {}
+supportHTML = False
 
-def buildPath(view, selection):
+def addPath(view, start, end, path):
+    global XPaths
+    XPaths[view.id()].append([sublime.Region(start, end), '/'.join(path)])
+
+def clearPaths(view):
+    global XPaths
+    XPaths.pop(view.id(), None)
+
+def buildPaths(view):
+    clearPaths(view)
+    global XPaths
+    XPaths[view.id()] = []
+    
     path = ['']
     levelCounters = [{}]
     firstIndexInXPath = 1
     
     tagRegions = view.find_by_selector('entity.name.tag.')
-    selfEndingTag = False
-    insideElement = False
-    prevStartTagOpenPos = None
-    prevTagClosePos = None
+    position = 0
+    
     for region in tagRegions:
-        if region.begin() > selection.end():
-            break;
-        
         prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
         tagName = view.substr(region)
         
-        if selfEndingTag:
-            path.pop()
-            levelCounters.pop()
         if prevChar == '<':
+            addPath(view, position, region.begin(), path)
+            
             # check last char before end of tag, to see if it is self closing or not...
             tagScope = view.extract_scope(region.end())
             selfEndingTag = view.substr(tagScope)[-2] == '/'
             
+            position = tagScope.end()
+            
             levelCounters[len(levelCounters) - 1][tagName] = levelCounters[len(levelCounters) - 1].setdefault(tagName, firstIndexInXPath - 1) + 1
             level = levelCounters[len(levelCounters) - 1].get(tagName)
             path.append(tagName + '[' + str(level) + ']')
-            levelCounters.append({})
             
-            insideElement = True
-            prevStartTagOpenPos = region.begin()
-            prevTagClosePos = tagScope.end()
-        elif prevChar == '/':
-            if selection.end() > region.end():
+            addPath(view, region.begin(), position, path)
+            if selfEndingTag:
                 path.pop()
-                levelCounters.pop()
-                insideElement = False
-                prevTagClosePos = region.end()
-            selfEndingTag = False
-        prevRegion = region
-    
-    if selfEndingTag and tagScope.end() <= selection.begin():
-        path.pop()
-        insideElement = False
-        levelCounters.pop() # technically not necessary because unused, but here for correctness
-    
-    if prevStartTagOpenPos is None:
-        xpathStart = 0
-        xpathEnd = 0
-    else:
-        if insideElement:
-            xpathStart = prevStartTagOpenPos
-            if prevChar == '/':
-                xpathEnd = prevRegion.end()
-            elif selfEndingTag:
-                xpathEnd = tagScope.end() - 1
             else:
-                prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
-                if prevChar == '/':
-                    xpathEnd = region.end()
-                else:
-                    xpathEnd = region.begin() - 1
-        elif selfEndingTag:
-            xpathStart = tagScope.end()
-        else:
-            xpathStart = prevTagClosePos + 1
-        if not insideElement:
-            prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
-            if prevChar == '/':
-                xpathEnd = region.end()
-            elif xpathStart > prevRegion.end():
-                xpathEnd = region.begin() - 1
-            else:
-                xpathEnd = prevRegion.end()
-    
-    return [[xpathStart, xpathEnd], path]
+                levelCounters.append({})
+        elif prevChar == '/':
+            addPath(view, position, region.end() + 1, path)
+            path.pop()
+            levelCounters.pop()
+            position = region.end() + 1
+        
+    addPath(view, position, view.size(), path)
+
+def getXPathAtPositions(view, positions):
+    global XPaths
+    count = len(positions)
+    current = 0
+    matches = []
+    for path in XPaths[view.id()]:
+        if path[0].intersects(positions[current]) or path[0].begin() == positions[current].begin():
+            matches.append(path[1])
+            current += 1
+            if current == count:
+                break
+    return matches
 
 def isSGML(view):
     currentSyntax = view.settings().get('syntax')
     if currentSyntax is not None:
         XMLSyntax = 'Packages/XML/'
         HTMLSyntax = 'Packages/HTML/'
-        return currentSyntax.startswith(XMLSyntax) or currentSyntax.startswith(HTMLSyntax)
+        global supportHTML
+        return currentSyntax.startswith(XMLSyntax) or (supportHTML and currentSyntax.startswith(HTMLSyntax))
     else:
-        return false
+        return False
 
 def updateStatusIfSGML(view):
     if isSGML(view):
         updateStatus(view)
 
 def updateStatus(view):
-    sel = view.sel()[0]
     newCount = view.change_count()
-    global changeCounter
-    global currentXPathRange
-    if changeCounter is None or newCount > changeCounter or (sel.begin() < currentXPathRange[0] or sel.end() > currentXPathRange[1]):
-        changeCounter = newCount
+    oldCount = changeCounters.get(view.id(), None)
+    global changeCounters
+    if oldCount is None or newCount > oldCount:
+        changeCounters[view.id()] = newCount
         view.set_status('xpath', 'XPath being calculated...')
-        path = buildPath(view, sel)
-        response = '/'.join(path[1])
-        view.set_status('xpath', 'XPath: ' + response)
-        currentXPathRange = path[0]
+        buildPaths(view)
+    
+    response = getXPathAtPositions(view, [view.sel()[0]])
+    showPath = ''
+    if len(response) == 1:
+        showPath = response[0]
+    view.set_status('xpath', 'XPath: ' + showPath)
 
 class XpathCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         view = self.view
 
         if isSGML(view):
-            view.set_status('xpath', 'XPath(s) being calculated...')
-            xpaths = []
-            for selection in view.sel():
-                path = buildPath(view, selection)
-                xpaths.append('/'.join(path[1]))
-            sublime.set_clipboard(os.linesep.join(xpaths))
+            sublime.set_clipboard(os.linesep.join(getXPathAtPositions(view, view.sel())))
             sublime.status_message('xpath(s) copied to clipboard')
         else:
-            sublime.status_message('xpath not copied to clipboard - ensure syntax is set to xml or html')
+            global supportHTML
+            message = 'xpath not copied to clipboard - ensure syntax is set to xml'
+            if supportHTML:
+                message += ' or html'
+            sublime.status_message(message)
 
 
 class XpathListener(sublime_plugin.EventListener):
@@ -130,3 +118,5 @@ class XpathListener(sublime_plugin.EventListener):
         updateStatusIfSGML(view)
     def on_activated_async(self, view):
         updateStatusIfSGML(view)
+    def on_pre_close(self, view):
+        clearPaths(view)
