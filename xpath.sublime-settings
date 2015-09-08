@@ -1,7 +1,8 @@
 {
 	"attributes_to_include":
 	[
-		"id"
+		"id",
+		"xmlns", "xmlns:*"
 	],
 	"show_all_attributes": "False"
 }
