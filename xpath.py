@@ -75,7 +75,7 @@ def buildPaths(view):
                             attr_name = scope_text
                     elif 'string.quoted.' in scope_name:
                         scope_text = view.substr(scope_region)
-                        if all_attributes or attr_name in wanted_attributes:
+                        if all_attributes or attr_namespace + attr_name in wanted_attributes or '*:' + attr_name in wanted_attributes or attr_namespace + '*' in wanted_attributes:
                             attributes.append('@' + attr_namespace + attr_name + ' = ' + scope_text)
                         attr_namespace = ''
                         attr_name = ''
