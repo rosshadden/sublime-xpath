@@ -130,9 +130,9 @@ def updateStatusIfSGML(view):
         updateStatus(view)
 
 def updateStatus(view):
+    global changeCounters
     newCount = view.change_count()
     oldCount = changeCounters.get(view.id(), None)
-    global changeCounters
     if oldCount is None or newCount > oldCount:
         changeCounters[view.id()] = newCount
         view.set_status('xpath', 'XPath being calculated...')
