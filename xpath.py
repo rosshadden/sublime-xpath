@@ -87,10 +87,11 @@ def buildPathsForView(view):
                 attributes = '[' + ' and '.join(attributes) + ']'
             else:
                 attributes = ''
-                
-            levelCounters[len(levelCounters) - 1][tagName] = levelCounters[len(levelCounters) - 1].setdefault(tagName, firstIndexInXPath - 1) + 1
-            level = levelCounters[len(levelCounters) - 1].get(tagName)
-            path.append(tagName + '[' + str(level) + ']' + attributes)
+            
+            level = len(levelCounters) - 1
+            levelCounters[level][tagName] = levelCounters[level].setdefault(tagName, firstIndexInXPath - 1) + 1
+            tagIndexAtCurrentLevel = levelCounters[level].get(tagName)
+            path.append(tagName + '[' + str(tagIndexAtCurrentLevel) + ']' + attributes)
             
             addPath(view, region.begin(), position, path)
             if selfEndingTag:
