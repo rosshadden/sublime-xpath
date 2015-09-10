@@ -43,6 +43,10 @@ def buildPathsForView(view):
     settings.add_on_change('reparse', settingsChanged)
     wanted_attributes = settings.get('attributes_to_include', [])
     all_attributes = settings.get('show_all_attributes', "False") == "True"
+    case_sensitive = settings.get('case_sensitive', "True") == "True"
+    
+    if not case_sensitive:
+        wanted_attributes = [element.lower() for element in wanted_attributes]
     
     for region in tagRegions:
         prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
@@ -77,7 +81,10 @@ def buildPathsForView(view):
                         attr_name = scope_text
                 elif 'string.quoted.' in scope_name:
                     scope_text = view.substr(scope_region)
-                    if all_attributes or attr_namespace + attr_name in wanted_attributes or '*:' + attr_name in wanted_attributes or attr_namespace + '*' in wanted_attributes:
+                    if (all_attributes or
+                        (    case_sensitive and (attr_namespace         + attr_name         in wanted_attributes or '*:' + attr_name         in wanted_attributes or attr_namespace         + '*' in wanted_attributes)) or
+                        (not case_sensitive and (attr_namespace.lower() + attr_name.lower() in wanted_attributes or '*:' + attr_name.lower() in wanted_attributes or attr_namespace.lower() + '*' in wanted_attributes))
+                    ):
                         attributes.append('@' + attr_namespace + attr_name + ' = ' + scope_text)
                     attr_namespace = ''
                     attr_name = ''
@@ -88,8 +95,11 @@ def buildPathsForView(view):
                 attributes = ''
             
             level = len(levelCounters) - 1
-            levelCounters[level][tagName] = levelCounters[level].setdefault(tagName, firstIndexInXPath - 1) + 1
-            tagIndexAtCurrentLevel = levelCounters[level].get(tagName)
+            checkTag = tagName
+            if not case_sensitive:
+                checkTag = checkTag.lower()
+            levelCounters[level][checkTag] = levelCounters[level].setdefault(checkTag, firstIndexInXPath - 1) + 1
+            tagIndexAtCurrentLevel = levelCounters[level].get(checkTag)
             path.append(tagName + '[' + str(tagIndexAtCurrentLevel) + ']' + attributes)
             
             addPath(view, region.begin(), position, path)
