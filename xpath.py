@@ -106,7 +106,7 @@ def buildPathsForView(view):
     addPath(view, position, view.size(), path)
 
 def getXPathAtPositions(view, positions):
-    """Given an array of regions, return the xpath strings that relate to each region."""
+    """Given a sorted array of regions, return the xpath strings that relate to each region."""
     global XPaths
     count = len(positions)
     current = 0
