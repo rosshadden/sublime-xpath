@@ -8,6 +8,7 @@ supportHTML = False
 settings = None
 
 def settingsChanged():
+    """Clear change counters and cached xpath regions for all views, and recalculate xpath regions for the current view."""
     global changeCounters
     global XPaths
     changeCounters.clear()
@@ -18,12 +19,14 @@ def addPath(view, start, end, path):
     global XPaths
     XPaths[view.id()].append([sublime.Region(start, end), '/'.join(path)])
 
-def clearPaths(view):
+def clearPathsForView(view):
+    """Clear all cached xpaths for the specified view."""
     global XPaths
     XPaths.pop(view.id(), None)
 
-def buildPaths(view):
-    clearPaths(view)
+def buildPathsForView(view):
+    """Clear and recreate a cache of all xpaths for the XML in the specified view."""
+    clearPathsForView(view)
     global XPaths
     XPaths[view.id()] = []
     
@@ -103,6 +106,7 @@ def buildPaths(view):
     addPath(view, position, view.size(), path)
 
 def getXPathAtPositions(view, positions):
+    """Given an array of regions, return the xpath strings that relate to each region."""
     global XPaths
     count = len(positions)
     current = 0
@@ -116,6 +120,7 @@ def getXPathAtPositions(view, positions):
     return matches
 
 def isSGML(view):
+    """Return True if the view's syntax is XML or HTML."""
     currentSyntax = view.settings().get('syntax')
     if currentSyntax is not None:
         XMLSyntax = 'Packages/XML/'
@@ -126,17 +131,19 @@ def isSGML(view):
         return False
 
 def updateStatusIfSGML(view):
+    """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
     if isSGML(view):
         updateStatus(view)
 
 def updateStatus(view):
+    """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
     global changeCounters
     newCount = view.change_count()
     oldCount = changeCounters.get(view.id(), None)
     if oldCount is None or newCount > oldCount:
         changeCounters[view.id()] = newCount
         view.set_status('xpath', 'XPath being calculated...')
-        buildPaths(view)
+        buildPathsForView(view)
     
     response = getXPathAtPositions(view, [view.sel()[0]])
     showPath = ''
