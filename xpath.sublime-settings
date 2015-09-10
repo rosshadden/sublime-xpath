@@ -4,5 +4,6 @@
 		"id",
 		"xmlns", "xmlns:*"
 	],
-	"show_all_attributes": "False"
+	"show_all_attributes": "False",
+	"case_sensitive": "True"
 }
