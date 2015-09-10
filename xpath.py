@@ -163,6 +163,7 @@ def updateStatus(view):
 
 class XpathCommand(sublime_plugin.TextCommand):
     def run(self, edit):
+        """Copy XPath(s) at cursor(s) to clipboard."""
         view = self.view
 
         if isSGML(view):
@@ -174,6 +175,10 @@ class XpathCommand(sublime_plugin.TextCommand):
             if supportHTML:
                 message += ' or html'
             sublime.status_message(message)
+    def is_enabled(self):
+        return isSGML(self.view)
+    def is_visible(self):
+        return isSGML(self.view)
 
 
 class XpathListener(sublime_plugin.EventListener):
