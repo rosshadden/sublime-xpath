@@ -182,4 +182,4 @@ class XpathListener(sublime_plugin.EventListener):
     def on_activated_async(self, view):
         updateStatusIfSGML(view)
     def on_pre_close(self, view):
-        clearPaths(view)
+        clearPathsForView(view)
