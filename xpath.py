@@ -4,7 +4,7 @@ import os
 
 changeCounters = {}
 XPaths = {}
-supportHTML = False
+supportHTML = True
 settings = None
 
 def settingsChanged():
@@ -52,36 +52,35 @@ def buildPathsForView(view):
             addPath(view, position, region.begin(), path)
             
             # check last char before end of tag, to see if it is self closing or not...
-            tagScope = view.extract_scope(region.end())
-            selfEndingTag = view.substr(tagScope)[-2] == '/'
+            tagScope = view.find('>', region.end(), sublime.LITERAL).end()
+            selfEndingTag = view.substr(tagScope - 2) == '/'
             
-            position = tagScope.end()
+            position = tagScope
             
             attributes = []
-            if region.end() < tagScope.end():
-                attr_pos = region.end() + 1
-                attr_namespace = ''
-                attr_name = ''
-                while attr_pos < tagScope.end():
-                    scope_name = view.scope_name(attr_pos)
-                    scope_region = view.extract_scope(attr_pos)
-                    
-                    attr_pos = scope_region.end() + 1
-                    if 'entity.other.attribute-name' in scope_name:
-                        scope_text = view.substr(scope_region)
-                        if scope_text.endswith(':'):
-                            attr_namespace = scope_text#[0:-1]
-                            attr_pos -= 1
-                        elif scope_text.startswith(':'):
-                            attr_name = scope_text[1:]
-                        else:
-                            attr_name = scope_text
-                    elif 'string.quoted.' in scope_name:
-                        scope_text = view.substr(scope_region)
-                        if all_attributes or attr_namespace + attr_name in wanted_attributes or '*:' + attr_name in wanted_attributes or attr_namespace + '*' in wanted_attributes:
-                            attributes.append('@' + attr_namespace + attr_name + ' = ' + scope_text)
-                        attr_namespace = ''
-                        attr_name = ''
+            attr_pos = region.end() + 1
+            attr_namespace = ''
+            attr_name = ''
+            while attr_pos < tagScope:
+                scope_name = view.scope_name(attr_pos)
+                scope_region = view.extract_scope(attr_pos)
+                
+                attr_pos = scope_region.end() + 1
+                if 'entity.other.attribute-name' in scope_name:
+                    scope_text = view.substr(scope_region)
+                    if scope_text.endswith(':'):
+                        attr_namespace = scope_text#[0:-1]
+                        attr_pos -= 1
+                    elif scope_text.startswith(':'):
+                        attr_name = scope_text[1:]
+                    else:
+                        attr_name = scope_text
+                elif 'string.quoted.' in scope_name:
+                    scope_text = view.substr(scope_region)
+                    if all_attributes or attr_namespace + attr_name in wanted_attributes or '*:' + attr_name in wanted_attributes or attr_namespace + '*' in wanted_attributes:
+                        attributes.append('@' + attr_namespace + attr_name + ' = ' + scope_text)
+                    attr_namespace = ''
+                    attr_name = ''
             
             if len(attributes) > 0:
                 attributes = '[' + ' and '.join(attributes) + ']'
