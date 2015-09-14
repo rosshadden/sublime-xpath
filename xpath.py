@@ -1,6 +1,7 @@
 import sublime
 import sublime_plugin
 import os
+from itertools import takewhile
 
 changeCounters = {}
 XPaths = {}
@@ -17,7 +18,7 @@ def settingsChanged():
 
 def addPath(view, start, end, path):
     global XPaths
-    XPaths[view.id()].append([sublime.Region(start, end), '/'.join(path)])
+    XPaths[view.id()].append([sublime.Region(start, end), path[:]])
 
 def clearPathsForView(view):
     """Clear all cached xpaths for the specified view."""
@@ -115,18 +116,34 @@ def buildPathsForView(view):
         
     addPath(view, position, view.size(), path)
 
-def getXPathAtPositions(view, positions):
-    """Given a sorted array of regions, return the xpath strings that relate to each region."""
+def getXPathIndexesAtPositions(view, positions):
+    """Given a sorted array of regions, return the indexes of the xpath strings that relate to each region."""
     global XPaths
     count = len(positions)
     current = 0
     matches = []
-    for path in XPaths[view.id()]:
+    for index, path in enumerate(XPaths[view.id()]):
         if path[0].intersects(positions[current]) or path[0].begin() == positions[current].begin():
-            matches.append(path[1])
+            matches.append(index)
             current += 1
             if current == count:
                 break
+    return matches
+
+def getXPathAtPositions(view, positions):
+    """Given a sorted array of regions, return the xpath nodes that relate to each region."""
+    global XPaths
+    matches = []
+    for index in getXPathIndexesAtPositions(view, positions):
+        matches.append(XPaths[view.id()][index][1])
+    return matches
+
+def getXPathStringAtPositions(view, positions):
+    """Given a sorted array of regions, return the xpath strings that relate to each region."""
+    global XPaths
+    matches = []
+    for match in getXPathAtPositions(view, positions):
+        matches.append('/'.join(match))
     return matches
 
 def isSGML(view):
@@ -142,7 +159,7 @@ def isSGML(view):
 
 def updateStatusIfSGML(view):
     """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
-    if isSGML(view):
+    if isSGML(view) and len(view.sel()) > 0:
         updateStatus(view)
 
 def updateStatus(view):
@@ -155,7 +172,7 @@ def updateStatus(view):
         view.set_status('xpath', 'XPath being calculated...')
         buildPathsForView(view)
     
-    response = getXPathAtPositions(view, [view.sel()[0]])
+    response = getXPathStringAtPositions(view, [view.sel()[0]])
     showPath = ''
     if len(response) == 1:
         showPath = response[0]
@@ -167,7 +184,7 @@ class XpathCommand(sublime_plugin.TextCommand):
         view = self.view
 
         if isSGML(view):
-            sublime.set_clipboard(os.linesep.join(getXPathAtPositions(view, view.sel())))
+            sublime.set_clipboard(os.linesep.join(getXPathStringAtPositions(view, view.sel())))
             sublime.status_message('xpath(s) copied to clipboard')
         else:
             global supportHTML
@@ -175,6 +192,61 @@ class XpathCommand(sublime_plugin.TextCommand):
             if supportHTML:
                 message += ' or html'
             sublime.status_message(message)
+    def is_enabled(self):
+        return isSGML(self.view)
+    def is_visible(self):
+        return isSGML(self.view)
+
+class GotoRelativeCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args): #sublime.active_window().active_view().run_command('goto_relative', {'event': {'y': 351.5, 'x': 364.5}, 'direction': 'prev'})
+        """Move cursor to specified sibling element."""
+        view = self.view
+        
+        global XPaths
+        
+        position = view.sel()[0]
+        currentPos = getXPathIndexesAtPositions(view, [position])[0]
+        currentPath = XPaths[view.id()][currentPos][1]
+        parentPath = '/'.join(currentPath[0:-1])
+        currentPath = '/'.join(currentPath)
+        
+        if args['direction'] == 'next':
+            search = XPaths[view.id()][currentPos + 1:] # search from current position down to the end of the document
+        else: # prev or parent
+            search = XPaths[view.id()][0:currentPos - 1] # search from current position up to the top of the document
+            search = search[::-1]
+        
+        foundPaths = takewhile(lambda p: '/'.join(p[1]).startswith(parentPath), search)
+        if args['direction'] == 'parent':
+            foundPaths = list(foundPaths)
+            if len(foundPaths) > 0:
+                foundPath = foundPaths[-1] # the last node (in reverse order, remember...) to have the same parent
+            else:
+                foundPath = None
+        elif args['direction'] == 'next':
+            foundPath = next((p for p in foundPaths if '/'.join(p[1]) != parentPath and not '/'.join(p[1]).startswith(currentPath)), None) # not the parent node and not a descendant of the current node
+        elif args['direction'] == 'prev':
+            foundPath = None
+            for path in foundPaths:
+                p = '/'.join(path[1])
+                if not p.startswith(parentPath + '/'): # if it isn't a descendant of the parent, ignore it
+                    pass
+                elif foundPath is not None:
+                    if p == '/'.join(foundPath[1]): # if it is the same sibling we have already found
+                        foundPath = path
+                    else:
+                        break
+                elif not p.startswith(currentPath):
+                    foundPath = path
+        
+        if foundPath is None:
+            sublime.status_message(args['direction'] + ' node not found')
+        else:
+            view.sel().clear()
+            view.sel().add(sublime.Region(foundPath[0].begin(), foundPath[0].end() - 1))
+            view.show(foundPath[0])
+    #def want_event(self):
+    #    return True
     def is_enabled(self):
         return isSGML(self.view)
     def is_visible(self):
