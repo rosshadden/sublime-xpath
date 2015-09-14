@@ -161,6 +161,8 @@ def updateStatusIfSGML(view):
     """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
     if isSGML(view) and len(view.sel()) > 0:
         updateStatus(view)
+    else:
+        view.erase_status('xpath')
 
 def updateStatus(view):
     """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
@@ -173,10 +175,14 @@ def updateStatus(view):
         buildPathsForView(view)
     
     response = getXPathStringAtPositions(view, [view.sel()[0]])
-    showPath = ''
-    if len(response) == 1:
+    if len(response) == 1 and len(response[0]) > 0:
         showPath = response[0]
-    view.set_status('xpath', 'XPath: ' + showPath)
+        intro = 'XPath'
+        if len(view.sel()) > 1:
+            intro = intro + ' (at first selection)'
+        view.set_status('xpath', intro + ': ' + showPath)
+    else:
+        view.erase_status('xpath')
 
 class XpathCommand(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -199,7 +205,7 @@ class XpathCommand(sublime_plugin.TextCommand):
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args): #sublime.active_window().active_view().run_command('goto_relative', {'event': {'y': 351.5, 'x': 364.5}, 'direction': 'prev'})
-        """Move cursor to specified sibling element."""
+        """Move cursor(s) to specified sibling element(s)."""
         view = self.view
         
         foundPaths = []
@@ -218,14 +224,15 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             view.sel().clear()
             for foundPath in foundPaths:
                 view.sel().add(foundPath)
-            view.show(foundPaths[0])
+            view.show(foundPaths[0]) # scroll to first selection if not already visible
     
-    def find_node(self, selection, direction):
+    def find_node(self, relative_to, direction):
+        """Find specified sibling element."""
         view = self.view
         
         global XPaths
         
-        currentPos = getXPathIndexesAtPositions(view, [selection])[0]
+        currentPos = getXPathIndexesAtPositions(view, [relative_to])[0]
         currentPath = XPaths[view.id()][currentPos][1]
         parentPath = '/'.join(currentPath[0:-1])
         currentPath = '/'.join(currentPath)
