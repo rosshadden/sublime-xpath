@@ -202,30 +202,50 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         """Move cursor to specified sibling element."""
         view = self.view
         
+        foundPaths = []
+        allFound = True
+        for selection in view.sel():
+            foundPath = self.find_node(selection, args['direction'])
+            if foundPath is not None:
+                foundPaths.append(foundPath)
+            else:
+                allFound = False
+                break
+        
+        if not allFound:
+            sublime.status_message(args['direction'] + ' node not found')
+        else:
+            view.sel().clear()
+            for foundPath in foundPaths:
+                view.sel().add(foundPath)
+            view.show(foundPaths[0])
+    
+    def find_node(self, selection, direction):
+        view = self.view
+        
         global XPaths
         
-        position = view.sel()[0]
-        currentPos = getXPathIndexesAtPositions(view, [position])[0]
+        currentPos = getXPathIndexesAtPositions(view, [selection])[0]
         currentPath = XPaths[view.id()][currentPos][1]
         parentPath = '/'.join(currentPath[0:-1])
         currentPath = '/'.join(currentPath)
         
-        if args['direction'] == 'next':
+        if direction == 'next':
             search = XPaths[view.id()][currentPos + 1:] # search from current position down to the end of the document
         else: # prev or parent
             search = XPaths[view.id()][0:currentPos - 1] # search from current position up to the top of the document
             search = search[::-1]
         
         foundPaths = takewhile(lambda p: '/'.join(p[1]).startswith(parentPath), search)
-        if args['direction'] == 'parent':
+        if direction == 'parent':
             foundPaths = list(foundPaths)
             if len(foundPaths) > 0:
                 foundPath = foundPaths[-1] # the last node (in reverse order, remember...) to have the same parent
             else:
                 foundPath = None
-        elif args['direction'] == 'next':
+        elif direction == 'next':
             foundPath = next((p for p in foundPaths if '/'.join(p[1]) != parentPath and not '/'.join(p[1]).startswith(currentPath)), None) # not the parent node and not a descendant of the current node
-        elif args['direction'] == 'prev':
+        elif direction == 'prev':
             foundPath = None
             wantedPath = None
             for path in foundPaths:
@@ -242,11 +262,10 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                     wantedPath = '/'.join(foundPath[1])
         
         if foundPath is None:
-            sublime.status_message(args['direction'] + ' node not found')
+            return None
         else:
-            view.sel().clear()
-            view.sel().add(sublime.Region(foundPath[0].begin(), foundPath[0].end() - 1))
-            view.show(foundPath[0])
+            return sublime.Region(foundPath[0].begin(), foundPath[0].end() - 1)
+    
     #def want_event(self):
     #    return True
     def is_enabled(self):
