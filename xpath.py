@@ -227,17 +227,19 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             foundPath = next((p for p in foundPaths if '/'.join(p[1]) != parentPath and not '/'.join(p[1]).startswith(currentPath)), None) # not the parent node and not a descendant of the current node
         elif args['direction'] == 'prev':
             foundPath = None
+            wantedPath = None
             for path in foundPaths:
                 p = '/'.join(path[1])
                 if not p.startswith(parentPath + '/'): # if it isn't a descendant of the parent, ignore it
                     pass
-                elif foundPath is not None:
-                    if p == '/'.join(foundPath[1]): # if it is the same sibling we have already found
+                elif wantedPath is not None:
+                    if p == wantedPath: # if it is the same sibling we have already found
                         foundPath = path
-                    else:
+                    elif not p.startswith(wantedPath):
                         break
                 elif not p.startswith(currentPath):
                     foundPath = path
+                    wantedPath = '/'.join(foundPath[1])
         
         if foundPath is None:
             sublime.status_message(args['direction'] + ' node not found')
