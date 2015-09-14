@@ -109,7 +109,8 @@ def buildPathsForView(view):
             else:
                 levelCounters.append({})
         elif prevChar == '/':
-            addPath(view, position, region.end() + 1, path)
+            addPath(view, position, region.begin(), path)
+            addPath(view, region.begin(), region.end() + 1, path)
             path.pop()
             levelCounters.pop()
             position = region.end() + 1
@@ -237,20 +238,14 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         parentPath = '/'.join(currentPath[0:-1])
         currentPath = '/'.join(currentPath)
         
-        if direction == 'next':
-            search = XPaths[view.id()][currentPos + 1:] # search from current position down to the end of the document
-        else: # prev or parent
-            search = XPaths[view.id()][0:currentPos - 1] # search from current position up to the top of the document
+        if direction in ('next', 'close'):
+            search = XPaths[view.id()][currentPos:] # search from current position down to the end of the document
+        else: # prev, parent or open
+            search = XPaths[view.id()][0:currentPos + 1] # search from current position up to the top of the document
             search = search[::-1]
         
         foundPaths = takewhile(lambda p: '/'.join(p[1]).startswith(parentPath), search)
-        if direction == 'parent':
-            foundPaths = list(foundPaths)
-            if len(foundPaths) > 0:
-                foundPath = foundPaths[-1] # the last node (in reverse order, remember...) to have the same parent
-            else:
-                foundPath = None
-        elif direction == 'next':
+        if direction == 'next':
             foundPath = next((p for p in foundPaths if '/'.join(p[1]) != parentPath and not '/'.join(p[1]).startswith(currentPath)), None) # not the parent node and not a descendant of the current node
         elif direction == 'prev':
             foundPath = None
@@ -267,6 +262,16 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                 elif not p.startswith(currentPath):
                     foundPath = path
                     wantedPath = '/'.join(foundPath[1])
+        elif direction in ('open', 'close', 'parent'):
+            if direction == 'parent':
+                wantedPath = parentPath
+            else:
+                wantedPath = currentPath
+            foundPaths = list(p for p in foundPaths if '/'.join(p[1]) == wantedPath)
+            if len(foundPaths) > 0:
+                foundPath = foundPaths[-1] # the last node (open and parent are in reverse order, remember...)
+            else:
+                foundPath = None
         
         if foundPath is None:
             return None
