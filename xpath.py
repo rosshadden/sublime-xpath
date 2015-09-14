@@ -42,8 +42,8 @@ def buildPathsForView(view):
     settings.clear_on_change('reparse')
     settings.add_on_change('reparse', settingsChanged)
     wanted_attributes = settings.get('attributes_to_include', [])
-    all_attributes = settings.get('show_all_attributes', "False") == "True"
-    case_sensitive = settings.get('case_sensitive', "True") == "True"
+    all_attributes = bool(settings.get('show_all_attributes', False))
+    case_sensitive = bool(settings.get('case_sensitive', True))
     
     if not case_sensitive:
         wanted_attributes = [element.lower() for element in wanted_attributes]
