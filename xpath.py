@@ -202,9 +202,7 @@ class XpathCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
         return isSGML(self.view)
     def is_visible(self):
-        global settings
-        settings = sublime.load_settings('xpath.sublime-settings')
-        return isSGML(self.view) and bool(settings.get('show_copy_xpath', True))
+        return isSGML(self.view)
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args): #sublime.active_window().active_view().run_command('goto_relative', {'event': {'y': 351.5, 'x': 364.5}, 'direction': 'prev'})
@@ -285,9 +283,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
         return isSGML(self.view)
     def is_visible(self):
-        global settings
-        settings = sublime.load_settings('xpath.sublime-settings')
-        return isSGML(self.view) and bool(settings.get('show_goto_relative', True))
+        return isSGML(self.view)
     def description(self, args):
         if args['direction'] in ('open', 'close'):
             descr = 'tag'
