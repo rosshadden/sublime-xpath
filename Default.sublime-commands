@@ -2,5 +2,20 @@
 	{
 		"caption": "XPath: Copy path to clipboard",
 		"command": "xpath"
+	}, {
+		"caption": "XPath: Goto Previous Sibling",
+		"command": "goto_relative", "args": { "direction": "prev" }
+	}, {
+		"caption": "XPath: Goto Next Sibling",
+		"command": "goto_relative", "args": { "direction": "next" }
+	}, {
+		"caption": "XPath: Goto Parent Open Tag",
+		"command": "goto_relative", "args": { "direction": "parent" }
+	}, {
+		"caption": "XPath: Goto Open Tag",
+		"command": "goto_relative", "args": { "direction": "open" }
+	}, {
+		"caption": "XPath: Goto Close Tag",
+		"command": "goto_relative", "args": { "direction": "close" }
 	}
 ]
