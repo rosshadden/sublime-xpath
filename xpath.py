@@ -202,11 +202,13 @@ class XpathCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
         return isSGML(self.view)
     def is_visible(self):
-        return isSGML(self.view)
+        global settings
+        settings = sublime.load_settings('xpath.sublime-settings')
+        return isSGML(self.view) and bool(settings.get('show_copy_xpath', True))
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args): #sublime.active_window().active_view().run_command('goto_relative', {'event': {'y': 351.5, 'x': 364.5}, 'direction': 'prev'})
-        """Move cursor(s) to specified sibling element(s)."""
+        """Move cursor(s) to specified relative tag(s)."""
         view = self.view
         
         foundPaths = []
@@ -228,7 +230,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             view.show(foundPaths[0]) # scroll to first selection if not already visible
     
     def find_node(self, relative_to, direction):
-        """Find specified sibling element."""
+        """Find specified relative tag."""
         view = self.view
         
         global XPaths
