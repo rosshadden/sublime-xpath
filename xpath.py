@@ -283,7 +283,20 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
         return isSGML(self.view)
     def is_visible(self):
-        return isSGML(self.view)
+        global settings
+        settings = sublime.load_settings('xpath.sublime-settings')
+        return isSGML(self.view) and bool(settings.get('show_goto_relative', True))
+    def description(self, args):
+        if args['direction'] in ('open', 'close'):
+            descr = 'tag'
+        elif args['direction'] in ('prev', 'next'):
+            descr = 'sibling'
+        elif args['direction'] in ('parent'):
+            descr = 'element'
+        else:
+            return None
+        
+        return 'Goto ' + args['direction'] + ' ' + descr
 
 
 class XpathListener(sublime_plugin.EventListener):
