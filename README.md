@@ -3,6 +3,7 @@ Sublime Text 3 - XPath Plugin
 
 - Copy XPath at cursor(s) to clipboard.
 - Updates status bar text to XPath of current line.
+- Jump selection to relative tag - previous or next sibling, parent, open or close tag
 
 Settings:
 
