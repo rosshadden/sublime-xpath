@@ -5,5 +5,6 @@
 		"xmlns", "xmlns:*"
 	],
 	"show_all_attributes": false,
-	"case_sensitive": true
+	"case_sensitive": true,
+	"show_goto_relative": true
 }
