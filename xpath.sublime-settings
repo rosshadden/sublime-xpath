@@ -1,9 +1,17 @@
 {
+	// specific attributes (or namespaces) to include in the xpath
+	// can use * as a wildcard, for example "xmlns:*" will show all attributes with an "xmlns" namespace, "*:id" will show all "id" attributes in any namespace
 	"attributes_to_include":
 	[
 		"id",
 		"xmlns", "xmlns:*"
 	],
+	// ignore the above and include all the attributes in the xpath
 	"show_all_attributes": false,
-	"case_sensitive": true
+	// whether tags and attributes should be treated as case sensitive for index purposes
+	"case_sensitive": true,
+	// show only the hierarchy (without indexes and attributes) in the status bar
+	"show_hierarchy_only": false,
+	// only copy unique xpaths when there are multiple selections
+	"copy_unique_path_only": true
 }

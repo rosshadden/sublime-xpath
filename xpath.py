@@ -139,12 +139,21 @@ def getXPathAtPositions(view, positions):
         matches.append(XPaths[view.id()][index][1])
     return matches
 
-def getXPathStringAtPositions(view, positions):
+def getXPathStringAtPositions(view, positions, hierarchyOnly):
     """Given a sorted array of regions, return the xpath strings that relate to each region."""
     global XPaths
     matches = []
     for match in getXPathAtPositions(view, positions):
-        matches.append('/'.join(match))
+        if hierarchyOnly:
+            hierarchy = []
+            for part in match:
+                pos = part.find('[')
+                if pos > -1:
+                    part = part[0:pos]
+                hierarchy.append(part)
+            matches.append('/'.join(hierarchy))
+        else:
+            matches.append('/'.join(match))
     return matches
 
 def isSGML(view):
@@ -175,7 +184,7 @@ def updateStatus(view):
         view.set_status('xpath', 'XPath being calculated...')
         buildPathsForView(view)
     
-    response = getXPathStringAtPositions(view, [view.sel()[0]])
+    response = getXPathStringAtPositions(view, [view.sel()[0]], getShowHierarchyOnlySetting())
     if len(response) == 1 and len(response[0]) > 0:
         showPath = response[0]
         intro = 'XPath'
@@ -185,20 +194,49 @@ def updateStatus(view):
     else:
         view.erase_status('xpath')
 
+def getShowHierarchyOnlySetting():
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    return bool(settings.get('show_hierarchy_only', False))
+
+def getCopyUniqueOnlySetting():
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    return bool(settings.get('copy_unique_path_only', True))
+
+def copyXPathsToClipboard(view, hierarchyOnly, unique):
+    if isSGML(view):
+        paths = getXPathStringAtPositions(view, view.sel(), hierarchyOnly)
+        if unique:
+            unique = []
+            for path in paths:
+                if path not in unique:
+                    unique.append(path)
+            paths = unique
+        sublime.set_clipboard(os.linesep.join(paths))
+        sublime.status_message('xpath(s) copied to clipboard')
+    else:
+        global supportHTML
+        message = 'xpath not copied to clipboard - ensure syntax is set to xml'
+        if supportHTML:
+            message += ' or html'
+        sublime.status_message(message)
+
 class XpathCommand(sublime_plugin.TextCommand):
-    def run(self, edit):
+    def run(self, edit, **args):
         """Copy XPath(s) at cursor(s) to clipboard."""
         view = self.view
-
-        if isSGML(view):
-            sublime.set_clipboard(os.linesep.join(getXPathStringAtPositions(view, view.sel())))
-            sublime.status_message('xpath(s) copied to clipboard')
+        
+        if args is not None and 'show_hierarchy_only' in args:
+            hierarchyOnly = args['show_hierarchy_only']
         else:
-            global supportHTML
-            message = 'xpath not copied to clipboard - ensure syntax is set to xml'
-            if supportHTML:
-                message += ' or html'
-            sublime.status_message(message)
+            hierarchyOnly = getShowHierarchyOnlySetting()
+        if args is not None and 'copy_unique_path_only' in args:
+            unique = args['copy_unique_path_only']
+        else:
+            unique = getCopyUniqueOnlySetting()
+        
+        copyXPathsToClipboard(view, hierarchyOnly, unique)
     def is_enabled(self):
         return isSGML(self.view)
     def is_visible(self):
@@ -220,7 +258,10 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                 break
         
         if not allFound:
-            sublime.status_message(args['direction'] + ' node not found')
+            message = args['direction'] + ' node not found'
+            if len(view.sel()) > 1:
+                message += ' for all selections'
+            sublime.status_message(message)
         else:
             view.sel().clear()
             for foundPath in foundPaths:

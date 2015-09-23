@@ -1,21 +1,26 @@
 [
 	{
-		"caption": "XPath: Copy path to clipboard",
-		"command": "xpath"
+		"caption": "XPath: Copy exact path to clipboard",
+		"command": "xpath",
+		"args":	{ "show_hierarchy_only": false }
 	}, {
-		"caption": "XPath: Goto Previous Sibling",
+		"caption": "XPath: Copy hierarchy to clipboard",
+		"command": "xpath",
+		"args":	{ "show_hierarchy_only": true }
+	}, {
+		"caption": "XPath: Goto previous sibling",
 		"command": "goto_relative", "args": { "direction": "prev" }
 	}, {
-		"caption": "XPath: Goto Next Sibling",
+		"caption": "XPath: Goto next sibling",
 		"command": "goto_relative", "args": { "direction": "next" }
 	}, {
-		"caption": "XPath: Goto Parent Open Tag",
+		"caption": "XPath: Goto parent open tag",
 		"command": "goto_relative", "args": { "direction": "parent" }
 	}, {
-		"caption": "XPath: Goto Open Tag",
+		"caption": "XPath: Goto open tag",
 		"command": "goto_relative", "args": { "direction": "open" }
 	}, {
-		"caption": "XPath: Goto Close Tag",
+		"caption": "XPath: Goto close tag",
 		"command": "goto_relative", "args": { "direction": "close" }
 	}
 ]
