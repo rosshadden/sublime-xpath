@@ -147,9 +147,9 @@ def getXPathStringAtPositions(view, positions, hierarchyOnly):
         if hierarchyOnly:
             hierarchy = []
             for part in match:
-                pos = part.find('[')
-                if pos > -1:
-                    part = part[0:pos]
+                begin = part.find('[')
+                end = part.find(']', begin) + len(']')
+                part = part[0:begin] + part[end:]
                 hierarchy.append(part)
             matches.append('/'.join(hierarchy))
         else:
@@ -260,7 +260,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         if not allFound:
             message = args['direction'] + ' node not found'
             if len(view.sel()) > 1:
-                message += ' for all selections'
+                message += ' for at least one selection'
             sublime.status_message(message)
         else:
             view.sel().clear()
