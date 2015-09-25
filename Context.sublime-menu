@@ -1,0 +1,10 @@
+[
+	{
+		"caption": "-"
+	}, {
+		"caption": "XPath: Copy path to clipboard",
+		"command": "xpath"
+	}, {
+		"caption": "-"
+	}
+]
