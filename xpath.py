@@ -31,11 +31,17 @@ def buildPathsForView(view):
     global XPaths
     XPaths[view.id()] = []
     
+    # find all xml and html scopes in the view
+    for region in view.find_by_selector('text.xml') + view.find_by_selector('text.html'):
+        buildPathsForViewRegion(view, region)
+
+def buildPathsForViewRegion(view, region_scope):
+    """Create a cache of all xpaths for the XML in the specified view region."""
     path = ['']
     levelCounters = [{}]
     firstIndexInXPath = 1
     
-    tagRegions = view.find_by_selector('entity.name.tag.')
+    tagRegions = [region for region in view.find_by_selector('entity.name.tag.') if region_scope.contains(region)] # find all entity name tags within the specified scope
     position = 0
     
     global settings
@@ -198,7 +204,12 @@ def updateStatus(view):
         intro = 'XPath'
         if len(view.sel()) > 1:
             intro = intro + ' (at first selection)'
-        view.set_status('xpath', intro + ': ' + showPath)
+        
+        text = intro + ': ' + showPath
+        maxLength = 236 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortuantely we have to truncate it...
+        if len(text) > maxLength:
+            text = text[0:maxLength]
+        view.set_status('xpath', text)
     else:
         view.erase_status('xpath')
 
