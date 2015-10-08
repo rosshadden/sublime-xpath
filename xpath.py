@@ -172,9 +172,9 @@ def getXPathStringAtPositions(view, positions, includeIndexes, includeAttributes
     return matches
 
 def isSGML(view):
-    """Return True if the view's syntax is XML or HTML."""
+    """Return True if the view contains XML or HTML syntax."""
     global supportHTML
-    return view.score_selector(0, 'text.xml') > 0 or (supportHTML and view.score_selector(0, 'text.html') > 0)
+    return len(view.find_by_selector('text.xml')) > 0 or (supportHTML and len(view.find_by_selector('text.html')) > 0)
 
 def updateStatusIfSGML(view):
     """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
