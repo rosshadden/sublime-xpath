@@ -208,7 +208,8 @@ def updateStatus(view):
         text = intro + ': ' + showPath
         maxLength = 236 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortuantely we have to truncate it...
         if len(text) > maxLength:
-            text = text[0:maxLength]
+            append = ' (truncated)'
+            text = text[0:maxLength - len(append)] + append
         view.set_status('xpath', text)
     else:
         view.erase_status('xpath')
