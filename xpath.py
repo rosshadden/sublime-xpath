@@ -31,11 +31,17 @@ def buildPathsForView(view):
     global XPaths
     XPaths[view.id()] = []
     
+    # find all xml and html scopes in the view
+    for region in view.find_by_selector('text.xml') + view.find_by_selector('text.html'):
+        buildPathsForViewRegion(view, region)
+
+def buildPathsForViewRegion(view, region_scope):
+    """Create a cache of all xpaths for the XML in the specified view region."""
     path = ['']
     levelCounters = [{}]
     firstIndexInXPath = 1
     
-    tagRegions = view.find_by_selector('entity.name.tag.')
+    tagRegions = [region for region in view.find_by_selector('entity.name.tag.') if region_scope.contains(region)] # find all entity name tags within the specified scope
     position = 0
     
     global settings
@@ -139,33 +145,36 @@ def getXPathAtPositions(view, positions):
         matches.append(XPaths[view.id()][index][1])
     return matches
 
-def getXPathStringAtPositions(view, positions, hierarchyOnly):
+def getXPathStringAtPositions(view, positions, includeIndexes, includeAttributes):
     """Given a sorted array of regions, return the xpath strings that relate to each region."""
     global XPaths
     matches = []
     for match in getXPathAtPositions(view, positions):
-        if hierarchyOnly:
+        if includeIndexes and includeAttributes:
+            matches.append('/'.join(match))
+        else:
             hierarchy = []
             for part in match:
                 begin = part.find('[')
                 end = part.find(']', begin) + len(']')
-                part = part[0:begin] + part[end:]
+                index = part[begin:end]
+                attributes = part[end:]
+                part = part[0:begin]
+                
+                if includeIndexes:
+                    part += index
+                if includeAttributes:
+                    part += attributes
+                
                 hierarchy.append(part)
             matches.append('/'.join(hierarchy))
-        else:
-            matches.append('/'.join(match))
+            
     return matches
 
 def isSGML(view):
-    """Return True if the view's syntax is XML or HTML."""
-    currentSyntax = view.settings().get('syntax')
-    if currentSyntax is not None:
-        XMLSyntax = 'Packages/XML/'
-        HTMLSyntax = 'Packages/HTML/'
-        global supportHTML
-        return currentSyntax.startswith(XMLSyntax) or (supportHTML and currentSyntax.startswith(HTMLSyntax))
-    else:
-        return False
+    """Return True if the view contains XML or HTML syntax."""
+    global supportHTML
+    return len(view.find_by_selector('text.xml')) > 0 or (supportHTML and len(view.find_by_selector('text.html')) > 0)
 
 def updateStatusIfSGML(view):
     """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
@@ -174,8 +183,8 @@ def updateStatusIfSGML(view):
     else:
         view.erase_status('xpath')
 
-def updateStatus(view):
-    """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
+def ensureXpathCacheIsCurrent(view):
+    """If the XML has changed since the xpaths were cached, recreate the cache."""
     global changeCounters
     newCount = view.change_count()
     oldCount = changeCounters.get(view.id(), None)
@@ -183,30 +192,40 @@ def updateStatus(view):
         changeCounters[view.id()] = newCount
         view.set_status('xpath', 'XPath being calculated...')
         buildPathsForView(view)
+
+def updateStatus(view):
+    """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
+    ensureXpathCacheIsCurrent(view)
     
-    response = getXPathStringAtPositions(view, [view.sel()[0]], getShowHierarchyOnlySetting())
+    includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', None, False)
+    response = getXPathStringAtPositions(view, [view.sel()[0]], includeIndexes, includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', None, False))
     if len(response) == 1 and len(response[0]) > 0:
         showPath = response[0]
         intro = 'XPath'
         if len(view.sel()) > 1:
             intro = intro + ' (at first selection)'
-        view.set_status('xpath', intro + ': ' + showPath)
+        
+        text = intro + ': ' + showPath
+        maxLength = 236 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortuantely we have to truncate it...
+        if len(text) > maxLength:
+            append = ' (truncated)'
+            text = text[0:maxLength - len(append)] + append
+        view.set_status('xpath', text)
     else:
         view.erase_status('xpath')
 
-def getShowHierarchyOnlySetting():
-    global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
-    return bool(settings.get('show_hierarchy_only', False))
+def getBoolValueFromArgsOrSettings(key, args, default):
+    if args is None or not key in args:
+        global settings
+        settings = sublime.load_settings('xpath.sublime-settings')
+        return bool(settings.get(key, default))
+    else:
+        return args[key]
 
-def getCopyUniqueOnlySetting():
-    global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
-    return bool(settings.get('copy_unique_path_only', True))
-
-def copyXPathsToClipboard(view, hierarchyOnly, unique):
+def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
     if isSGML(view):
-        paths = getXPathStringAtPositions(view, view.sel(), hierarchyOnly)
+        ensureXpathCacheIsCurrent(view)
+        paths = getXPathStringAtPositions(view, view.sel(), includeIndexes, includeAttributes)
         if unique:
             unique = []
             for path in paths:
@@ -227,19 +246,14 @@ class XpathCommand(sublime_plugin.TextCommand):
         """Copy XPath(s) at cursor(s) to clipboard."""
         view = self.view
         
-        if args is not None and 'show_hierarchy_only' in args:
-            hierarchyOnly = args['show_hierarchy_only']
-        else:
-            hierarchyOnly = getShowHierarchyOnlySetting()
-        if args is not None and 'copy_unique_path_only' in args:
-            unique = args['copy_unique_path_only']
-        else:
-            unique = getCopyUniqueOnlySetting()
+        includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
+        unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
+        includeAttributes = includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
         
-        copyXPathsToClipboard(view, hierarchyOnly, unique)
+        copyXPathsToClipboard(view, includeIndexes, includeIndexes or includeAttributes, unique)
     def is_enabled(self):
         return isSGML(self.view)
-    def is_visible(self):
+    def is_visible(self, **args):
         return isSGML(self.view)
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):

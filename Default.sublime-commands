@@ -4,9 +4,13 @@
 		"command": "xpath",
 		"args":	{ "show_hierarchy_only": false }
 	}, {
-		"caption": "XPath: Copy hierarchy to clipboard",
+		"caption": "XPath: Copy hierarchy without attributes to clipboard",
 		"command": "xpath",
-		"args":	{ "show_hierarchy_only": true }
+		"args":	{ "show_hierarchy_only": true, "show_attributes_in_hierarchy": false }
+	}, {
+		"caption": "XPath: Copy hierarchy with attributes to clipboard",
+		"command": "xpath",
+		"args":	{ "show_hierarchy_only": true, "show_attributes_in_hierarchy": true }
 	}, {
 		"caption": "XPath: Goto previous sibling",
 		"command": "goto_relative", "args": { "direction": "prev" }

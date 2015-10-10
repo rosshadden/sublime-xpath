@@ -10,8 +10,10 @@
 	"show_all_attributes": false,
 	// whether tags and attributes should be treated as case sensitive for index purposes
 	"case_sensitive": true,
-	// show only the hierarchy (without indexes and attributes) in the status bar
+	// show only the hierarchy (without indexes) in the status bar
 	"show_hierarchy_only": false,
+	// when in hierarchy mode, whether to include attributes or not
+	"show_attributes_in_hierarchy": false,
 	// only copy unique xpaths when there are multiple selections
 	"copy_unique_path_only": true
 }
