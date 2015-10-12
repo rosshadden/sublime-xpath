@@ -121,7 +121,7 @@ def buildPathsForViewRegion(view, region_scope):
             levelCounters.pop()
             position = region.end() + 1
         
-    addPath(view, position, view.size(), path)
+    addPath(view, position, region_scope.end(), path)
 
 def getXPathIndexesAtPositions(view, positions):
     """Given a sorted array of regions, return the indexes of the xpath strings that relate to each region."""
@@ -176,6 +176,10 @@ def isSGML(view):
     global supportHTML
     return len(view.find_by_selector('text.xml')) > 0 or (supportHTML and len(view.find_by_selector('text.html')) > 0)
 
+def isCursorInsideSGML(view):
+    """Return True if at least one cursor is within XML or HTML syntax."""
+    return isSGML(view) and len(getXPathIndexesAtPositions(view, view.sel())) > 0
+
 def updateStatusIfSGML(view):
     """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
     if isSGML(view) and len(view.sel()) > 0:
@@ -206,7 +210,7 @@ def updateStatus(view):
             intro = intro + ' (at first selection)'
         
         text = intro + ': ' + showPath
-        maxLength = 236 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortuantely we have to truncate it...
+        maxLength = 234 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortunately we have to truncate it...
         if len(text) > maxLength:
             append = ' (truncated)'
             text = text[0:maxLength - len(append)] + append
@@ -251,8 +255,8 @@ class XpathCommand(sublime_plugin.TextCommand):
         includeAttributes = includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
         
         copyXPathsToClipboard(view, includeIndexes, includeIndexes or includeAttributes, unique)
-    def is_enabled(self):
-        return isSGML(self.view)
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
     def is_visible(self, **args):
         return isSGML(self.view)
 
@@ -288,10 +292,15 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         
         global XPaths
         
-        currentPos = getXPathIndexesAtPositions(view, [relative_to])[0]
+        xpathIndexes = getXPathIndexesAtPositions(view, [relative_to])
+        if len(xpathIndexes) == 0:
+            return None
+        currentPos = xpathIndexes[0]
         currentPath = XPaths[view.id()][currentPos][1]
         parentPath = '/'.join(currentPath[0:-1])
         currentPath = '/'.join(currentPath)
+        if len(currentPath) == 0:
+            return None
         
         if direction in ('next', 'close'):
             search = XPaths[view.id()][currentPos:] # search from current position down to the end of the document
@@ -335,8 +344,8 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
     
     #def want_event(self):
     #    return True
-    def is_enabled(self):
-        return isSGML(self.view)
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
     def is_visible(self):
         return isSGML(self.view)
     def description(self, args):
