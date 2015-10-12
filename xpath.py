@@ -265,6 +265,8 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         """Move cursor(s) to specified relative tag(s)."""
         view = self.view
         
+        ensureXpathCacheIsCurrent(view)
+        
         foundPaths = []
         allFound = True
         for selection in view.sel():
@@ -293,13 +295,13 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         global XPaths
         
         xpathIndexes = getXPathIndexesAtPositions(view, [relative_to])
-        if len(xpathIndexes) == 0:
+        if len(xpathIndexes) == 0: # if there is no xpath at the specified position, it's probably not a XML/HTML region
             return None
         currentPos = xpathIndexes[0]
         currentPath = XPaths[view.id()][currentPos][1]
         parentPath = '/'.join(currentPath[0:-1])
         currentPath = '/'.join(currentPath)
-        if len(currentPath) == 0:
+        if len(currentPath) == 0: # if the xpath is blank, (aka no node) there can be no related nodes...
             return None
         
         if direction in ('next', 'close'):
