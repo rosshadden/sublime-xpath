@@ -17,6 +17,7 @@ def settingsChanged():
     updateStatusIfSGML(sublime.active_window().active_view())
 
 def addPath(view, start, end, path):
+    """Add the supplied xpath array to the cache for the view."""
     global XPaths
     XPaths[view.id()].append([sublime.Region(start, end), path[:]])
 
@@ -124,7 +125,7 @@ def buildPathsForViewRegion(view, region_scope):
     addPath(view, position, region_scope.end(), path)
 
 def getXPathIndexesAtPositions(view, positions):
-    """Given a sorted array of regions, return the indexes of the xpath strings that relate to each region."""
+    """Given a sorted array of regions, return the indexes of the xpath strings that relate to each region. Requires that the xpaths have been cached already for the specified view."""
     global XPaths
     count = len(positions)
     current = 0
@@ -171,24 +172,24 @@ def getXPathStringAtPositions(view, positions, includeIndexes, includeAttributes
             
     return matches
 
-def isSGML(view):
+def containsSGML(view):
     """Return True if the view contains XML or HTML syntax."""
     global supportHTML
     return len(view.find_by_selector('text.xml')) > 0 or (supportHTML and len(view.find_by_selector('text.html')) > 0)
 
 def isCursorInsideSGML(view):
     """Return True if at least one cursor is within XML or HTML syntax."""
-    return isSGML(view) and len(getXPathIndexesAtPositions(view, view.sel())) > 0
+    return containsSGML(view) and len(getXPathIndexesAtPositions(view, view.sel())) > 0
 
 def updateStatusIfSGML(view):
-    """Update the status bar with the relevant xpath at the cursor if the syntax is XML."""
-    if isSGML(view) and len(view.sel()) > 0:
+    """Update the status bar with the relevant xpath at the cursor if the view contains XML or HTML syntax."""
+    if containsSGML(view):
         updateStatus(view)
     else:
         view.erase_status('xpath')
 
 def ensureXpathCacheIsCurrent(view):
-    """If the XML has changed since the xpaths were cached, recreate the cache."""
+    """If the document has been modified since the xpaths were cached, recreate the cache."""
     global changeCounters
     newCount = view.change_count()
     oldCount = changeCounters.get(view.id(), None)
@@ -196,9 +197,12 @@ def ensureXpathCacheIsCurrent(view):
         changeCounters[view.id()] = newCount
         view.set_status('xpath', 'XPath being calculated...')
         buildPathsForView(view)
+        view.erase_status('xpath')
 
 def updateStatus(view):
     """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
+    if len(view.sel()) == 0: # no point doing any work as there is no cursor selection
+        return
     ensureXpathCacheIsCurrent(view)
     
     includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', None, False)
@@ -219,6 +223,7 @@ def updateStatus(view):
         view.erase_status('xpath')
 
 def getBoolValueFromArgsOrSettings(key, args, default):
+    """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
     if args is None or not key in args:
         global settings
         settings = sublime.load_settings('xpath.sublime-settings')
@@ -227,7 +232,8 @@ def getBoolValueFromArgsOrSettings(key, args, default):
         return args[key]
 
 def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
-    if isSGML(view):
+    """Copy the XPath(s) at the cursor(s) to the clipboard."""
+    if containsSGML(view):
         ensureXpathCacheIsCurrent(view)
         paths = getXPathStringAtPositions(view, view.sel(), includeIndexes, includeAttributes)
         if unique:
@@ -236,8 +242,11 @@ def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
                 if path not in unique:
                     unique.append(path)
             paths = unique
-        sublime.set_clipboard(os.linesep.join(paths))
-        sublime.status_message('xpath(s) copied to clipboard')
+        if len(paths) > 0:
+            sublime.set_clipboard(os.linesep.join(paths))
+            sublime.status_message('xpath(s) copied to clipboard')
+        else:
+            message = 'no xpath at cursor to copy to clipboard'
     else:
         global supportHTML
         message = 'xpath not copied to clipboard - ensure syntax is set to xml'
@@ -258,10 +267,10 @@ class XpathCommand(sublime_plugin.TextCommand):
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self, **args):
-        return isSGML(self.view)
+        return containsSGML(self.view)
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args): #sublime.active_window().active_view().run_command('goto_relative', {'event': {'y': 351.5, 'x': 364.5}, 'direction': 'prev'})
+    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', 'direction': 'prev'})
         """Move cursor(s) to specified relative tag(s)."""
         view = self.view
         
@@ -289,7 +298,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             view.show(foundPaths[0]) # scroll to first selection if not already visible
     
     def find_node(self, relative_to, direction):
-        """Find specified relative tag."""
+        """Given a direction/relative to search and a region to start from, find the relevant node."""
         view = self.view
         
         global XPaths
@@ -349,7 +358,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self):
-        return isSGML(self.view)
+        return containsSGML(self.view)
     def description(self, args):
         if args['direction'] in ('open', 'close'):
             descr = 'tag'
@@ -370,3 +379,7 @@ class XpathListener(sublime_plugin.EventListener):
         updateStatusIfSGML(view)
     def on_pre_close(self, view):
         clearPathsForView(view)
+
+def plugin_loaded():
+    """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
+    sublime.set_timeout_async(settingsChanged, 10)
