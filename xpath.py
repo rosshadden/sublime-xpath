@@ -245,7 +245,7 @@ def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
             paths = unique
         if len(paths) > 0:
             sublime.set_clipboard(os.linesep.join(paths))
-            sublime.status_message('xpath(s) copied to clipboard')
+            message = 'xpath(s) copied to clipboard'
         else:
             message = 'no xpath at cursor to copy to clipboard'
     else:
@@ -253,7 +253,7 @@ def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
         message = 'xpath not copied to clipboard - ensure syntax is set to xml'
         if supportHTML:
             message += ' or html'
-        sublime.status_message(message)
+    sublime.status_message(message)
 
 class XpathCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
