@@ -243,6 +243,8 @@ def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
                 if path not in unique:
                     unique.append(path)
             paths = unique
+        
+        paths = [path for path in paths if len(path) > 0] # ignore blank paths
         if len(paths) > 0:
             sublime.set_clipboard(os.linesep.join(paths))
             message = 'xpath(s) copied to clipboard'
