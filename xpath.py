@@ -202,12 +202,13 @@ def ensureXpathCacheIsCurrent(view):
 def updateStatus(view):
     """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
     if len(view.sel()) == 0: # no point doing any work as there is no cursor selection
+        view.erase_status('xpath')
         return
     ensureXpathCacheIsCurrent(view)
     
     includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', None, False)
     response = getXPathStringAtPositions(view, [view.sel()[0]], includeIndexes, includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', None, False))
-    if len(response) == 1 and len(response[0]) > 0:
+    if len(response) == 1 and len(response[0]) > 0: # if there is an xpath at the cursor position, and it is not empty
         showPath = response[0]
         intro = 'XPath'
         if len(view.sel()) > 1:
