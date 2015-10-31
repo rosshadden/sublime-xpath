@@ -430,6 +430,7 @@ class queryXpathCommand(sublime_plugin.TextCommand):
             # option 2: - traverse the hierarchy to find the full, absolute xpath of the selected element
             #             for example, query was //c, selection was made in the quick panel of 2nd index, lets say the full xpath would be (/a/b[1]/c[2])
             #           - then lookup our stored xpaths and find a match, and as we store the position with it, we know where to move the cursor to
+            # option 3: - create our own xpath query engine... element tree's is quite simple (http://effbot.org/zone/element-xpath.htm), so to get the same basic functionality wouldn't be as involved as following the full XPath 2.0 spec...
             
             print(self.items[selected_index])
             print(etree.tostring(self.items[selected_index], encoding="unicode"))
