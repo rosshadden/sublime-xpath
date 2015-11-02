@@ -272,7 +272,7 @@ class XpathCommand(sublime_plugin.TextCommand):
         return containsSGML(self.view)
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', 'direction': 'prev'})
+    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', {'direction': 'prev'})
         """Move cursor(s) to specified relative tag(s)."""
         view = self.view
         
@@ -386,13 +386,16 @@ def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
     sublime.set_timeout_async(settingsChanged, 10)
 
-class queryXpathCommand(sublime_plugin.TextCommand):
+class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//{http://namespace}LocalName' })
     input_panel = None
     items = None # results from query
     previous_input = '' # remember previous query so that when the user next runs this command, it will be prepopulated
     
-    def run(self, edit):
-        self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
+    def run(self, edit, **args):
+        if args is not None and 'xpath' in args: # if an xpath is supplied, query it
+            self.show_results_for_query(args['xpath'])
+        else: # show an input prompt where the user can type their xpath query
+            self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
     
     def xpath_input_done(self, value):
         self.input_panel = None
@@ -400,14 +403,18 @@ class queryXpathCommand(sublime_plugin.TextCommand):
         self.show_results_for_query(value)
         
     def show_results_for_query(self, query):
-        # parse the view as xml # TODO: parse only the SGML region the cursor is in
-        xmlString = self.view.substr(sublime.Region(0, self.view.size()))
+        # find the region that the cursor is in
+        region = next((r for r in getSGMLRegions(self.view) if r.contains(self.view.sel()[0])))
+        
+        # parse the region as XML
+        xmlString = self.view.substr(region)
         root = etree.fromstring(xmlString)
-        xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root
+        xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root (a limitation of element tree)
         
         # allow starting the search from the element at the cursor position, i.e. a relative search, if there is one selection
-        if query.startswith('./') and len(view.sel()) == 1:
-            startQueryFrom = xml.find('TODO: current xpath at cursor')
+        if query.startswith('./') and len(self.view.sel()) == 1:
+            startQueryFrom = getXPathStringAtPositions(self.view, [self.view.sel()[0]], True, False)[0]
+            startQueryFrom = xml.find(startQueryFrom) # TODO: use element tree compatible xpath... it seems that it can't find /rootElement, it looks through rootElement's children for rootElement... plus in terms of namespaces and ns prefixes...
         else:
             startQueryFrom = xml
         
