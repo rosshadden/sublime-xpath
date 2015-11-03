@@ -414,9 +414,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
     
     def change(self, value):
-        # NOTE: this doesn't work in real time because showing a quick panel steals the focus, and re-focusing the input box closes the quick panel because it lost the focus...
-        #self.show_results_for_query(value)
-        #self.view.window().focus_view(self.input_panel)
+        # NOTE: it is not possible to show results in real time because showing a quick panel steals the focus, and re-focusing the input box closes the quick panel because it lost the focus...
         pass
     def cancel(self):
         self.input_panel = None
@@ -432,7 +430,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if len(self.results) == 0:
             sublime.status_message('no results found matching xpath expression "' + query + '"')
         else:
-            if self.show_results:
+            if self.show_results: # TODO: also show results if results is not a node set...
                 self.show_results_for_query()
             else:
                 self.goto_results_for_query()
@@ -449,7 +447,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root (a limitation of element tree)
             
             # allow starting the search from the element at the cursor position
-            if query.startswith('./'):
+            if not query.startswith('/'):
                 cursors = [r for r in self.view.sel() if region.contains(r)]
                 
                 for cursor in cursors:
@@ -476,6 +474,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def xpath_selection_done(self, selected_index):
         if selected_index > -1: # quick panel wasn't cancelled
             self.results = [self.results[selected_index]]
+            # TODO: only if the result is a node...
             self.goto_results_for_query()
         else:
             self.results = None # clear unnecessary memory
