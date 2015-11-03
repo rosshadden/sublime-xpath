@@ -27,8 +27,22 @@ def clearPathsForView(view):
     XPaths.pop(view.id(), None)
 
 def getSGMLRegions(view):
-    """find all xml and html scopes in the specified view."""
+    """Find all xml and html scopes in the specified view."""
     return view.find_by_selector('text.xml') + view.find_by_selector('text.html')
+
+def getSGMLRegionsContainingCursors(view):
+    """Find the SGML region(s) that the cursor(s) are in for the specified view."""
+    allRegions = getSGMLRegions(view)
+    cursor_regions = []
+    for region in allRegions:
+        containsCursor = False
+        for cursor in view.sel():
+            if region.contains(cursor):
+                containsCursor = True
+                break
+        if containsCursor:
+            cursor_regions.append(region)
+    return cursor_regions
 
 def buildPathsForView(view):
     """Clear and recreate a cache of all xpaths for the XML in the specified view."""
@@ -181,11 +195,11 @@ def containsSGML(view):
 
 def isCursorInsideSGML(view):
     """Return True if at least one cursor is within XML or HTML syntax."""
-    return containsSGML(view) and len(getXPathIndexesAtPositions(view, view.sel())) > 0
+    return len(getSGMLRegionsContainingCursors(view)) > 0
 
 def updateStatusIfSGML(view):
-    """Update the status bar with the relevant xpath at the cursor if the view contains XML or HTML syntax."""
-    if containsSGML(view):
+    """Update the status bar with the relevant xpath at the cursor."""
+    if isCursorInsideSGML(view):
         updateStatus(view)
     else:
         view.erase_status('xpath')
@@ -386,63 +400,19 @@ def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
     sublime.set_timeout_async(settingsChanged, 10)
 
-class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//{http://namespace}LocalName' })
+class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//{http://namespace}LocalName', 'show': True })
     input_panel = None
-    items = None # results from query
+    results = None # results from query
     previous_input = '' # remember previous query so that when the user next runs this command, it will be prepopulated
+    show_results = None # whether to show the results of the query, so the user can pick one to move the cursor to. If False, cursor will move to all results.
     
     def run(self, edit, **args):
+        self.show_results = args is None or args.get('show', True)
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
-            self.show_results_for_query(args['xpath'])
+            self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
             self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
     
-    def xpath_input_done(self, value):
-        self.input_panel = None
-        self.previous_input = value
-        self.show_results_for_query(value)
-        
-    def show_results_for_query(self, query):
-        # find the region that the cursor is in
-        region = next((r for r in getSGMLRegions(self.view) if r.contains(self.view.sel()[0])))
-        
-        # parse the region as XML
-        xmlString = self.view.substr(region)
-        root = etree.fromstring(xmlString)
-        xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root (a limitation of element tree)
-        
-        # allow starting the search from the element at the cursor position, i.e. a relative search, if there is one selection
-        if query.startswith('./') and len(self.view.sel()) == 1:
-            startQueryFrom = getXPathStringAtPositions(self.view, [self.view.sel()[0]], True, False)[0]
-            startQueryFrom = xml.find(startQueryFrom) # TODO: use element tree compatible xpath... it seems that it can't find /rootElement, it looks through rootElement's children for rootElement... plus in terms of namespaces and ns prefixes...
-        else:
-            startQueryFrom = xml
-        
-        self.items = startQueryFrom.findall(query)
-        
-        if len(self.items) == 0:
-            sublime.status_message('no results found matching xpath expression "' + query + '"')
-        elif len(self.items) == 1:
-            sublime.status_message('one result found')
-            self.xpath_selection_done(0)
-        else:
-            # truncate each xml result at 60 chars so that it appears correctly in the quick panel
-            self.view.window().show_quick_panel([[e.tag, e.text, etree.tostring(e, encoding="unicode")[0:60]] for e in self.items], self.xpath_selection_done)
-        
-    def xpath_selection_done(self, selected_index):
-        if selected_index > -1: # quick panel wasn't cancelled
-            
-            # TODO: move the cursor to the selected node
-            # option 1: - use an xml parser that returns line and column information
-            # option 2: - traverse the hierarchy to find the full, absolute xpath of the selected element
-            #             for example, query was //c, selection was made in the quick panel of 2nd index, lets say the full xpath would be (/a/b[1]/c[2])
-            #           - then lookup our stored xpaths and find a match, and as we store the position with it, we know where to move the cursor to
-            # option 3: - create our own xpath query engine... element tree's is quite simple (http://effbot.org/zone/element-xpath.htm), so to get the same basic functionality wouldn't be as involved as following the full XPath 2.0 spec...
-            
-            print(self.items[selected_index])
-            print(etree.tostring(self.items[selected_index], encoding="unicode"))
-        
-        self.items = None
     def change(self, value):
         # NOTE: this doesn't work in real time because showing a quick panel steals the focus, and re-focusing the input box closes the quick panel because it lost the focus...
         #self.show_results_for_query(value)
@@ -450,6 +420,79 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         pass
     def cancel(self):
         self.input_panel = None
+    
+    def xpath_input_done(self, value):
+        self.input_panel = None
+        self.previous_input = value
+        self.process_results_for_query(value)
+    
+    def process_results_for_query(self, query):
+        self.results = self.get_results_for_query(query)
+        
+        if len(self.results) == 0:
+            sublime.status_message('no results found matching xpath expression "' + query + '"')
+        else:
+            if self.show_results:
+                self.show_results_for_query()
+            else:
+                self.goto_results_for_query()
+        
+    def get_results_for_query(self, query):
+        regions = getSGMLRegionsContainingCursors(self.view)
+        
+        matches = []
+        
+        # parse each region as XML
+        for region in regions:
+            xmlString = self.view.substr(region)
+            root = etree.fromstring(xmlString)
+            xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root (a limitation of element tree)
+            
+            # allow starting the search from the element at the cursor position
+            if query.startswith('./'):
+                cursors = [r for r in self.view.sel() if region.contains(r)]
+                
+                for cursor in cursors:
+                    startQueryFrom = getXPathStringAtPositions(self.view, [cursor], True, False)[0]
+                    startQueryFrom = xml.find(startQueryFrom) # TODO: use element tree compatible xpath... it seems that it can't find /rootElement, it looks through rootElement's children for rootElement... plus in terms of namespaces and ns prefixes...
+                    
+                    matches += startQueryFrom.findall(query)
+                
+            else:
+                startQueryFrom = xml
+                
+                matches += startQueryFrom.findall(query)
+            
+        return matches
+        
+    def show_results_for_query(self):
+        #if len(self.results) == 1:
+        #    sublime.status_message('one result found')
+        #    self.xpath_selection_done(0) # go directly to the single result
+        #else:
+        # truncate each xml result at 60 chars so that it appears correctly in the quick panel
+        self.view.window().show_quick_panel([[e.tag, e.text, etree.tostring(e, encoding="unicode")[0:60]] for e in self.results], self.xpath_selection_done)
+        
+    def xpath_selection_done(self, selected_index):
+        if selected_index > -1: # quick panel wasn't cancelled
+            self.results = [self.results[selected_index]]
+            self.goto_results_for_query()
+        else:
+            self.results = None # clear unnecessary memory
+    
+    def goto_results_for_query(self):    
+        # TODO: move the cursor to the result nodes
+        # option 1: - use an xml parser that returns line and column information
+        # option 2: - traverse the hierarchy to find the full, absolute xpath of the selected element
+        #             for example, query was //c, selection was made in the quick panel of 2nd index, lets say the full xpath would be (/a/b[1]/c[2])
+        #           - then lookup our stored xpaths and find a match, and as we store the position with it, we know where to move the cursor to
+        # option 3: - create our own xpath query engine... element tree's is quite simple (http://effbot.org/zone/element-xpath.htm), so to get the same basic functionality wouldn't be as involved as following the full XPath 2.0 spec...
+        
+        for node in self.results:
+            print(etree.tostring(node, encoding="unicode"))
+        
+        self.results = None # clear unnecessary memory
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self):
