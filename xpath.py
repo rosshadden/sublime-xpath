@@ -248,17 +248,21 @@ def getBoolValueFromArgsOrSettings(key, args, default):
     else:
         return args[key]
 
+def getUniqueItems(items):
+    """Return the items without any duplicates, preserving order."""
+    unique = []
+    for item in items:
+        if item not in unique:
+            unique.append(item)
+    return unique
+
 def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
     """Copy the XPath(s) at the cursor(s) to the clipboard."""
     if containsSGML(view):
         ensureXpathCacheIsCurrent(view)
         paths = getXPathStringAtPositions(view, view.sel(), includeIndexes, includeAttributes)
         if unique:
-            unique = []
-            for path in paths:
-                if path not in unique:
-                    unique.append(path)
-            paths = unique
+            paths = getUniqueItems(paths)
         
         paths = [path for path in paths if len(path) > 0] # ignore blank paths
         if len(paths) > 0:
@@ -400,14 +404,14 @@ def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
     sublime.set_timeout_async(settingsChanged, 10)
 
-class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//{http://namespace}LocalName', 'show': True })
+class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//{http://namespace}LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
     previous_input = '' # remember previous query so that when the user next runs this command, it will be prepopulated
-    show_results = None # whether to show the results of the query, so the user can pick one to move the cursor to. If False, cursor will move to all results.
+    show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
     
     def run(self, edit, **args):
-        self.show_results = args is None or args.get('show', True)
+        self.show_query_results = args is None or getBoolValueFromArgsOrSettings('show_query_results', args, True)
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
@@ -430,38 +434,33 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if len(self.results) == 0:
             sublime.status_message('no results found matching xpath expression "' + query + '"')
         else:
-            if self.show_results: # TODO: also show results if results is not a node set...
+            if self.show_query_results: # TODO: also show results if results is not a node set, as we can't "go to" them...
                 self.show_results_for_query()
             else:
                 self.goto_results_for_query()
         
     def get_results_for_query(self, query):
-        regions = getSGMLRegionsContainingCursors(self.view)
-        
-        matches = []
+        contexts = []
         
         # parse each region as XML
-        for region in regions:
+        for region in getSGMLRegionsContainingCursors(self.view):
             xmlString = self.view.substr(region)
             root = etree.fromstring(xmlString)
             xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root (a limitation of element tree)
             
-            # allow starting the search from the element at the cursor position
-            if not query.startswith('/'):
-                cursors = [r for r in self.view.sel() if region.contains(r)]
-                
-                for cursor in cursors:
-                    startQueryFrom = getXPathStringAtPositions(self.view, [cursor], True, False)[0]
-                    startQueryFrom = xml.find(startQueryFrom) # TODO: use element tree compatible xpath... it seems that it can't find /rootElement, it looks through rootElement's children for rootElement... plus in terms of namespaces and ns prefixes...
-                    
-                    matches += startQueryFrom.findall(query)
-                
+            # allow starting the search from the element at the cursor position - i.e. set the context nodes
+            if query.startswith('/'): # if it is an absolute path, there is no need to set the context, so just use the root/entry point of the tree
+                contexts.append(xml)
             else:
-                startQueryFrom = xml
-                
-                matches += startQueryFrom.findall(query)
-            
-        return matches
+                for cursor in (r for r in self.view.sel() if region.contains(r)):
+                    contextPath = getXPathStringAtPositions(self.view, [cursor], True, False)[0]
+                    contexts.append(xml.find(contextPath)) # TODO: use element tree compatible xpath... it seems that it can't find /rootElement, it looks through rootElement's children for rootElement... plus in terms of namespaces and ns prefixes...
+        
+        matches = []
+        for context in contexts:
+            matches += context.findall(query)
+        
+        return getUniqueItems(matches)
         
     def show_results_for_query(self):
         #if len(self.results) == 1:
@@ -474,7 +473,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def xpath_selection_done(self, selected_index):
         if selected_index > -1: # quick panel wasn't cancelled
             self.results = [self.results[selected_index]]
-            # TODO: only if the result is a node...
+            # TODO: only if the result is a node, as we can't "go to" a value...
             self.goto_results_for_query()
         else:
             self.results = None # clear unnecessary memory
