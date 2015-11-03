@@ -2,7 +2,8 @@ import sublime
 import sublime_plugin
 import os
 from itertools import takewhile
-import xml.etree.ElementTree as etree
+from xml.dom import minidom
+import xml.sax
 
 changeCounters = {}
 XPaths = {}
@@ -404,6 +405,26 @@ def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
     sublime.set_timeout_async(settingsChanged, 10)
 
+def parse_xml_string_with_location(xmlString): # code improved from http://stackoverflow.com/a/5133181/4473405
+    """Parse the given string as an xml document. Element nodes will have a 'parse_position' property."""
+    parser = xml.sax.make_parser()
+    original_set_content_handler = parser.setContentHandler
+    
+    def override_set_content_handler(dom_handler):
+        original_start_element_ns = dom_handler.startElementNS
+        
+        def override_startElementNS(name, tagName, attrs):
+            original_start_element_ns(name, tagName, attrs)
+            cur_elem = dom_handler.elementStack[-1]
+            cur_elem.parse_position = (parser._parser.CurrentLineNumber, parser._parser.CurrentColumnNumber)
+        
+        dom_handler.startElementNS = override_startElementNS
+        original_set_content_handler(dom_handler)
+    
+    parser.setContentHandler = override_set_content_handler
+    
+    return minidom.parseString(xmlString, parser)
+
 class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//{http://namespace}LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
@@ -445,8 +466,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         # parse each region as XML
         for region in getSGMLRegionsContainingCursors(self.view):
             xmlString = self.view.substr(region)
-            root = etree.fromstring(xmlString)
-            xml = etree.ElementTree(root) # convert from a root element to an element tree, so that we don't need to perform relative xpath queries from the root (a limitation of element tree)
+            tree = parse_xml_string_with_location(xmlString)
             
             # allow starting the search from the element at the cursor position - i.e. set the context nodes
             if query.startswith('/'): # if it is an absolute path, there is no need to set the context, so just use the root/entry point of the tree
@@ -454,11 +474,13 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             else:
                 for cursor in (r for r in self.view.sel() if region.contains(r)):
                     contextPath = getXPathStringAtPositions(self.view, [cursor], True, False)[0]
-                    contexts.append(xml.find(contextPath)) # TODO: use element tree compatible xpath... it seems that it can't find /rootElement, it looks through rootElement's children for rootElement... plus in terms of namespaces and ns prefixes...
+                    # TODO: find element by xpath
+                    #contexts.append(xml.find(contextPath))
         
         matches = []
-        for context in contexts:
-            matches += context.findall(query)
+        # TODO: find results of xpath query, maybe by using https://github.com/neild/py-dom-xpath
+        #for context in contexts:
+        #    matches += context.findall(query)
         
         return getUniqueItems(matches)
         
