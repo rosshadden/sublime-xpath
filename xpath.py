@@ -515,23 +515,149 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
     
     return createETree.etree
 
+def getTagNameWithPrefix(node):
+    tag = node.tag.split('}')[-1]
+    
+    if node.prefix:
+        tag = node.prefix + ':' + tag
+    
+    return tag
+
+def collapseWhitespace(text, maxlen):
+    return (text or '').strip().replace('\n', ' ').replace('\t', ' ').replace('  ', ' ')[0:maxlen]
+
+def getNodeLocation(node):
+    global namespace_start_tag
+    ns = node.nsmap[namespace_start_tag].split('/')
+    col = int(ns[-1]) + 1
+    row = int(ns[-3])
+    return (row, col)
+
+def getElementXMLPreview(node, maxlen):
+    """Generate the xml string for the given node, up to the specified number of characters."""
+    # NOTE: we can't use built in tostring method because it repeats all xmlns attributes unnecessarily
+    # response = etree.tostring(node, encoding='unicode')
+    
+    # add opening tag
+    tagName = getTagNameWithPrefix(node)
+    response = '<' + tagName
+    # add attributes
+    for attrib in node.attrib:
+        splitNS = attrib.split('}')
+        localName = splitNS[-1]
+        prefix = ''
+        if len(splitNS) == 2:
+            splitNS[0] = splitNS[0][len('{'):]
+            for prefix in node.nsmap:
+                if node.nsmap[prefix] == splitNS[0]:
+                    prefix += ':'
+                    break
+                
+        response += ' ' + prefix + localName + '="' + node.get(attrib) + '"'
+    
+    # add namespaces that were not on the parent element
+    parent = node.getparent()
+    differences = None
+    if parent is not None:
+        differences = set(node.nsmap).difference(set(parent.nsmap))
+    else:
+        differences = node.nsmap
+    
+    global namespace_start_tag
+    for ns in differences:
+        if ns != namespace_start_tag:
+            response += ' xmlns'
+            if ns is not None:
+                response += ':' + ns
+            response += '="' + node.nsmap[ns] + '"'
+    
+    # if no children and no text, is probably self closing
+    if len(node) == 0 and node.text is None:
+        response += ' />'
+    else:
+        # end of open tag
+        response += '>'
+        # add text
+        remaining_size = maxlen - len(response)
+        if remaining_size > 0 and node.text is not None:
+            response += collapseWhitespace(node.text, remaining_size) # remove whitespace
+        
+        # loop through children
+        for child in node.iterchildren():
+            remaining_size = maxlen - len(response)
+            if remaining_size <= 0:
+                break
+            else:
+                response += getElementXMLPreview(child, remaining_size) + collapseWhitespace(child.tail, remaining_size) # remove whitespace
+        
+        response += '</' + tagName + '>'
+        
+    return response[0:maxlen]
+
 def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start = 1):
     flattened = {}
     for item in items:
         flattened.setdefault(item[0] or replaceNoneWith, []).append(item[1])
     
-    unique = []
+    unique = {}
     for key in flattened.keys():
         if len(flattened[key]) == 1:
-            unique.append((key, flattened[key][0]))
+            unique[key] = flattened[key][0]
         else:
             index = start
             for item in flattened[key]:
-                unique.append((key + str(index), item))
+                unique[key + str(index)] = item
                 index += 1
     return unique
-            
+
+def get_results_for_xpath_query(view, query, from_root):
+    matches = []
     
+    getNamespaces = etree.XPath('//namespace::*')
+    
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
+    
+    # parse each region as XML
+    for region in getSGMLRegionsContainingCursors(view):
+        xmlString = view.substr(region)
+        tree = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
+        
+        # find all namespaces in the document, so that the same prefixes can be used for the xpath
+        # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
+        # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
+        global namespace_start_tag
+        namespaces = [ns for ns in getUniqueItems(getNamespaces(tree)) if ns[0] != namespace_start_tag]
+        nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(namespaces, defaultNamespacePrefix, 1)
+        
+        try:
+            xpath = etree.XPath(query, namespaces = nsmap)
+        except Exception as e:
+            sublime.status_message(str(e)) # show parsing error in status bar
+            return None
+        
+        contexts = []
+        
+        if from_root:
+            contexts.append(tree)
+        else:
+            # allow starting the search from the element at the cursor position - i.e. set the context nodes
+            for cursor in (r for r in view.sel() if region.contains(r)):
+                # TODO: include default namespace prefixes where applicable
+                contextPath = '/'.join(getXPathStringAtPositions(view, [cursor], True, False)[0].split('/')[2:]) # ignore root element when searching path
+                contextElement = tree.find(contextPath)
+                contexts.append(contextElement)
+        
+        for context in contexts:
+            matches += xpath(context)
+    
+    if not from_root: # if multiple contexts were used, get unique items only
+        # TODO: only get unique items if a nodeset
+        matches = getUniqueItems(matches)
+    
+    return matches
+
 class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
@@ -585,7 +711,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     
     def process_results_for_query(self, query):
         if len(query) > 0:
-            self.results = self.get_results_for_query(query)
+            self.results = get_results_for_xpath_query(self.view, query, True)
             
             if self.results is not None:
                 if len(self.results) == 0:
@@ -596,134 +722,6 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                         self.show_results_for_query()
                     else:
                         self.goto_results_for_query()
-        
-    def get_results_for_query(self, query):
-        matches = []
-        
-        getNamespaces = etree.XPath('//namespace::*')
-        
-        global settings
-        settings = sublime.load_settings('xpath.sublime-settings')
-        defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-        
-        # parse each region as XML
-        for region in getSGMLRegionsContainingCursors(self.view):
-            xmlString = self.view.substr(region)
-            tree = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
-            
-            # find all namespaces in the document, so that the same prefixes can be used for the xpath
-            # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
-            # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-            global namespace_start_tag
-            namespaces = [ns for ns in getUniqueItems(getNamespaces(tree)) if ns[0] != namespace_start_tag]
-            namespaces = makeNamespacePrefixesUniqueWithNumericSuffix(namespaces, defaultNamespacePrefix, 1)
-            nsmap = {}
-            for ns in namespaces:
-                nsmap[ns[0]] = ns[1]
-            
-            try:
-                xpath = etree.XPath(query, namespaces = nsmap)
-            except Exception as e:
-                sublime.status_message(str(e)) # show parsing error in status bar
-                return None
-            
-            contexts = []
-            
-            # allow starting the search from the element at the cursor position - i.e. set the context nodes
-            
-            #if self.live_mode or query.startswith('/'): # if it is an absolute path, there is no need to set the context, so just use the root/entry point of the tree
-            contexts.append(tree)
-            #else:
-                # for cursor in (r for r in self.view.sel() if region.contains(r)):
-                #     # TODO: use namespace maps, and include default: prefix where applicable
-                #     contextPath = '/'.join(getXPathStringAtPositions(self.view, [cursor], True, False)[0].split('/')[2:]) # ignore root element when searching path
-                #     contextElement = tree.find(contextPath)
-                #     contexts.append(contextElement)
-        
-            
-            for context in contexts:
-                matches += xpath(context)
-        
-        # TODO: only get unique items if a nodeset? and if multiple contexts were used
-        return getUniqueItems(matches)
-    
-    def _getTagNameWithPrefix(self, node):  # NOTE: this can be static
-        tag = node.tag.split('}')[-1]
-        
-        if node.prefix:
-            tag = node.prefix + ':' + tag
-        
-        return tag
-    
-    def _collapseWhitespace(self, text, maxlen): # NOTE: this can be static
-        return (text or '').strip().replace('\n', ' ').replace('\t', ' ').replace('  ', ' ')[0:maxlen]
-    
-    def _getElementLocation(self, node): # NOTE: this can be static
-        global namespace_start_tag
-        ns = node.nsmap[namespace_start_tag].split('/')
-        col = int(ns[-1]) + 1
-        row = int(ns[-3])
-        return (row, col)
-    
-    def _getElementXML(self, node, maxlen): # NOTE: this can be static
-        # NOTE: we can't use built in tostring method because it repeats all xmlns attributes unnecessarily
-        # response = etree.tostring(node, encoding='unicode')
-        
-        # add opening tag
-        tagName = self._getTagNameWithPrefix(node)
-        response = '<' + tagName
-        # add attributes
-        for attrib in node.attrib:
-            splitNS = attrib.split('}')
-            localName = splitNS[-1]
-            prefix = ''
-            if len(splitNS) == 2:
-                splitNS[0] = splitNS[0][len('{'):]
-                for prefix in node.nsmap:
-                    if node.nsmap[prefix] == splitNS[0]:
-                        prefix += ':'
-                        break
-                    
-            response += ' ' + prefix + localName + '="' + node.get(attrib) + '"'
-        
-        # add namespaces that were not on the parent element
-        parent = node.getparent()
-        differences = None
-        if parent is not None:
-            differences = set(node.nsmap).difference(set(parent.nsmap))
-        else:
-            differences = node.nsmap
-        
-        global namespace_start_tag
-        for ns in differences:
-            if ns != namespace_start_tag:
-                response += ' xmlns'
-                if ns is not None:
-                    response += ':' + ns
-                response += '="' + node.nsmap[ns] + '"'
-        
-        # if no children and no text, is probably self closing
-        if len(node) == 0 and node.text is None:
-            response += ' />'
-        else:
-            # end of open tag
-            response += '>'
-            # add text
-            remaining_size = maxlen - len(response)
-            if remaining_size > 0 and node.text is not None:
-                response += self._collapseWhitespace(node.text, remaining_size) # remove whitespace
-            
-            # loop through children
-            for child in node.iterchildren():
-                remaining_size = maxlen - len(response)
-                if remaining_size <= 0:
-                    break
-                else:
-                    response += self._getElementXML(child, remaining_size) + self._collapseWhitespace(child.tail, remaining_size) # remove whitespace
-            
-            response += '</' + tagName + '>'
-            
-        return response[0:maxlen]
     
     def close_quick_panel(self):
         sublime.active_window().run_command('hide_overlay', { 'cancel': True }) # close existing quick panel
@@ -738,7 +736,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         
         maxlen = 70
-        self.view.window().show_quick_panel([[self._getTagNameWithPrefix(e), self._collapseWhitespace(e.text, maxlen), self._getElementXML(e, maxlen)] for e in self.results], self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
+        self.view.window().show_quick_panel([[getTagNameWithPrefix(e), collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results], self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
         
     def xpath_selection_changed(self, selected_index):
         self.xpath_selection_done(selected_index)
@@ -758,10 +756,10 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             results = [results[specific_index]]
         
         for node in results:
-            row, col = self._getElementLocation(node)
+            row, col = getNodeLocation(node)
             
             char_index = self.view.text_point(row - 1, col)
-            char_index_end = char_index #+ len(self.getTagNameWithPrefix(node))
+            char_index_end = char_index #+ len(getTagNameWithPrefix(node))
             
             cursors.append(sublime.Region(char_index, char_index_end))
             
