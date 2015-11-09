@@ -476,6 +476,7 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
             
             global namespace_start_tag
             pos = self._getParsePosition()
+            print('start', tagName, pos)
             self.startPrefixMapping(namespace_start_tag, 'http://lxml/line/' + str(pos[0]) + '/col/' + str(pos[1])) # note that due to the way lxml element proxies work, we can't store the column number without making it a part of the document
             
             self._new_mappings = self._getNamespaceMap()
@@ -493,6 +494,7 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
                 self._default_ns = self._getNamespaceURI(None)
         
         def endElementNS(self, name, tagName):
+            print('end', tagName, self._getParsePosition()) # TODO: find a way to store the end tag position, so that we could replace the current xpath at cursor system... http://lxml.de/element_classes.html#element-initialization might help here where it mentions keeping the proxies alive
             tag = self._splitPrefixAndGetNamespaceURI(tagName)
             name = (tag[2], tag[1])
             super().endElementNS(name, tagName)
@@ -513,6 +515,23 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
     
     return createETree.etree
 
+def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start = 1):
+    flattened = {}
+    for item in items:
+        flattened.setdefault(item[0] or replaceNoneWith, []).append(item[1])
+    
+    unique = []
+    for key in flattened.keys():
+        if len(flattened[key]) == 1:
+            unique.append((key, flattened[key][0]))
+        else:
+            index = start
+            for item in flattened[key]:
+                unique.append((key + str(index), item))
+                index += 1
+    return unique
+            
+    
 class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
@@ -520,6 +539,7 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
     selected_index = None
     live_mode = None
+    pending = []
     
     def run(self, edit, **args):
         self.show_query_results = args is None or getBoolValueFromArgsOrSettings('show_query_results', args, True)
@@ -530,11 +550,27 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
     
     def change(self, value):
+        """When the xpath query is changed, after a short delay (so that it doesn't query unnecessarily while the xpath is still being typed), execute the expression."""
+        def cb():
+            if self.pending.pop() == value:
+                self.process_results_for_query(value)
+                if self.input_panel is not None:
+                    self.input_panel.window().focus_view(self.input_panel)
+        
         if self.live_mode and self.show_query_results:
-            # TODO: maybe set a timeout so that it doesn't query unnecessarily while the xpath is still being typed
-            self.process_results_for_query(value)
-            if self.input_panel is not None:
-                self.input_panel.window().focus_view(self.input_panel)
+            self.pending.append(value)
+            
+            global settings
+            settings = sublime.load_settings('xpath.sublime-settings')
+            delay = settings.get('live_query_timeout', 0)
+            async = settings.get('live_query_async', True)
+            
+            if async:
+                sublime.set_timeout_async(cb, delay)
+            elif delay == 0:
+                cb()
+            else:
+                sublime.set_timeout(cb, delay)
         
     def cancel(self):
         self.input_panel = None
@@ -576,19 +612,14 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             tree = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
             
             # find all namespaces in the document, so that the same prefixes can be used for the xpath
-            # TODO: if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
-            nsmap = {}
+            # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
+            # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
             global namespace_start_tag
             namespaces = [ns for ns in getUniqueItems(getNamespaces(tree)) if ns[0] != namespace_start_tag]
-            print(namespaces)
+            namespaces = makeNamespacePrefixesUniqueWithNumericSuffix(namespaces, defaultNamespacePrefix, 1)
+            nsmap = {}
             for ns in namespaces:
                 nsmap[ns[0]] = ns[1]
-            
-            # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-            # TODO: cater for multiple default namespaces (i.e. on different elements) here / or in the code above
-            defaultNSURI = nsmap.pop(None, None)
-            if defaultNSURI is not None:
-                nsmap[defaultNamespacePrefix] = defaultNSURI
             
             try:
                 xpath = etree.XPath(query, namespaces = nsmap)
