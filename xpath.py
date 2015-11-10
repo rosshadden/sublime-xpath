@@ -409,29 +409,9 @@ def plugin_loaded():
 def lxml_etree_parse_xml_string_with_location(xmlString):
     parser = make_parser()
     
-    class LocationAwareElement(etree.ElementBase):
-        start_tag_pos = None
-        end_tag_pos = None
-        
-        def _init(self):
-            super()._init()
-            
-            if '{lxml}start_tag_pos' in self.attrib.keys():
-                self.start_tag_pos = self.get('{lxml}start_tag_pos') # it should be possible to pop these attributes so that they don't appear in the final DOM... but doing so seems to not work, despite keeping the element proxy alive
-                self.end_tag_pos = self.get('{lxml}end_tag_pos')
-    
-    etree_parser = etree.XMLParser()
-    lookup = etree.ElementDefaultClassLookup(element=LocationAwareElement)
-    etree_parser.set_element_class_lookup(lookup)
-    
     class ETreeContent(ElementTreeContentHandler):
         _locator = None
         _prefix_hierarchy = []
-        
-        proxy_cache = None
-        
-        def __init__(self):
-            super().__init__(makeelement=etree_parser.makeelement)
         
         def setDocumentLocator(self, locator):
             self._locator = locator
@@ -496,7 +476,7 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
             super().startElementNS(name, tagName, attrs)
             
             current = self._element_stack[-1]
-            current.set('{lxml}start_tag_pos', self._getParsePosition())
+            current.set('{lxml}open_tag_start_pos', self._getParsePosition())
             
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
@@ -509,8 +489,10 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
                 self._default_ns = self._getNamespaceURI(None)
         
         def endElementNS(self, name, tagName):
+            self._recordEndPosition()
+            
             current = self._element_stack[-1]
-            current.set('{lxml}end_tag_pos', self._getParsePosition())
+            self._recordPosition(current, 'close_tag_start_pos')
             
             tag = self._splitPrefixAndGetNamespaceURI(tagName)
             name = (tag[2], tag[1])
@@ -519,8 +501,29 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
                 self.endPrefixMapping(None)
             self._prefix_hierarchy.pop()
         
+        def _recordPosition(self, node, position_name, position = None):
+            position_name = '{lxml}' + position_name
+            if position is not None or position_name not in node.attrib.keys():
+                node.set(position_name, position or self._getParsePosition())
+        
+        def _recordEndPosition(self):
+            current = self._element_stack[-1]
+            if len(current) == 0: # current element has no children
+                if current.text is None:
+                    self._recordPosition(current, 'open_tag_end_pos')
+            else: # current element has children
+                last_child = current[-1] # get the last child
+                if last_child.tail is None:
+                    self._recordPosition(last_child, 'close_tag_end_pos')
+                    if last_child.get('{lxml}close_tag_end_pos') == last_child.get('{lxml}open_tag_end_pos'): # self-closing tag, update the start position of the "close tag" to the start position of the open tag
+                        self._recordPosition(last_child, 'close_tag_start_pos', last_child.get('{lxml}open_tag_start_pos'))
+        
+        def characters(self, data):
+            self._recordEndPosition()
+            super().characters(data)
+        
         def endDocument(self):
-            self.proxy_cache = list(self.etree.iter())
+            self._recordPosition(self.etree.getroot(), 'close_tag_end_pos')
     
     createETree = ETreeContent()
     
@@ -533,7 +536,7 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
     
     parser.close()
     
-    return (createETree.etree, createETree.proxy_cache)
+    return createETree.etree
 
 def getTagNameWithPrefix(node):
     tag = node.tag.split('}')[-1]
@@ -545,13 +548,6 @@ def getTagNameWithPrefix(node):
 
 def collapseWhitespace(text, maxlen):
     return (text or '').strip().replace('\n', ' ').replace('\t', ' ').replace('  ', ' ')[0:maxlen]
-
-def getNodeLocation(node):
-    global namespace_start_tag
-    ns = node.nsmap[namespace_start_tag].split('/')
-    col = int(ns[-1]) + 1
-    row = int(ns[-3])
-    return (row, col)
 
 def getElementXMLPreview(node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
@@ -585,16 +581,15 @@ def getElementXMLPreview(node, maxlen):
     else:
         differences = node.nsmap
     
-    global namespace_start_tag
     for ns in differences:
-        if ns != namespace_start_tag:
+        if node.nsmap[ns] != 'lxml': # ignore our lxml node position namespace
             response += ' xmlns'
             if ns is not None:
                 response += ':' + ns
             response += '="' + node.nsmap[ns] + '"'
     
     # if no children and no text, is probably self closing
-    if len(node) == 0 and node.text is None:
+    if len(node) == 0 and node.text is None: # TODO: can change to check if start and end tag positions are the same
         response += ' />'
     else:
         # end of open tag
@@ -625,7 +620,7 @@ def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start =
     for key in flattened.keys():
         if len(flattened[key]) == 1:
             unique[key] = flattened[key][0]
-        else:
+        else: # TODO: what if a namespace with the new prefix already exists? need to find next available number...
             index = start
             for item in flattened[key]:
                 unique[key + str(index)] = item
@@ -644,14 +639,25 @@ def get_results_for_xpath_query(view, query, from_root):
     # parse each region as XML
     for region in getSGMLRegionsContainingCursors(view):
         xmlString = view.substr(region)
-        tree, proxy_cache = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
+        tree = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
         
         # find all namespaces in the document, so that the same prefixes can be used for the xpath
         # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
         # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-        global namespace_start_tag
-        namespaces = [ns for ns in getUniqueItems(getNamespaces(tree)) if ns[0] != namespace_start_tag]
+        namespaces = getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != 'lxml'])
         nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(namespaces, defaultNamespacePrefix, 1)
+        
+        # test code to prove that the positions and namespaces are reported correctly
+        if False:
+            def pointFromNodePos(node, pos):
+                row, col = node.get('{lxml}' + pos).split('/')
+                return view.text_point(int(row) - 1, int(col))
+            def regionFromNode(node, start, end):
+                return sublime.Region(pointFromNodePos(node, start), pointFromNodePos(node, end))
+            for node in tree.iter():
+                print(view.substr(regionFromNode(node, 'open_tag_start_pos', 'open_tag_end_pos')))
+                print(view.substr(regionFromNode(node, 'close_tag_start_pos', 'close_tag_end_pos')))
+            print(namespaces, nsmap)
         
         try:
             xpath = etree.XPath(query, namespaces = nsmap)
@@ -769,8 +775,6 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         # TODO: close input box if it is open
     
     def goto_results_for_query(self, specific_index = None):
-        global namespace_start_tag
-        
         cursors = []
         
         results = self.results
@@ -778,9 +782,9 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             results = [results[specific_index]]
         
         for node in results:
-            row, col = node.start_tag_pos.split('/')
+            row, col = node.get('{lxml}open_tag_start_pos').split('/')
             
-            char_index = self.view.text_point(int(row) - 1, int(col))
+            char_index = self.view.text_point(int(row) - 1, int(col) + 1)
             char_index_end = char_index #+ len(getTagNameWithPrefix(node))
             
             cursors.append(sublime.Region(char_index, char_index_end))
