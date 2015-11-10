@@ -9,7 +9,6 @@ from xml.sax import make_parser, ContentHandler#, parseString, handler
 changeCounters = {}
 XPaths = {}
 settings = None
-namespace_start_tag = 'START_TAG_POS'
 
 def settingsChanged():
     """Clear change counters and cached xpath regions for all views, and recalculate xpath regions for the current view."""
@@ -410,13 +409,32 @@ def plugin_loaded():
 def lxml_etree_parse_xml_string_with_location(xmlString):
     parser = make_parser()
     
-    class ETreeContent(ElementTreeContentHandler):
-        locator = None
+    class LocationAwareElement(etree.ElementBase):
+        start_tag_pos = None
+        end_tag_pos = None
         
-        prefix_hierarchy = []
+        def _init(self):
+            super()._init()
+            
+            if '{lxml}start_tag_pos' in self.attrib.keys():
+                self.start_tag_pos = self.get('{lxml}start_tag_pos') # it should be possible to pop these attributes so that they don't appear in the final DOM... but doing so seems to not work, despite keeping the element proxy alive
+                self.end_tag_pos = self.get('{lxml}end_tag_pos')
+    
+    etree_parser = etree.XMLParser()
+    lookup = etree.ElementDefaultClassLookup(element=LocationAwareElement)
+    etree_parser.set_element_class_lookup(lookup)
+    
+    class ETreeContent(ElementTreeContentHandler):
+        _locator = None
+        _prefix_hierarchy = []
+        
+        proxy_cache = None
+        
+        def __init__(self):
+            super().__init__(makeelement=etree_parser.makeelement)
         
         def setDocumentLocator(self, locator):
-            self.locator = locator
+            self._locator = locator
         
         def _splitPrefixAndGetNamespaceURI(self, fullName):
             prefix = None
@@ -432,25 +450,25 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
             return (prefix, local_name, self._getNamespaceURI(prefix))
         
         def _getNamespaceURI(self, prefix):
-            for mappings in reversed(self.prefix_hierarchy):
+            for mappings in reversed(self._prefix_hierarchy):
                 if prefix in mappings:
                     return mappings[prefix]
             return None
         
         def _getNamespaceMap(self):
             flattened = {}
-            for mappings in self.prefix_hierarchy:
+            for mappings in self._prefix_hierarchy:
                 for prefix in mappings:
                     flattened[prefix] = mappings[prefix]
             return flattened
         
         def _getParsePosition(self):
-            locator = self.locator or parser
-            return (locator.getLineNumber(), locator.getColumnNumber())
+            locator = self._locator or parser
+            return str(locator.getLineNumber()) + '/' + str(locator.getColumnNumber())
         
         def startElementNS(self, name, tagName, attrs):
             # correct missing element and attribute namespaceURIs, using known prefixes and new prefixes declared with this element
-            self.prefix_hierarchy.append({})
+            self._prefix_hierarchy.append({})
             
             nsmap = []
             attrmap = []
@@ -474,33 +492,35 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
             tag = self._splitPrefixAndGetNamespaceURI(tagName)
             name = (tag[2], tag[1])
             
-            global namespace_start_tag
-            pos = self._getParsePosition()
-            print('start', tagName, pos)
-            self.startPrefixMapping(namespace_start_tag, 'http://lxml/line/' + str(pos[0]) + '/col/' + str(pos[1])) # note that due to the way lxml element proxies work, we can't store the column number without making it a part of the document
-            
             self._new_mappings = self._getNamespaceMap()
-            
             super().startElementNS(name, tagName, attrs)
             
+            current = self._element_stack[-1]
+            current.set('{lxml}start_tag_pos', self._getParsePosition())
+            
         def startPrefixMapping(self, prefix, uri):
-            self.prefix_hierarchy[-1][prefix] = uri
+            self._prefix_hierarchy[-1][prefix] = uri
             if prefix is None:
                 self._default_ns = uri
         
         def endPrefixMapping(self, prefix):
-            self.prefix_hierarchy[-1].pop(prefix)
+            self._prefix_hierarchy[-1].pop(prefix)
             if prefix is None:
                 self._default_ns = self._getNamespaceURI(None)
         
         def endElementNS(self, name, tagName):
-            print('end', tagName, self._getParsePosition()) # TODO: find a way to store the end tag position, so that we could replace the current xpath at cursor system... http://lxml.de/element_classes.html#element-initialization might help here where it mentions keeping the proxies alive
+            current = self._element_stack[-1]
+            current.set('{lxml}end_tag_pos', self._getParsePosition())
+            
             tag = self._splitPrefixAndGetNamespaceURI(tagName)
             name = (tag[2], tag[1])
             super().endElementNS(name, tagName)
-            if None in self.prefix_hierarchy[-1]: # re-map default namespace if applicable
+            if None in self._prefix_hierarchy[-1]: # re-map default namespace if applicable
                 self.endPrefixMapping(None)
-            self.prefix_hierarchy.pop()
+            self._prefix_hierarchy.pop()
+        
+        def endDocument(self):
+            self.proxy_cache = list(self.etree.iter())
     
     createETree = ETreeContent()
     
@@ -513,7 +533,7 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
     
     parser.close()
     
-    return createETree.etree
+    return (createETree.etree, createETree.proxy_cache)
 
 def getTagNameWithPrefix(node):
     tag = node.tag.split('}')[-1]
@@ -548,6 +568,8 @@ def getElementXMLPreview(node, maxlen):
         prefix = ''
         if len(splitNS) == 2:
             splitNS[0] = splitNS[0][len('{'):]
+            if splitNS[0] == 'lxml':
+                continue
             for prefix in node.nsmap:
                 if node.nsmap[prefix] == splitNS[0]:
                     prefix += ':'
@@ -622,7 +644,7 @@ def get_results_for_xpath_query(view, query, from_root):
     # parse each region as XML
     for region in getSGMLRegionsContainingCursors(view):
         xmlString = view.substr(region)
-        tree = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
+        tree, proxy_cache = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
         
         # find all namespaces in the document, so that the same prefixes can be used for the xpath
         # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
@@ -756,9 +778,9 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             results = [results[specific_index]]
         
         for node in results:
-            row, col = getNodeLocation(node)
+            row, col = node.start_tag_pos.split('/')
             
-            char_index = self.view.text_point(row - 1, col)
+            char_index = self.view.text_point(int(row) - 1, int(col))
             char_index_end = char_index #+ len(getTagNameWithPrefix(node))
             
             cursors.append(sublime.Region(char_index, char_index_end))
