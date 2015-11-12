@@ -265,8 +265,8 @@ def getNodePositions(view, node):
     
     yield (node, pos, close_pos.end(), True)
 
-def regionIntersects(region1, region2, include_beginning):
-    return region1.intersects(region2) or (include_beginning and region1.contains(region2.begin()))
+def regionIntersects(outer, inner, include_beginning):
+    return outer.intersects(inner) or (include_beginning and outer.contains(inner.begin()))
 
 def getNodesAtPositions(view, trees, positions):
     """Given a sorted list of trees and non-overlapping positions, return the nodes that relate to each position - efficiently, without searching through unnecessary children and stop once all are found."""
@@ -359,7 +359,7 @@ def getXPathOfNodes(nodes, args):
                 sibling_tag = getTagName(sibling)
                 if not case_sensitive:
                     sibling_tag[2] = sibling_tag.lower()
-                return sibling_tag == tag
+                return sibling_tag == tag # namespace uri, prefix and tag name must all match
                     
             for sibling in siblings:
                 if compare(sibling):
@@ -404,7 +404,7 @@ def getXPathOfNodes(nodes, args):
         tree = node.getroottree()
         root = tree.getroot()
         
-        if root not in namespaces:
+        if root not in namespaces and show_default_namespace_prefix: # TODO: mayb ealso necessary if a prefix is used more than once
             namespaces[tree] = get_all_namespaces_in_tree(tree)
         
         while node != root:
