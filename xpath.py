@@ -31,21 +31,27 @@ def containsSGML(view):
 
 def getSGMLRegionsContainingCursors(view):
     """Find the SGML region(s) that the cursor(s) are in for the specified view."""
-    allRegions = getSGMLRegions(view)
-    cursor_regions = []
-    for index, region in enumerate(allRegions):
-        containsCursor = False
-        for cursor in view.sel():
+    cursors = [cursor for cursor in view.sel()]
+    regions = getSGMLRegions(view)
+    for region_index, region in enumerate(regions):
+        cursors_to_remove = []
+        for cursor in cursors:
             if region.contains(cursor):
-                containsCursor = True
+                yield (region, region_index, cursor)
+                cursors_to_remove.append(cursor)
+            elif region.begin() > cursor.end(): # cursor before this region
+                cursors_to_remove.append(cursor)
+            elif cursor.begin() > region.end(): # found all cursors in this region
                 break
-        if containsCursor:
-            cursor_regions.append((region, index))
-    return cursor_regions
+        if region_index < len(regions) - 1: # no point removing cursors from those left to find if no regions left to search through
+            for cursor in cursors_to_remove:
+                cursors.remove(cursor)
+            if len(cursors) == 0:
+                break
 
 def isCursorInsideSGML(view):
     """Return True if at least one cursor is within XML or HTML syntax."""
-    return len(getSGMLRegionsContainingCursors(view)) > 0
+    return next(getSGMLRegionsContainingCursors(view), None) is not None
 
 def buildTreesForView(view):
     """Create an xml tree for each XML region in the specified view."""
@@ -324,6 +330,7 @@ def getNodesAtPositions(view, trees, positions):
 
 def getXPathOfNodes(nodes):
     paths = []
+    # TODO: include attributes, include indexes
     for node in nodes:
         paths.append(node.getroottree().getelementpath(node))
     return paths
@@ -371,7 +378,45 @@ def updateStatusToCurrentXPathIfSGML(view):
     else:
         view.set_status('xpath', status)
 
-# TODO: re-add copy xpath to clipboard command!
+def copyXPathsToClipboard(view, include_indexes, include_attributes, unique):
+    """Copy the XPath(s) at the cursor(s) to the clipboard."""
+    if isCursorInsideSGML(view):
+        trees = ensureTreeCacheIsCurrent(view)
+        
+        cursors = []
+        for result in getSGMLRegionsContainingCursors(view):
+            cursors.append(result[2])
+        results = getNodesAtPositions(view, trees, cursors)
+        paths = getXPathOfNodes([result[0] for result in results]) # TODO: include indexes, include attributes
+        
+        if unique:
+            paths = getUniqueItems(paths)
+        
+        if len(paths) > 0:
+            sublime.set_clipboard(os.linesep.join(paths))
+            message = str(len(paths)) + ' xpath(s) copied to clipboard'
+        else:
+            message = 'no xpath at cursor to copy to clipboard'
+    else:
+        message = 'xpath not copied to clipboard - ensure syntax is set to xml or html'
+    sublime.status_message(message)
+
+class XpathCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        """Copy XPath(s) at cursor(s) to clipboard."""
+        view = self.view
+        
+        includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
+        unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
+        includeAttributes = includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
+        
+        copyXPathsToClipboard(view, includeIndexes, includeIndexes or includeAttributes, unique)
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
+    def is_visible(self, **args):
+        return containsSGML(self.view)
+
+# TODO: re-add goto relative node command
 
 def getBoolValueFromArgsOrSettings(key, args, default):
     """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
@@ -508,8 +553,14 @@ def get_results_for_xpath_query(view, query, from_root):
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
     global xml_trees
-    for region, region_index in getSGMLRegionsContainingCursors(view):
-        tree = xml_trees[view.id()][region_index]
+    trees = xml_trees[view.id()]
+    
+    regions_cursors = {}
+    for result in getSGMLRegionsContainingCursors(view):
+        regions_cursors.setdefault(result[1], []).append(result[2])
+    
+    for region_index in regions_cursors.keys():
+        tree = trees[region_index]
         
         # find all namespaces in the document, so that the same prefixes can be used for the xpath
         # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
@@ -529,8 +580,7 @@ def get_results_for_xpath_query(view, query, from_root):
             contexts.append(tree)
         else:
             # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
-            cursors_in_region = [r for r in view.sel() if region.contains(r)]
-            for node in getNodesAtPositions(view, [tree], cursors_in_region):
+            for node in getNodesAtPositions(view, [tree], regions_cursors[region_index]):
                 contexts.append(node[1])
         
         for context in contexts:
