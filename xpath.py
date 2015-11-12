@@ -356,7 +356,7 @@ def getXPathOfNodes(nodes, args):
         
         if include_indexes:
             siblings = node.itersiblings(preceding = True)
-            count = 0 # TODO: rename to index?
+            index = 1
             
             def compare(sibling):
                 sibling_tag = getTagName(sibling)
@@ -366,20 +366,19 @@ def getXPathOfNodes(nodes, args):
                     
             for sibling in siblings:
                 if compare(sibling):
-                    count += 1
+                    index += 1
             
             # if there are no previous sibling matches, check next siblings to see if we should index this node
-            if count == 0:
+            multiple = index > 1
+            if not multiple:
                 siblings = node.itersiblings()
                 for sibling in siblings:
                     if compare(sibling):
-                        count += 1
+                        multiple = True
                         break
-            else:
-                count += 1 # there are previous siblings, so this node is the next index
             
-            if count > 0:
-                output += '[' + str(count) + ']'
+            if multiple:
+                output += '[' + str(index) + ']'
         
         if include_attributes:
             attributes_to_show = []
@@ -392,7 +391,9 @@ def getXPathOfNodes(nodes, args):
                         if not case_sensitive:
                             attr_name = attr_name.lower()
                         attr = attr_name.split(':')
-                        include_attribute = attr_name in wanted_attributes or (len(attr) == 2 and attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes)
+                        include_attribute = attr_name in wanted_attributes 
+                        if not include_attribue and len(attr) == 2:
+                            include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
                     
                     if include_attribute:
                         attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
@@ -797,7 +798,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
-            # TODO: if previous input is blank, use path of first cursor
+            # TODO: if previous input is blank, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
             self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
     
     def change(self, value):
