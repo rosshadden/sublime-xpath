@@ -793,13 +793,20 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def run(self, edit, **args):
         self.show_query_results = args is None or getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = args is None or getBoolValueFromArgsOrSettings('live_mode', args, True)
-        self.relative_mode = args is None or getBoolValueFromArgsOrSettings('relative_mode', args, True) # TODO: cache context nodes now? to allow live mode to work with it
+        self.relative_mode = args is None or getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
         
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
-            # TODO: if previous input is blank, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
-            self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
+            # if previous input is blank, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
+            prefill = self.previous_input
+            if not self.previous_input:
+                global previous_first_selection
+                prev = previous_first_selection.get(self.view.id(), None)
+                if prev is not None:
+                    xpaths = getXPathOfNodes([prev[1]], None)
+                    prefill = xpaths[0]
+            self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
     
     def change(self, value):
         """When the xpath query is changed, after a short delay (so that it doesn't query unnecessarily while the xpath is still being typed), execute the expression."""
@@ -879,7 +886,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if specific_index is not None and specific_index > -1:
             results = [results[specific_index]]
         
-        move_cursors_to_nodes(view, results, 'open')
+        move_cursors_to_nodes(self.view, results, 'open')
         
         if specific_index is None or specific_index == -1:
             self.results = None
