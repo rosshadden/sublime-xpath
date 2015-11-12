@@ -341,23 +341,40 @@ def getXPathOfNodes(nodes, args):
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
     
+    namespaces = {}
+    
     def getNodePathPart(node):
-        tag = getTagNameWithPrefix(node) # TODO: default namespace prefix if applicable
+        tag = getTagName(node) # TODO: default namespace prefix if applicable
         
-        output = tag
+        output = tag[2]
         
         if not case_sensitive:
-            tag = tag.lower()
+            tag[2] = tag[2].lower()
         
         if include_indexes:
             siblings = node.itersiblings(preceding = True)
             count = 0
-            for sibling in siblings:
-                sibling_name = getTagNameWithPrefix(sibling)
+            
+            def compare(sibling):
+                sibling_tag = getTagName(sibling)
                 if not case_sensitive:
-                    sibling_name = sibling_name.lower()
-                if sibling_name == tag: # TODO: probably it should check namespace URI and local name?
+                    sibling_tag[2] = sibling_tag.lower()
+                return sibling_tag == tag
+                    
+            for sibling in siblings:
+                if compare(sibling):
                     count += 1
+            
+            # if there are no previous sibling matches, check next siblings to see if we should index this node
+            if count == 0:
+                siblings = node.itersiblings()
+                for sibling in siblings:
+                    if compare(sibling):
+                        count += 1
+                        break
+            else:
+                count += 1 # there are previous siblings, so this node is the next index
+            
             if count > 0:
                 output += '[' + str(count) + ']'
         
@@ -384,7 +401,12 @@ def getXPathOfNodes(nodes, args):
                 
         
     def getNodePathSegments(node):
-        root = node.getroottree().getroot()
+        tree = node.getroottree()
+        root = tree.getroot()
+        
+        if root not in namespaces:
+            namespaces[tree] = get_all_namespaces_in_tree(tree)
+        
         while node != root:
             yield getNodePathPart(node)
             node = node.getparent()
@@ -486,7 +508,7 @@ def move_cursors_to_nodes(view, nodes, position_type):
     
     for node in nodes:
         pos = getNodeTagRegion(view, node, position_type)
-        tag = getTagNameWithPrefix(node)
+        tag = getTagName(node)[2]
         
         chars_before_tag = len('<')
         if position_type == 'close' and not isTagSelfClosing(node):
@@ -604,13 +626,17 @@ def plugin_loaded():
     settings.add_on_change('reparse', settingsChanged)
     sublime.set_timeout_async(settingsChanged, 10)
 
-def getTagNameWithPrefix(node):
-    tag = node.tag.split('}')[-1]
+def getTagName(node):
+    items = node.tag.split('}')
+    namespace = None
+    local_name = items[-1]
+    full_name = local_name
+    if len(items) == 2:
+        namespace = items[0]
+        if node.prefix is not None:
+            full_name = node.prefix + ':' + full_name
     
-    if node.prefix:
-        tag = node.prefix + ':' + tag
-    
-    return tag
+    return (namespace, local_name, full_name)
 
 def collapseWhitespace(text, maxlen):
     return (text or '').strip().replace('\n', ' ').replace('\t', ' ').replace('  ', ' ')[0:maxlen]
@@ -627,7 +653,7 @@ def getElementXMLPreview(node, maxlen):
     # response = etree.tostring(node, encoding='unicode')
     
     # add opening tag
-    tag_name = getTagNameWithPrefix(node)
+    tag_name = getTagName(node)[2]
     response = '<' + tag_name
     # add attributes
     for attrib in node.attrib:
@@ -698,11 +724,16 @@ def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start =
                 index += 1
     return unique
 
+def get_all_namespaces_in_tree(tree):
+    # find all namespaces in the document, so that the same prefixes can be used for the xpath
+    # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
+    # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
+    getNamespaces = etree.XPath('//namespace::*')
+    return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != 'lxml'])
+
 def get_results_for_xpath_query(view, query, from_root):
     """Execute the specified xpath query on all SGML regions that contain a cursor, and return the results."""
     matches = []
-    
-    getNamespaces = etree.XPath('//namespace::*')
     
     global settings
     settings = sublime.load_settings('xpath.sublime-settings')
@@ -718,11 +749,7 @@ def get_results_for_xpath_query(view, query, from_root):
     for region_index in regions_cursors.keys():
         tree = trees[region_index]
         
-        # find all namespaces in the document, so that the same prefixes can be used for the xpath
-        # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
-        # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-        namespaces = getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != 'lxml'])
-        nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(namespaces, defaultNamespacePrefix, 1)
+        nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix, 1)
         
         try:
             xpath = etree.XPath(query, namespaces = nsmap)
@@ -829,7 +856,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         
         maxlen = 70
-        self.view.window().show_quick_panel([[getTagNameWithPrefix(e), collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results], self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
+        self.view.window().show_quick_panel([[getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results], self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
         
     def xpath_selection_changed(self, selected_index):
         self.xpath_selection_done(selected_index)
