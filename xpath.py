@@ -401,7 +401,7 @@ def copyXPathsToClipboard(view, include_indexes, include_attributes, unique):
         message = 'xpath not copied to clipboard - ensure syntax is set to xml or html'
     sublime.status_message(message)
 
-class XpathCommand(sublime_plugin.TextCommand):
+class CopyXpathCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
         """Copy XPath(s) at cursor(s) to clipboard."""
         view = self.view
@@ -416,7 +416,74 @@ class XpathCommand(sublime_plugin.TextCommand):
     def is_visible(self, **args):
         return containsSGML(self.view)
 
-# TODO: re-add goto relative node command
+def move_cursors_to_nodes(view, nodes, position_type):
+    cursors = []
+    
+    for node in nodes:
+        pos = getNodeTagRegion(view, node, position_type)
+        tag = getTagNameWithPrefix(node)
+        
+        chars_before_tag = len('<')
+        if position_type == 'close' and not isTagSelfClosing(node):
+            chars_before_tag += len('/')
+        # select only the tag name with the prefix
+        cursors.append(sublime.Region(pos.begin() + chars_before_tag, pos.begin() + chars_before_tag + len(tag)))
+    
+    view.sel().clear()
+    view.sel().add_all(cursors)
+    
+    view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
+
+class GotoRelativeCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', 'direction': 'prev'})
+        """Move cursor(s) to specified relative tag(s)."""
+        view = self.view
+        
+        trees = ensureTreeCacheIsCurrent(view)
+        
+        cursors = []
+        for result in getSGMLRegionsContainingCursors(view):
+            cursors.append(result[2])
+        results = getNodesAtPositions(view, trees, cursors)
+        
+        new_nodes_under_cursors = []
+        for result in results:
+            allFound = True
+            desired_node = self.find_node(result[0], args['direction'])
+            if desired_node is None:
+                allFound = False
+                break
+            else:
+                new_nodes_under_cursors.append(desired_node)
+        
+        if not allFound:
+            message = args['direction'] + ' node not found'
+            if len(cursors) > 1:
+                message += ' for at least one selection'
+            sublime.status_message(message)
+        else:
+            position_type = 'open'
+            if args['direction'] == 'close':
+                position_type = 'close'
+            move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
+    
+    def find_node(self, relative_to, direction):
+        def return_specific(node):
+            yield node
+        generator = None
+        if direction == 'next':
+            generator = relative_to.itersiblings()
+        elif direction == 'prev':
+            generator = relative_to.itersiblings(preceding = True)
+        elif direction in ('open', 'close'):
+            generator = return_specific(relative_to) # return self
+        elif direction == 'parent':
+            generator = return_specific(relative_to.getparent())
+        
+        if generator is None:
+            raise StandardError('Unknown direction "' + direction + '"')
+        else:
+            return next(generator, None)
 
 def getBoolValueFromArgsOrSettings(key, args, default):
     """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
@@ -463,6 +530,12 @@ def getTagNameWithPrefix(node):
 def collapseWhitespace(text, maxlen):
     return (text or '').strip().replace('\n', ' ').replace('\t', ' ').replace('  ', ' ')[0:maxlen]
 
+def isTagSelfClosing(node):
+    """If the start and end tag positions are the same, then it is self closing."""
+    open_pos = getNodeTagRange(node, 'open')
+    close_pos = getNodeTagRange(node, 'close')
+    return open_pos == close_pos
+
 def getElementXMLPreview(node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
     # NOTE: we can't use built in tostring method because it repeats all xmlns attributes unnecessarily
@@ -502,10 +575,7 @@ def getElementXMLPreview(node, maxlen):
                 response += ':' + ns
             response += '="' + node.nsmap[ns] + '"'
     
-    # if start and end tag positions are the same, then it is self closing
-    open_pos = getNodeTagRange(node, 'open')
-    close_pos = getNodeTagRange(node, 'close')
-    if open_pos == close_pos:
+    if isTagSelfClosing(node):
         response += ' />'
     else:
         # end of open tag
@@ -592,7 +662,7 @@ def get_results_for_xpath_query(view, query, from_root):
     
     return matches
 
-class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
+class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
     previous_input = '' # remember previous query so that when the user next runs this command, it will be prepopulated
