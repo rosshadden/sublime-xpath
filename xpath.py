@@ -473,7 +473,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         generator = None
         if direction == 'next':
             generator = relative_to.itersiblings()
-        elif direction == 'prev':
+        elif direction in ('prev', 'previous'):
             generator = relative_to.itersiblings(preceding = True)
         elif direction in ('open', 'close'):
             generator = return_specific(relative_to) # return self
@@ -484,6 +484,22 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             raise StandardError('Unknown direction "' + direction + '"')
         else:
             return next(generator, None)
+    
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
+    def is_visible(self):
+        return containsSGML(self.view)
+    def description(self, args):
+        if args['direction'] in ('open', 'close'):
+            descr = 'tag'
+        elif args['direction'] in ('prev', 'previous', 'next'):
+            descr = 'sibling'
+        elif args['direction'] in ('parent'):
+            descr = 'element'
+        else:
+            return None
+        
+        return 'Goto ' + args['direction'] + ' ' + descr
 
 def getBoolValueFromArgsOrSettings(key, args, default):
     """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
@@ -757,16 +773,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if specific_index is not None and specific_index > -1:
             results = [results[specific_index]]
         
-        for node in results:
-            open_pos = getNodeTagRegion(self.view, node, 'open')
-            
-            # select only the tag name with the prefix
-            cursors.append(sublime.Region(open_pos.begin() + len('<'), open_pos.begin() + len('<' + getTagNameWithPrefix(node))))
-        
-        self.view.sel().clear()
-        self.view.sel().add_all(cursors)
-        
-        self.view.show(cursors[0])
+        move_cursors_to_nodes(view, results, 'open')
         
         if specific_index is None or specific_index == -1:
             self.results = None
