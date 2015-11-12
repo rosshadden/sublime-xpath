@@ -6,412 +6,61 @@ from lxml.sax import ElementTreeContentHandler
 from lxml import etree
 from xml.sax import make_parser, ContentHandler#, parseString, handler
 
-changeCounters = {}
-XPaths = {}
-settings = None
+change_counters = {}
+xml_trees = {}
+previous_first_selection = {}
+settings = None # TODO: don't forget about case sensitivity and attributes etc. hierarchy only, no indexes...
 
 def settingsChanged():
-    """Clear change counters and cached xpath regions for all views, and recalculate xpath regions for the current view."""
-    global changeCounters
-    global XPaths
-    changeCounters.clear()
-    XPaths.clear()
-    updateStatusIfSGML(sublime.active_window().active_view())
-
-def addPath(view, start, end, path):
-    """Add the supplied xpath array to the cache for the view."""
-    global XPaths
-    XPaths[view.id()].append([sublime.Region(start, end), path[:]])
-
-def clearPathsForView(view):
-    """Clear all cached xpaths for the specified view."""
-    global XPaths
-    XPaths.pop(view.id(), None)
+    """Clear change counters and cached xpath regions for all views, and reparse xml regions for the current view."""
+    global change_counters
+    global xml_trees
+    global previous_first_selection
+    change_counters.clear()
+    xml_trees.clear()
+    previous_first_selection.clear()
+    updateStatusToCurrentXPathIfSGML(sublime.active_window().active_view())
 
 def getSGMLRegions(view):
     """Find all xml and html scopes in the specified view."""
     return view.find_by_selector('text.xml') + view.find_by_selector('text.html')
 
+def containsSGML(view):
+    """Return True if the view contains XML or HTML syntax."""
+    return len(getSGMLRegions(view)) > 0
+
 def getSGMLRegionsContainingCursors(view):
     """Find the SGML region(s) that the cursor(s) are in for the specified view."""
     allRegions = getSGMLRegions(view)
     cursor_regions = []
-    for region in allRegions:
+    for index, region in enumerate(allRegions):
         containsCursor = False
         for cursor in view.sel():
             if region.contains(cursor):
                 containsCursor = True
                 break
         if containsCursor:
-            cursor_regions.append(region)
+            cursor_regions.append((region, index))
     return cursor_regions
-
-def buildPathsForView(view):
-    """Clear and recreate a cache of all xpaths for the XML in the specified view."""
-    clearPathsForView(view)
-    global XPaths
-    XPaths[view.id()] = []
-    
-    for region in getSGMLRegions(view):
-        buildPathsForViewRegion(view, region)
-
-def buildPathsForViewRegion(view, region_scope):
-    """Create a cache of all xpaths for the XML in the specified view region."""
-    path = ['']
-    levelCounters = [{}]
-    firstIndexInXPath = 1
-    
-    tagRegions = [region for region in view.find_by_selector('entity.name.tag.') if region_scope.contains(region)] # find all entity name tags within the specified scope
-    position = 0
-    
-    global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
-    settings.clear_on_change('reparse')
-    settings.add_on_change('reparse', settingsChanged)
-    wanted_attributes = settings.get('attributes_to_include', [])
-    all_attributes = bool(settings.get('show_all_attributes', False))
-    case_sensitive = bool(settings.get('case_sensitive', True))
-    
-    if not case_sensitive:
-        wanted_attributes = [element.lower() for element in wanted_attributes]
-    
-    for region in tagRegions:
-        prevChar = view.substr(sublime.Region(region.begin() - 1, region.begin()))
-        tagName = view.substr(region)
-        
-        if prevChar == '<':
-            addPath(view, position, region.begin(), path)
-            
-            # check last char before end of tag, to see if it is self closing or not...
-            tagScope = view.find('>', region.end(), sublime.LITERAL).end()
-            selfEndingTag = view.substr(tagScope - 2) == '/'
-            
-            position = tagScope
-            
-            attributes = []
-            attr_pos = region.end() + 1
-            attr_namespace = ''
-            attr_name = ''
-            while attr_pos < tagScope:
-                scope_name = view.scope_name(attr_pos)
-                scope_region = view.extract_scope(attr_pos)
-                
-                attr_pos = scope_region.end() + 1
-                if 'entity.other.attribute-name' in scope_name:
-                    scope_text = view.substr(scope_region)
-                    if scope_text.endswith(':'):
-                        attr_namespace = scope_text#[0:-1]
-                        attr_pos -= 1
-                    elif scope_text.startswith(':'):
-                        attr_name = scope_text[1:]
-                    else:
-                        attr_name = scope_text
-                elif 'string.quoted.' in scope_name:
-                    scope_text = view.substr(scope_region)
-                    if (all_attributes or
-                        (    case_sensitive and (attr_namespace         + attr_name         in wanted_attributes or '*:' + attr_name         in wanted_attributes or attr_namespace         + '*' in wanted_attributes)) or
-                        (not case_sensitive and (attr_namespace.lower() + attr_name.lower() in wanted_attributes or '*:' + attr_name.lower() in wanted_attributes or attr_namespace.lower() + '*' in wanted_attributes))
-                    ):
-                        attributes.append('@' + attr_namespace + attr_name + ' = ' + scope_text)
-                    attr_namespace = ''
-                    attr_name = ''
-            
-            if len(attributes) > 0:
-                attributes = '[' + ' and '.join(attributes) + ']'
-            else:
-                attributes = ''
-            
-            level = len(levelCounters) - 1
-            checkTag = tagName
-            if not case_sensitive:
-                checkTag = checkTag.lower()
-            levelCounters[level][checkTag] = levelCounters[level].setdefault(checkTag, firstIndexInXPath - 1) + 1
-            tagIndexAtCurrentLevel = levelCounters[level].get(checkTag)
-            path.append(tagName + '[' + str(tagIndexAtCurrentLevel) + ']' + attributes)
-            
-            addPath(view, region.begin(), position, path)
-            if selfEndingTag:
-                path.pop()
-            else:
-                levelCounters.append({})
-        elif prevChar == '/':
-            addPath(view, position, region.begin(), path)
-            addPath(view, region.begin(), region.end() + 1, path)
-            path.pop()
-            levelCounters.pop()
-            position = region.end() + 1
-        
-    addPath(view, position, region_scope.end(), path)
-
-def getXPathIndexesAtPositions(view, positions):
-    """Given a sorted array of regions, return the indexes of the xpath strings that relate to each region. Requires that the xpaths have been cached already for the specified view."""
-    global XPaths
-    count = len(positions)
-    current = 0
-    matches = []
-    for index, path in enumerate(XPaths[view.id()]):
-        if path[0].intersects(positions[current]) or path[0].begin() == positions[current].begin():
-            matches.append(index)
-            current += 1
-            if current == count:
-                break
-    return matches
-
-def getXPathAtPositions(view, positions):
-    """Given a sorted array of regions, return the xpath nodes that relate to each region."""
-    global XPaths
-    matches = []
-    for index in getXPathIndexesAtPositions(view, positions):
-        matches.append(XPaths[view.id()][index][1])
-    return matches
-
-def getXPathStringAtPositions(view, positions, includeIndexes, includeAttributes):
-    """Given a sorted array of regions, return the xpath strings that relate to each region."""
-    global XPaths
-    matches = []
-    for match in getXPathAtPositions(view, positions):
-        if includeIndexes and includeAttributes:
-            matches.append('/'.join(match))
-        else:
-            hierarchy = []
-            for part in match:
-                begin = part.find('[')
-                end = part.find(']', begin) + len(']')
-                index = part[begin:end]
-                attributes = part[end:]
-                part = part[0:begin]
-                
-                if includeIndexes:
-                    part += index
-                if includeAttributes:
-                    part += attributes
-                
-                hierarchy.append(part)
-            matches.append('/'.join(hierarchy))
-            
-    return matches
-
-def containsSGML(view):
-    """Return True if the view contains XML or HTML syntax."""
-    return len(getSGMLRegions(view)) > 0
 
 def isCursorInsideSGML(view):
     """Return True if at least one cursor is within XML or HTML syntax."""
     return len(getSGMLRegionsContainingCursors(view)) > 0
 
-def updateStatusIfSGML(view):
-    """Update the status bar with the relevant xpath at the cursor."""
-    if isCursorInsideSGML(view):
-        updateStatus(view)
-    else:
-        view.erase_status('xpath')
+def buildTreesForView(view):
+    """Create an xml tree for each XML region in the specified view."""
+    trees = []
+    for region in getSGMLRegions(view):
+        trees.append(buildTreeForViewRegion(view, region))
+    return trees
 
-def ensureXpathCacheIsCurrent(view):
-    """If the document has been modified since the xpaths were cached, recreate the cache."""
-    global changeCounters
-    newCount = view.change_count()
-    oldCount = changeCounters.get(view.id(), None)
-    if oldCount is None or newCount > oldCount:
-        changeCounters[view.id()] = newCount
-        view.set_status('xpath', 'XPath being calculated...')
-        buildPathsForView(view)
-        view.erase_status('xpath')
-
-def updateStatus(view):
-    """If the XML has changed since the xpaths were cached, recreate the cache. Updates the status bar with the xpath at the location of the first selection in the view."""
-    if len(view.sel()) == 0: # no point doing any work as there is no cursor selection
-        view.erase_status('xpath')
-        return
-    ensureXpathCacheIsCurrent(view)
-    
-    includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', None, False)
-    response = getXPathStringAtPositions(view, [view.sel()[0]], includeIndexes, includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', None, False))
-    if len(response) == 1 and len(response[0]) > 0: # if there is an xpath at the cursor position, and it is not empty
-        showPath = response[0]
-        intro = 'XPath'
-        if len(view.sel()) > 1:
-            intro = intro + ' (at first selection)'
-        
-        text = intro + ': ' + showPath
-        maxLength = 234 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortunately we have to truncate it...
-        if len(text) > maxLength:
-            append = ' (truncated)'
-            text = text[0:maxLength - len(append)] + append
-        view.set_status('xpath', text)
-    else:
-        view.erase_status('xpath')
-
-def getBoolValueFromArgsOrSettings(key, args, default):
-    """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
-    if args is None or not key in args:
-        global settings
-        settings = sublime.load_settings('xpath.sublime-settings')
-        return bool(settings.get(key, default))
-    else:
-        return args[key]
-
-def getUniqueItems(items):
-    """Return the items without any duplicates, preserving order."""
-    unique = []
-    for item in items:
-        if item not in unique:
-            unique.append(item)
-    return unique
-
-def copyXPathsToClipboard(view, includeIndexes, includeAttributes, unique):
-    """Copy the XPath(s) at the cursor(s) to the clipboard."""
-    if containsSGML(view):
-        ensureXpathCacheIsCurrent(view)
-        paths = getXPathStringAtPositions(view, view.sel(), includeIndexes, includeAttributes)
-        if unique:
-            paths = getUniqueItems(paths)
-        
-        paths = [path for path in paths if len(path) > 0] # ignore blank paths
-        if len(paths) > 0:
-            sublime.set_clipboard(os.linesep.join(paths))
-            message = 'xpath(s) copied to clipboard'
-        else:
-            message = 'no xpath at cursor to copy to clipboard'
-    else:
-        message = 'xpath not copied to clipboard - ensure syntax of text under cursor is set to xml or html'
-    sublime.status_message(message)
-
-class XpathCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args):
-        """Copy XPath(s) at cursor(s) to clipboard."""
-        view = self.view
-        
-        includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
-        unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
-        includeAttributes = includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
-        
-        copyXPathsToClipboard(view, includeIndexes, includeIndexes or includeAttributes, unique)
-    def is_enabled(self, **args):
-        return isCursorInsideSGML(self.view)
-    def is_visible(self, **args):
-        return containsSGML(self.view)
-
-class GotoRelativeCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', {'direction': 'prev'})
-        """Move cursor(s) to specified relative tag(s)."""
-        view = self.view
-        
-        ensureXpathCacheIsCurrent(view)
-        
-        foundPaths = []
-        allFound = True
-        for selection in view.sel():
-            foundPath = self.find_node(selection, args['direction'])
-            if foundPath is not None:
-                foundPaths.append(foundPath)
-            else:
-                allFound = False
-                break
-        
-        if not allFound:
-            message = args['direction'] + ' node not found'
-            if len(view.sel()) > 1:
-                message += ' for at least one selection'
-            sublime.status_message(message)
-        else:
-            view.sel().clear()
-            for foundPath in foundPaths:
-                view.sel().add(foundPath)
-            view.show(foundPaths[0]) # scroll to first selection if not already visible
-    
-    def find_node(self, relative_to, direction):
-        """Given a direction/relative to search and a region to start from, find the relevant node."""
-        view = self.view
-        
-        global XPaths
-        
-        xpathIndexes = getXPathIndexesAtPositions(view, [relative_to])
-        if len(xpathIndexes) == 0: # if there is no xpath at the specified position, it's probably not a XML/HTML region
-            return None
-        currentPos = xpathIndexes[0]
-        currentPath = XPaths[view.id()][currentPos][1]
-        parentPath = '/'.join(currentPath[0:-1])
-        currentPath = '/'.join(currentPath)
-        if len(currentPath) == 0: # if the xpath is blank, (aka no node) there can be no related nodes...
-            return None
-        
-        if direction in ('next', 'close'):
-            search = XPaths[view.id()][currentPos:] # search from current position down to the end of the document
-        else: # prev, parent or open
-            search = XPaths[view.id()][0:currentPos + 1] # search from current position up to the top of the document
-            search = search[::-1]
-        
-        foundPaths = takewhile(lambda p: '/'.join(p[1]).startswith(parentPath), search)
-        if direction == 'next':
-            foundPath = next((p for p in foundPaths if '/'.join(p[1]) != parentPath and not '/'.join(p[1]).startswith(currentPath)), None) # not the parent node and not a descendant of the current node
-        elif direction == 'prev':
-            foundPath = None
-            wantedPath = None
-            for path in foundPaths:
-                p = '/'.join(path[1])
-                if not p.startswith(parentPath + '/'): # if it isn't a descendant of the parent, ignore it
-                    pass
-                elif wantedPath is not None:
-                    if p == wantedPath: # if it is the same sibling we have already found
-                        foundPath = path
-                    elif not p.startswith(wantedPath):
-                        break
-                elif not p.startswith(currentPath):
-                    foundPath = path
-                    wantedPath = '/'.join(foundPath[1])
-        elif direction in ('open', 'close', 'parent'):
-            if direction == 'parent':
-                wantedPath = parentPath
-            else:
-                wantedPath = currentPath
-            foundPaths = list(p for p in foundPaths if '/'.join(p[1]) == wantedPath)
-            if len(foundPaths) > 0:
-                foundPath = foundPaths[-1] # the last node (open and parent are in reverse order, remember...)
-            else:
-                foundPath = None
-        
-        if foundPath is None:
-            return None
-        else:
-            return sublime.Region(foundPath[0].begin(), foundPath[0].end() - 1)
-    
-    #def want_event(self):
-    #    return True
-    def is_enabled(self, **args):
-        return isCursorInsideSGML(self.view)
-    def is_visible(self):
-        return containsSGML(self.view)
-    def description(self, args):
-        if args['direction'] in ('open', 'close'):
-            descr = 'tag'
-        elif args['direction'] in ('prev', 'next'):
-            descr = 'sibling'
-        elif args['direction'] in ('parent'):
-            descr = 'element'
-        else:
-            return None
-        
-        return 'Goto ' + args['direction'] + ' ' + descr
-
-
-class XpathListener(sublime_plugin.EventListener):
-    def on_selection_modified_async(self, view):
-        updateStatusIfSGML(view)
-    def on_activated_async(self, view):
-        updateStatusIfSGML(view)
-    def on_pre_close(self, view):
-        clearPathsForView(view)
-
-def plugin_loaded():
-    """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
-    sublime.set_timeout_async(settingsChanged, 10)
-
-def lxml_etree_parse_xml_string_with_location(xmlString):
+def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
     parser = make_parser()
     
     class ETreeContent(ElementTreeContentHandler):
         _locator = None
         _prefix_hierarchy = []
+        _last_action = None
         
         def setDocumentLocator(self, locator):
             self._locator = locator
@@ -444,9 +93,12 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
         
         def _getParsePosition(self):
             locator = self._locator or parser
-            return str(locator.getLineNumber()) + '/' + str(locator.getColumnNumber())
+            return str(locator.getLineNumber() - 1 + line_number_offset) + '/' + str(locator.getColumnNumber())
         
         def startElementNS(self, name, tagName, attrs):
+            self._recordEndPosition()
+            
+            self._last_action = 'open'
             # correct missing element and attribute namespaceURIs, using known prefixes and new prefixes declared with this element
             self._prefix_hierarchy.append({})
             
@@ -491,6 +143,8 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
         def endElementNS(self, name, tagName):
             self._recordEndPosition()
             
+            self._last_action = 'close'
+            
             current = self._element_stack[-1]
             self._recordPosition(current, 'close_tag_start_pos')
             
@@ -507,16 +161,18 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
                 node.set(position_name, position or self._getParsePosition())
         
         def _recordEndPosition(self):
-            current = self._element_stack[-1]
-            if len(current) == 0: # current element has no children
-                if current.text is None:
-                    self._recordPosition(current, 'open_tag_end_pos')
-            else: # current element has children
-                last_child = current[-1] # get the last child
-                if last_child.tail is None:
-                    self._recordPosition(last_child, 'close_tag_end_pos')
-                    if last_child.get('{lxml}close_tag_end_pos') == last_child.get('{lxml}open_tag_end_pos'): # self-closing tag, update the start position of the "close tag" to the start position of the open tag
-                        self._recordPosition(last_child, 'close_tag_start_pos', last_child.get('{lxml}open_tag_start_pos'))
+            if len(self._element_stack) > 0:
+                current = self._element_stack[-1]
+                if len(current) == 0: # current element has no children
+                    if current.text is None:
+                        self._recordPosition(current, 'open_tag_end_pos')
+                else: # current element has children
+                    if len(current) > 0: # current element has children
+                        last_child = current[-1] # get the last child
+                        if last_child.tail is None and self._last_action is not None:
+                            self._recordPosition(last_child, self._last_action + '_tag_end_pos')
+                            if self._last_action == 'close' and last_child.get('{lxml}close_tag_end_pos') == last_child.get('{lxml}open_tag_end_pos'): # self-closing tag, update the start position of the "close tag" to the start position of the open tag
+                                self._recordPosition(last_child, 'close_tag_start_pos', last_child.get('{lxml}open_tag_start_pos'))
         
         def characters(self, data):
             self._recordEndPosition()
@@ -527,16 +183,229 @@ def lxml_etree_parse_xml_string_with_location(xmlString):
     
     createETree = ETreeContent()
     
-    #parser.setFeature(handler.feature_namespace_prefixes, True) # xml.sax._exceptions.SAXNotSupportedException: expat does not report namespace prefixes
     parser.setContentHandler(createETree)
-    parser.feed(xmlString) # using feed does not call the setDocumentLocator method of the handler
-    
-    #parseString(bytes(xmlString, 'UTF-8'), parser) # AttributeError: 'ExpatParser' object has no attribute 'processingInstruction'
-    #parseString(bytes(xmlString, 'UTF-8'), createETree) # if using parseString then using the handler method directly is necessary, because the parser gives the above error
+    parser.feed(xml_string)
     
     parser.close()
     
     return createETree.etree
+
+def buildTreeForViewRegion(view, region_scope):
+    """Create an xml tree for the XML in the specified view region."""
+    xml_string = view.substr(region_scope)
+    return lxml_etree_parse_xml_string_with_location(xml_string, view.rowcol(region_scope.begin())[0])
+
+def ensureTreeCacheIsCurrent(view):
+    """If the document has been modified since the xml was parsed, parse it again to recreate the trees."""
+    global change_counters
+    newCount = view.change_count()
+    oldCount = change_counters.get(view.id(), None)
+    
+    global xml_trees
+    if oldCount is None or newCount > oldCount:
+        change_counters[view.id()] = newCount
+        view.set_status('xpath', 'XML being parsed...')
+        trees = None
+        try:
+            trees = buildTreesForView(view)
+            view.erase_status('xpath')
+        except Exception as e:
+            view.set_status('xpath', 'XPath: Error parsing XML: ' + str(e))
+        
+        xml_trees[view.id()] = trees
+        global previous_first_selection
+        previous_first_selection[view.id()] = None
+    return xml_trees[view.id()]
+
+def getSpecificNodePosition(node, position_name):
+    """Given a node and a position name, return the row and column that relates to the node's position."""
+    
+    row, col = node.get('{lxml}' + position_name).split('/')
+    return (int(row), int(col))
+
+def getNodeTagRange(node, position_type):
+    """Given a node and position type (open or close), return the rows and columns that relate to the node's position."""
+    begin = getSpecificNodePosition(node, position_type + '_tag_start_pos')
+    end = getSpecificNodePosition(node, position_type + '_tag_end_pos')
+    return (begin, end)
+
+def getNodeTagRegion(view, node, position_type):
+    """Given a view, a node and a position type (open or close), return the region that relates to the node's position."""
+    begin, end = getNodeTagRange(node, position_type)
+    
+    begin = view.text_point(begin[0], begin[1])
+    end = view.text_point(end[0], end[1])
+    
+    return sublime.Region(begin, end)
+
+def getNodePosition(view, node):
+    """Given a view and a node, return the regions that represent the positions of the open and close tags."""
+    open_pos = getNodeTagRegion(view, node, 'open')
+    close_pos = getNodeTagRegion(view, node, 'close')
+    
+    return (open_pos, close_pos)
+
+def getNodePositions(view, node):
+    """Generator for distinct positions within this node."""
+    open_pos, close_pos = getNodePosition(view, node)
+    
+    pos = open_pos.begin()
+    
+    for child in node.iterchildren():
+        child_open_pos, child_close_pos = getNodePosition(view, child)
+        yield (node, pos, child_open_pos.begin(), True)
+        pos = child_close_pos.end()
+        yield (child, child_open_pos.begin(), pos, len(child) == 0)
+    
+    yield (node, pos, close_pos.end(), True)
+
+def regionIntersects(region1, region2, include_beginning):
+    return region1.intersects(region2) or (include_beginning and region1.contains(region2.begin()))
+
+def getNodesAtPositions(view, trees, positions):
+    """Given a sorted list of trees and non-overlapping positions, return the nodes that relate to each position - efficiently, without searching through unnecessary children and stop once all are found."""
+    
+    def relevance(span, start_index, max_index, include_beginning):
+        """Look through all sorted positions from the starting index to the max, to find those that match the span. If there is a gap, stop looking."""
+        found_one = False
+        for index in range(start_index, max_index + 1):
+            if regionIntersects(span, positions[index], include_beginning):
+                yield index
+                found_one = True
+            elif found_one: # if we have found something previously, there is no need to check positions after this non-match, because they are sorted
+                break
+            elif index > start_index + 1 and not found_one: # if we haven't found anything, there is no need to check positions after start_index + 1, because they are sorted
+                break
+    
+    def matchSpan(span, start_index, max_index, include_beginning):
+        """Return the indexes that match the span, as well as the first index that was found and the last index that was found."""
+        matches = list(relevance(span, start_index, max_index, include_beginning))
+        if len(matches) > 0:
+            start_index = matches[0]
+            max_index = matches[-1]
+        
+        return (matches, start_index, max_index)
+    
+    def getMatches(node, next_match_index, max_index, final_matches):
+        """Check the node and it's children for all matches within the specified range.""" 
+        spans = getNodePositions(view, node)
+        
+        found_match_at_last_expected_position_in_node = False
+        for span_node, pos_start, pos_end, is_final in spans:
+            matches, first_match_index, last_match_index = matchSpan(sublime.Region(pos_start, pos_end), next_match_index, max_index, span_node == node)
+            
+            if len(matches) > 0: # if matches were found
+                if last_match_index == max_index: # if the last index that matched is the maximum index that could match inside this node
+                    found_match_at_last_expected_position_in_node = True # it could be the last match inside this node
+                if is_final:
+                    final_matches.append((span_node, matches, pos_start, pos_end, span_node == node))
+                    next_match_index = last_match_index # the next index to search is the last index that matched
+                else:
+                    next_match_index = getMatches(span_node, first_match_index, last_match_index, final_matches) # the next index to search is the last index that matched
+            elif found_match_at_last_expected_position_in_node: # no match this time. If we have previously found the match at the last expected position within this node, then it was the last match in the node
+                break # stop looking for further matches
+        
+        return next_match_index
+    
+    matches = []
+    start_match_index = 0
+    last_match_index = len(positions) - 1
+    for tree in trees:
+        root = tree.getroot()
+        get_matches_in_tree = True
+        if len(trees) > 1: # if there is only one tree, we can skip the optimization check, because we know for sure the matches will be in the tree
+            open_pos, close_pos = getNodePosition(view, root)
+            root_matches, start_match_index, last_match_index = matchSpan(open_pos.cover(close_pos), start_match_index, last_match_index)
+            get_matches_in_tree = len(root_matches) > 0 # determine if it is worth checking this tree
+        if get_matches_in_tree: # skip the tree if it doesn't participate in the match (saves iterating through all children of root element unnecessarily)
+            start_match_index = getMatches(root, start_match_index, last_match_index, matches)
+    
+    return matches
+
+def getXPathOfNodes(nodes):
+    paths = []
+    for node in nodes:
+        paths.append(node.getroottree().getelementpath(node))
+    return paths
+
+def updateStatusToCurrentXPathIfSGML(view):
+    """Update the status bar with the relevant xpath at the first cursor."""
+    status = None
+    if isCursorInsideSGML(view):
+        trees = ensureTreeCacheIsCurrent(view)
+        if trees is None: # don't hide parse errors by overwriting status
+            return
+        else:
+            # use cache of previous first selection if it exists
+            global previous_first_selection
+            prev = previous_first_selection[view.id()]
+            
+            current_first_sel = view.sel()[0]
+            nodes = []
+            if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), prev[2]): # current first selection matches xpath region from previous first selection
+                nodes.append(prev[1])
+            else: # current first selection doesn't match xpath region from previous first selection or is not cached
+                results = getNodesAtPositions(view, trees, [current_first_sel]) # get nodes at first selection
+                if len(results) > 0:
+                    result = results[0]
+                    previous_first_selection[view.id()] = (sublime.Region(result[2], result[3]), result[0], result[4]) # cache node and xpath region
+                    nodes.append(result[0])
+            
+            # calculate xpath of node
+            xpaths = getXPathOfNodes(nodes) # TODO: respect settings
+            if len(xpaths) == 1:
+                xpath = xpaths[0]
+                intro = 'XPath'
+                if len(view.sel()) > 1:
+                    intro = intro + ' (at first selection)'
+                
+                text = intro + ': ' + xpath
+                maxLength = 234 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortunately we have to truncate it...
+                if len(text) > maxLength:
+                    append = ' (truncated)'
+                    text = text[0:maxLength - len(append)] + append
+                status = text
+    
+    if status is None:
+        view.erase_status('xpath')
+    else:
+        view.set_status('xpath', status)
+
+# TODO: re-add copy xpath to clipboard command!
+
+def getBoolValueFromArgsOrSettings(key, args, default):
+    """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
+    if args is None or not key in args:
+        global settings
+        settings = sublime.load_settings('xpath.sublime-settings')
+        return bool(settings.get(key, default))
+    else:
+        return args[key]
+
+def getUniqueItems(items):
+    """Return the items without any duplicates, preserving order."""
+    unique = []
+    for item in items:
+        if item not in unique:
+            unique.append(item)
+    return unique
+
+class XpathListener(sublime_plugin.EventListener):
+    def on_selection_modified_async(self, view):
+        updateStatusToCurrentXPathIfSGML(view)
+    def on_activated_async(self, view):
+        updateStatusToCurrentXPathIfSGML(view)
+    def on_pre_close(self, view):
+        global change_counters
+        global xml_trees
+        global previous_first_selection
+        change_counters.pop(view.id(), None)
+        xml_trees.pop(view.id(), None)
+        previous_first_selection.pop(view.id(), None)
+
+def plugin_loaded():
+    """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
+    sublime.set_timeout_async(settingsChanged, 10)
 
 def getTagNameWithPrefix(node):
     tag = node.tag.split('}')[-1]
@@ -588,8 +457,10 @@ def getElementXMLPreview(node, maxlen):
                 response += ':' + ns
             response += '="' + node.nsmap[ns] + '"'
     
-    # if no children and no text, is probably self closing
-    if len(node) == 0 and node.text is None: # TODO: can change to check if start and end tag positions are the same
+    # if start and end tag positions are the same, then it is self closing
+    open_pos = getNodeTagRange(node, 'open')
+    close_pos = getNodeTagRange(node, 'close')
+    if open_pos == close_pos:
         response += ' />'
     else:
         # end of open tag
@@ -636,28 +507,15 @@ def get_results_for_xpath_query(view, query, from_root):
     settings = sublime.load_settings('xpath.sublime-settings')
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
-    # parse each region as XML
-    for region in getSGMLRegionsContainingCursors(view):
-        xmlString = view.substr(region)
-        tree = lxml_etree_parse_xml_string_with_location(xmlString) # TODO: parse xml only when document is opened or modified, not every time an xpath query is made
+    global xml_trees
+    for region, region_index in getSGMLRegionsContainingCursors(view):
+        tree = xml_trees[view.id()][region_index]
         
         # find all namespaces in the document, so that the same prefixes can be used for the xpath
         # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
         # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
         namespaces = getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != 'lxml'])
         nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(namespaces, defaultNamespacePrefix, 1)
-        
-        # test code to prove that the positions and namespaces are reported correctly
-        if False:
-            def pointFromNodePos(node, pos):
-                row, col = node.get('{lxml}' + pos).split('/')
-                return view.text_point(int(row) - 1, int(col))
-            def regionFromNode(node, start, end):
-                return sublime.Region(pointFromNodePos(node, start), pointFromNodePos(node, end))
-            for node in tree.iter():
-                print(view.substr(regionFromNode(node, 'open_tag_start_pos', 'open_tag_end_pos')))
-                print(view.substr(regionFromNode(node, 'close_tag_start_pos', 'close_tag_end_pos')))
-            print(namespaces, nsmap)
         
         try:
             xpath = etree.XPath(query, namespaces = nsmap)
@@ -670,12 +528,10 @@ def get_results_for_xpath_query(view, query, from_root):
         if from_root:
             contexts.append(tree)
         else:
-            # allow starting the search from the element at the cursor position - i.e. set the context nodes
-            for cursor in (r for r in view.sel() if region.contains(r)):
-                # TODO: include default namespace prefixes where applicable
-                contextPath = '/'.join(getXPathStringAtPositions(view, [cursor], True, False)[0].split('/')[2:]) # ignore root element when searching path
-                contextElement = tree.find(contextPath)
-                contexts.append(contextElement)
+            # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
+            cursors_in_region = [r for r in view.sel() if region.contains(r)]
+            for node in getNodesAtPositions(view, [tree], cursors_in_region):
+                contexts.append(node[1])
         
         for context in contexts:
             matches += xpath(context)
@@ -782,14 +638,10 @@ class queryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             results = [results[specific_index]]
         
         for node in results:
-            row, col = node.get('{lxml}open_tag_start_pos').split('/')
+            open_pos = getNodeTagRegion(self.view, node, 'open')
             
-            char_index = self.view.text_point(int(row) - 1, int(col) + 1)
-            char_index_end = char_index #+ len(getTagNameWithPrefix(node))
-            
-            cursors.append(sublime.Region(char_index, char_index_end))
-            
-            #print(node.getroottree().getelementpath(node))
+            # select only the tag name with the prefix
+            cursors.append(sublime.Region(open_pos.begin() + len('<'), open_pos.begin() + len('<' + getTagNameWithPrefix(node))))
         
         self.view.sel().clear()
         self.view.sel().add_all(cursors)
