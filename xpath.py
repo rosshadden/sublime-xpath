@@ -31,7 +31,7 @@ def containsSGML(view):
 
 def getSGMLRegionsContainingCursors(view):
     """Find the SGML region(s) that the cursor(s) are in for the specified view."""
-    cursors = [cursor for cursor in view.sel()]
+    cursors = [cursor for cursor in view.sel()] # can't use `view.sel()[:]` because it gives an error `TypeError: an integer is required`
     regions = getSGMLRegions(view)
     for region_index, region in enumerate(regions):
         cursors_to_remove = []
@@ -333,10 +333,70 @@ def getXPathOfNodes(nodes, args):
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
     show_default_namespace_prefix = getBoolValueFromArgsOrSettings('show_default_namespace_prefix', args, False)
+    case_sensitive = getBoolValueFromArgsOrSettings('case_sensitive', args, False)
+    all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
+    
+    global settings
+    wanted_attributes = settings.get('attributes_to_include', [])
+    if not case_sensitive:
+        wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
+    
+    def getNodePathPart(node):
+        tag = getTagNameWithPrefix(node) # TODO: default namespace prefix if applicable
+        
+        output = tag
+        
+        if not case_sensitive:
+            tag = tag.lower()
+        
+        if include_indexes:
+            siblings = node.itersiblings(preceding = True)
+            count = 0
+            for sibling in siblings:
+                sibling_name = getTagNameWithPrefix(sibling)
+                if not case_sensitive:
+                    sibling_name = sibling_name.lower()
+                if sibling_name == tag: # TODO: probably it should check namespace URI and local name?
+                    count += 1
+            if count > 0:
+                output += '[' + str(count) + ']'
+        
+        if include_attributes:
+            attributes_to_show = []
+            for attr_name in node.attrib:
+                include_attribue = False
+                if not attr_name.startswith('{lxml}'):
+                    if all_attributes:
+                        include_attribute = True
+                    else:
+                        if not case_sensitive:
+                            attr_name = attr_name.lower()
+                        attr = attr_name.split(':')
+                        include_attribute = attr_name in wanted_attributes or (len(attr) == 2 and attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes)
+                    
+                    if include_attribute:
+                        attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
+            
+            if len(attributes_to_show) > 0:
+                output += '[' + ' and '.join(attributes_to_show) + ']'
+        
+        return output
+                
+        
+    def getNodePathSegments(node):
+        root = node.getroottree().getroot()
+        while node != root:
+            yield getNodePathPart(node)
+            node = node.getparent()
+        yield getNodePathPart(node)
+        yield ''
+    
+    def getNodePath(node):
+        return '/'.join(reversed(list(getNodePathSegments(node))))
     
     paths = []
     for node in nodes:
-        paths.append(node.getroottree().getpath(node)) # TODO: use settings
+        paths.append(getNodePath(node))
     
     if unique:
         paths = getUniqueItems(paths)
@@ -538,6 +598,10 @@ class XpathListener(sublime_plugin.EventListener):
 
 def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    settings.clear_on_change('reparse')
+    settings.add_on_change('reparse', settingsChanged)
     sublime.set_timeout_async(settingsChanged, 10)
 
 def getTagNameWithPrefix(node):
@@ -563,8 +627,8 @@ def getElementXMLPreview(node, maxlen):
     # response = etree.tostring(node, encoding='unicode')
     
     # add opening tag
-    tagName = getTagNameWithPrefix(node)
-    response = '<' + tagName
+    tag_name = getTagNameWithPrefix(node)
+    response = '<' + tag_name
     # add attributes
     for attrib in node.attrib:
         splitNS = attrib.split('}')
@@ -614,7 +678,7 @@ def getElementXMLPreview(node, maxlen):
             else:
                 response += getElementXMLPreview(child, remaining_size) + collapseWhitespace(child.tail, remaining_size) # remove whitespace
         
-        response += '</' + tagName + '>'
+        response += '</' + tag_name + '>'
         
     return response[0:maxlen]
 
