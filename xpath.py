@@ -140,6 +140,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
             self._prefix_hierarchy[-1][prefix] = uri
             if prefix is None:
                 self._default_ns = uri
+            # TODO: record all used namespace uri and prefix combinations used in document, to avoid looking them all up again later
         
         def endPrefixMapping(self, prefix):
             self._prefix_hierarchy[-1].pop(prefix)
@@ -223,6 +224,7 @@ def ensureTreeCacheIsCurrent(view):
         previous_first_selection[view.id()] = None
     return xml_trees[view.id()]
 
+# TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getSpecificNodePosition(node, position_name):
     """Given a node and a position name, return the row and column that relates to the node's position."""
     
@@ -268,6 +270,7 @@ def getNodePositions(view, node):
 def regionIntersects(outer, inner, include_beginning):
     return outer.intersects(inner) or (include_beginning and outer.contains(inner.begin()))
 
+# TODO: consider subclassing tree? and moving function to that class
 def getNodesAtPositions(view, trees, positions):
     """Given a sorted list of trees and non-overlapping positions, return the nodes that relate to each position - efficiently, without searching through unnecessary children and stop once all are found."""
     
@@ -353,7 +356,7 @@ def getXPathOfNodes(nodes, args):
         
         if include_indexes:
             siblings = node.itersiblings(preceding = True)
-            count = 0
+            count = 0 # TODO: rename to index?
             
             def compare(sibling):
                 sibling_tag = getTagName(sibling)
@@ -626,6 +629,7 @@ def plugin_loaded():
     settings.add_on_change('reparse', settingsChanged)
     sublime.set_timeout_async(settingsChanged, 10)
 
+# TODO: move to Element subclass?
 def getTagName(node):
     items = node.tag.split('}')
     namespace = None
@@ -793,6 +797,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
+            # TODO: if previous input is blank, use path of first cursor
             self.input_panel = self.view.window().show_input_panel('enter xpath', self.previous_input, self.xpath_input_done, self.change, self.cancel)
     
     def change(self, value):
