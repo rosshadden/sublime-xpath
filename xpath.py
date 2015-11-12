@@ -9,7 +9,7 @@ from xml.sax import make_parser, ContentHandler#, parseString, handler
 change_counters = {}
 xml_trees = {}
 previous_first_selection = {}
-settings = None # TODO: don't forget about case sensitivity and attributes etc. hierarchy only, no indexes...
+settings = None
 
 def settingsChanged():
     """Clear change counters and cached xpath regions for all views, and reparse xml regions for the current view."""
@@ -110,14 +110,14 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
             
             nsmap = []
             attrmap = []
-            for attrName, attrValue in attrs.items():
-                if attrName[0] == None: # if there is no namespace URI associated with the attribute already
-                    if attrName[1].startswith('xmlns:'): # map the prefix to the namespace URI
-                        nsmap.append((attrName, attrName[1][len('xmlns:'):], attrValue))
-                    elif attrName[1] == 'xmlns': # map the default namespace URI
-                        nsmap.append((attrName, None, attrValue))
-                    elif ':' in attrName[1]: # separate the prefix from the local name
-                        attrmap.append((attrName, self._splitPrefixAndGetNamespaceURI(attrName[1]), attrValue))
+            for attr_name, attr_value in attrs.items():
+                if attr_name[0] == None: # if there is no namespace URI associated with the attribute already
+                    if attr_name[1].startswith('xmlns:'): # map the prefix to the namespace URI
+                        nsmap.append((attr_name, attr_name[1][len('xmlns:'):], attr_value))
+                    elif attr_name[1] == 'xmlns': # map the default namespace URI
+                        nsmap.append((attr_name, None, attr_value))
+                    elif ':' in attr_name[1]: # separate the prefix from the local name
+                        attrmap.append((attr_name, self._splitPrefixAndGetNamespaceURI(attr_name[1]), attr_value))
             
             for ns in nsmap:
                 attrs.pop(ns[0]) # remove the xmlns attribute
@@ -204,12 +204,12 @@ def buildTreeForViewRegion(view, region_scope):
 def ensureTreeCacheIsCurrent(view):
     """If the document has been modified since the xml was parsed, parse it again to recreate the trees."""
     global change_counters
-    newCount = view.change_count()
-    oldCount = change_counters.get(view.id(), None)
+    new_count = view.change_count()
+    old_count = change_counters.get(view.id(), None)
     
     global xml_trees
-    if oldCount is None or newCount > oldCount:
-        change_counters[view.id()] = newCount
+    if old_count is None or new_count > old_count:
+        change_counters[view.id()] = new_count
         view.set_status('xpath', 'XML being parsed...')
         trees = None
         try:
@@ -328,11 +328,19 @@ def getNodesAtPositions(view, trees, positions):
     
     return matches
 
-def getXPathOfNodes(nodes):
+def getXPathOfNodes(nodes, args):
+    include_indexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
+    unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
+    include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
+    show_default_namespace_prefix = getBoolValueFromArgsOrSettings('show_default_namespace_prefix', args, False)
+    
     paths = []
-    # TODO: include attributes, include indexes
     for node in nodes:
-        paths.append(node.getroottree().getelementpath(node))
+        paths.append(node.getroottree().getpath(node)) # TODO: use settings
+    
+    if unique:
+        paths = getUniqueItems(paths)
+    
     return paths
 
 def updateStatusToCurrentXPathIfSGML(view):
@@ -359,7 +367,7 @@ def updateStatusToCurrentXPathIfSGML(view):
                     nodes.append(result[0])
             
             # calculate xpath of node
-            xpaths = getXPathOfNodes(nodes) # TODO: respect settings
+            xpaths = getXPathOfNodes(nodes, None)
             if len(xpaths) == 1:
                 xpath = xpaths[0]
                 intro = 'XPath'
@@ -378,7 +386,7 @@ def updateStatusToCurrentXPathIfSGML(view):
     else:
         view.set_status('xpath', status)
 
-def copyXPathsToClipboard(view, include_indexes, include_attributes, unique):
+def copyXPathsToClipboard(view, args):
     """Copy the XPath(s) at the cursor(s) to the clipboard."""
     if isCursorInsideSGML(view):
         trees = ensureTreeCacheIsCurrent(view)
@@ -387,10 +395,7 @@ def copyXPathsToClipboard(view, include_indexes, include_attributes, unique):
         for result in getSGMLRegionsContainingCursors(view):
             cursors.append(result[2])
         results = getNodesAtPositions(view, trees, cursors)
-        paths = getXPathOfNodes([result[0] for result in results]) # TODO: include indexes, include attributes
-        
-        if unique:
-            paths = getUniqueItems(paths)
+        paths = getXPathOfNodes([result[0] for result in results], args)
         
         if len(paths) > 0:
             sublime.set_clipboard(os.linesep.join(paths))
@@ -401,20 +406,20 @@ def copyXPathsToClipboard(view, include_indexes, include_attributes, unique):
         message = 'xpath not copied to clipboard - ensure syntax is set to xml or html'
     sublime.status_message(message)
 
-class CopyXpathCommand(sublime_plugin.TextCommand):
+class CopyXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('copy_xpath', { 'show_hierarchy_only': True })
     def run(self, edit, **args):
         """Copy XPath(s) at cursor(s) to clipboard."""
         view = self.view
         
-        includeIndexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
-        unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
-        includeAttributes = includeIndexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
-        
-        copyXPathsToClipboard(view, includeIndexes, includeIndexes or includeAttributes, unique)
+        copyXPathsToClipboard(view, args)
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self, **args):
         return containsSGML(self.view)
+
+class XpathCommand(CopyXpathCommand):
+    """To retain legacy use of this command. It has now been renamed to CopyXpathCommand, to make it's purpose more clear."""
+    pass
 
 def move_cursors_to_nodes(view, nodes, position_type):
     cursors = []
@@ -630,6 +635,7 @@ def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start =
     return unique
 
 def get_results_for_xpath_query(view, query, from_root):
+    """Execute the specified xpath query on all SGML regions that contain a cursor, and return the results."""
     matches = []
     
     getNamespaces = etree.XPath('//namespace::*')
@@ -685,11 +691,14 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
     selected_index = None
     live_mode = None
+    relative_mode = None
     pending = []
     
     def run(self, edit, **args):
         self.show_query_results = args is None or getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = args is None or getBoolValueFromArgsOrSettings('live_mode', args, True)
+        self.relative_mode = args is None or getBoolValueFromArgsOrSettings('relative_mode', args, True) # TODO: cache context nodes now? to allow live mode to work with it
+        
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
@@ -731,7 +740,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     
     def process_results_for_query(self, query):
         if len(query) > 0:
-            self.results = get_results_for_xpath_query(self.view, query, True)
+            self.results = get_results_for_xpath_query(self.view, query, not self.relative_mode)
             
             if self.results is not None:
                 if len(self.results) == 0:

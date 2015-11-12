@@ -1,19 +1,19 @@
 [
 	{
 		"caption": "XPath: Copy exact path to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": false }
 	}, {
 		"caption": "XPath: Copy hierarchy without attributes to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": true, "show_attributes_in_hierarchy": false }
 	}, {
 		"caption": "XPath: Copy hierarchy with attributes to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": true, "show_attributes_in_hierarchy": true }
 	}, {
 		"caption": "XPath: Goto previous sibling",
-		"command": "goto_relative", "args": { "direction": "prev" }
+		"command": "goto_relative", "args": { "direction": "previous" }
 	}, {
 		"caption": "XPath: Goto next sibling",
 		"command": "goto_relative", "args": { "direction": "next" }
@@ -26,5 +26,8 @@
 	}, {
 		"caption": "XPath: Goto close tag",
 		"command": "goto_relative", "args": { "direction": "close" }
+	}, {
+		"caption": "XPath: Query document",
+		"command": "query_xpath"
 	}
 ]

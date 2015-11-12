@@ -3,11 +3,11 @@
 		"caption": "-"
 	}, {
 		"caption": "XPath: Copy exact path to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": false }
 	}, {
 		"caption": "XPath: Copy hierarchy to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": true }
 	}, {
 		"caption": "-"
