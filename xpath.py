@@ -369,27 +369,29 @@ def getXPathOfNodes(nodes, args):
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
     
-    def getNodePathPart(node, namespaces):
+    def getTagNameWithMappedPrefix(node, namespaces):
         tag = getTagName(node)
-        
         if show_namespace_prefixes_from_query and tag[0] is not None: # if the element belongs to a namespace
             prefix = next((prefix for prefix in namespaces.keys() if namespaces[prefix] == tag[0]), None) # find the first prefix in the map that relates to this uri
             if prefix is not None:
                 tag = (tag[0], tag[1], prefix + ':' + tag[1]) # ensure that the path we display can be used to query the element
         
-        output = tag[2]
-        
         if not case_sensitive:
             tag = (tag[0], tag[1].lower(), tag[2].lower())
+        
+        return tag
+    
+    def getNodePathPart(node, namespaces):
+        tag = getTagNameWithMappedPrefix(node, namespaces)
+        
+        output = tag[2]
         
         if include_indexes:
             siblings = node.itersiblings(preceding = True)
             index = 1
             
             def compare(sibling):
-                sibling_tag = getTagName(sibling)
-                if not case_sensitive:
-                    sibling_tag = (sibling_tag[0], sibling_tag[1].lower(), sibling_tag[2].lower())
+                sibling_tag = getTagNameWithMappedPrefix(sibling, namespaces)
                 return sibling_tag == tag # namespace uri, prefix and tag name must all match
             
             for sibling in siblings:
@@ -852,7 +854,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                 global previous_first_selection
                 prev = previous_first_selection.get(self.view.id(), None)
                 if prev is not None:
-                    xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True })
+                    xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True }) # ensure the path matches this node and only this node
                     prefill = xpaths[0]
             else:
                 prefill = self.previous_input
