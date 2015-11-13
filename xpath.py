@@ -365,6 +365,7 @@ def getXPathOfNodes(nodes, args):
     all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
     
     global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
     wanted_attributes = settings.get('attributes_to_include', [])
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
@@ -444,10 +445,8 @@ def getXPathOfNodes(nodes, args):
         return '/'.join(reversed(list(getNodePathSegments(node, namespaces, root))))
     
     
-    global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-        
+    
     roots = {}
     for node in nodes:
         tree = node.getroottree()
@@ -456,10 +455,10 @@ def getXPathOfNodes(nodes, args):
     
     namespaces = {}
     for root in roots:
-        namespaces = None
+        nsmap = None
         if show_namespace_prefixes_from_query:
-            namespaces = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(root.getroottree()), defaultNamespacePrefix)
-        namespaces[root] = namespaces
+            nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(root.getroottree()), defaultNamespacePrefix)
+        namespaces[root] = nsmap
     
     paths = []
     for root in roots.keys():
