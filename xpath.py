@@ -694,7 +694,13 @@ def getTagName(node):
     return (namespace, local_name, full_name)
 
 def collapseWhitespace(text, maxlen):
-    return (text or '').strip().replace('\n', ' ').replace('\t', ' ').replace('  ', ' ')[0:maxlen]
+    text = (text or '').strip()[0:maxlen + 1].replace('\n', ' ').replace('\t', ' ')
+    append = ''
+    if len(text) > maxlen:
+        append = '...'
+    while '  ' in text:
+        text = text.replace('  ', ' ')
+    return text[0:maxlen - len(append)] + append
 
 def isTagSelfClosing(node):
     """If the start and end tag positions are the same, then it is self closing."""
@@ -759,8 +765,10 @@ def getElementXMLPreview(node, maxlen):
             else:
                 response += getElementXMLPreview(child, remaining_size) + collapseWhitespace(child.tail, remaining_size) # remove whitespace
         
-        response += '</' + tag_name + '>'
-        
+        remaining_size = maxlen - len(response)
+        if remaining_size > 0:
+            response += '</' + tag_name + '>'
+    
     return response[0:maxlen]
 
 def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start = 1):
