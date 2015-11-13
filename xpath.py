@@ -1,7 +1,6 @@
 import sublime
 import sublime_plugin
 import os
-from itertools import takewhile
 from lxml.sax import ElementTreeContentHandler
 from lxml import etree
 from xml.sax import make_parser, ContentHandler#, parseString, handler
