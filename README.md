@@ -7,6 +7,7 @@ Sublime Text - XPath Plugin
 - Updates status bar text to XPath of current line.
 - Jump selection to relative tag - previous or next sibling, parent, open or close tag.
 - Query document by XPath expression.
+- Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
 
 ## Settings:
 
@@ -19,11 +20,9 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `attributes_to_include` - Specific attributes or namespaces to include in the XPath.
 - `show_attributes_in_hierarchy` - Whether or not to include attributes when in hierarchy mode. (If `show_all_attributes` is false and the `attributes_to_include` whitelist is empty, this will have no effect.)
 
-
 ## Potential future improvements:
 
 - Optimize writes, especially non-structure-altering changes.
-
 
 ## Contributors
 
