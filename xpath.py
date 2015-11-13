@@ -369,9 +369,6 @@ def getXPathOfNodes(nodes, args):
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
     
-    show_namespace_prefixes_from_query = True # TODO: remove this test code
-    case_sensitive = False
-    
     def getNodePathPart(node, namespaces):
         tag = getTagName(node)
         
