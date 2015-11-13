@@ -747,9 +747,15 @@ def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start =
     for key in flattened.keys():
         if len(flattened[key]) == 1:
             unique[key] = flattened[key][0]
-        else: # TODO: what if a namespace with the new prefix already exists? need to find next available number...
+        else: # find next available number. we can't just append the number, because it is possible that a namespace with the new prefix already exists
             index = start
             for item in flattened[key]:
+                while True:
+                    try_key = key + str(index)
+                    if try_key in unique.keys():
+                        index += 1
+                    else:
+                        break
                 unique[key + str(index)] = item
                 index += 1
     return unique
@@ -797,7 +803,11 @@ def get_results_for_xpath_query(view, query, from_root):
                 contexts.append(node[1])
         
         for context in contexts:
-            matches += xpath(context)
+            try:
+                matches += xpath(context)
+            except Exception as e:
+                sublime.status_message(str(e)) # show parsing error in status bar
+                return None
     
     if not from_root: # if multiple contexts were used, get unique items only
         # TODO: only get unique items if a nodeset
