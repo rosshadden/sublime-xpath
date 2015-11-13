@@ -770,6 +770,7 @@ def get_all_namespaces_in_tree(tree):
 def get_results_for_xpath_query(view, query, from_root):
     """Execute the specified xpath query on all SGML regions that contain a cursor, and return the results."""
     matches = []
+    is_nodeset = None
     
     global settings
     settings = sublime.load_settings('xpath.sublime-settings')
@@ -804,16 +805,21 @@ def get_results_for_xpath_query(view, query, from_root):
         
         for context in contexts:
             try:
-                matches += xpath(context)
+                result = xpath(context)
+                if isinstance(result, list):
+                    is_nodeset = True
+                    matches += result
+                else:
+                    is_nodeset = False
+                    matches.append(result)
             except Exception as e:
                 sublime.status_message(str(e)) # show parsing error in status bar
                 return None
     
-    if not from_root: # if multiple contexts were used, get unique items only
-        # TODO: only get unique items if a nodeset
+    if not from_root and is_nodeset: # if multiple contexts were used, get unique items only
         matches = getUniqueItems(matches)
     
-    return matches
+    return (is_nodeset, matches)
 
 class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
@@ -880,13 +886,12 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def process_results_for_query(self, query):
         if len(query) > 0:
             self.results = get_results_for_xpath_query(self.view, query, not self.relative_mode)
-            
             if self.results is not None:
-                if len(self.results) == 0:
+                if self.results[0] and len(self.results[1]) == 0:
                     sublime.status_message('no results found matching xpath expression "' + query + '"')
                 else:
                     sublime.status_message('') # clear status message as it is out of date now
-                    if self.show_query_results: # TODO: also show results if results is not a node set, as we can't "go to" them...
+                    if self.show_query_results or not self.results[0]: # also show results if results is not a node set, as we can't "go to" them...
                         self.show_results_for_query()
                     else:
                         self.goto_results_for_query()
@@ -897,27 +902,26 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def show_results_for_query(self):
         self.close_quick_panel()
         
-        #if len(self.results) == 1:
-        #    sublime.status_message('one result found')
-        #    self.xpath_selection_done(0) # go directly to the single result
-        #else:
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
-        
         maxlen = 70
-        self.view.window().show_quick_panel([[getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results], self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
+        if self.results[0]:
+            list_comp = [[getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results[1]]
+        else:
+            list_comp = [str(result)[0:maxlen] for result in self.results[1]]
+        self.view.window().show_quick_panel(list_comp, self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
         
     def xpath_selection_changed(self, selected_index):
         self.xpath_selection_done(selected_index)
     
     def xpath_selection_done(self, selected_index):
         if selected_index > -1: # quick panel wasn't cancelled
-            self.goto_results_for_query(selected_index)
-        # TODO: close input box if it is open
+            if self.results[0]:
+                self.goto_results_for_query(selected_index)
     
     def goto_results_for_query(self, specific_index = None):
         cursors = []
         
-        results = self.results
+        results = self.results[1]
         if specific_index is not None and specific_index > -1:
             results = [results[specific_index]]
         
