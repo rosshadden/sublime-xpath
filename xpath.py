@@ -78,7 +78,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
             split_pos = fullName.find(':')
             if split_pos > -1:
                 prefix = fullName[0:split_pos]
-                local_name =  fullName[split_pos + 1:]
+                local_name = fullName[split_pos + 1:]
             else:
                 local_name = fullName
             
@@ -200,7 +200,16 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
 def buildTreeForViewRegion(view, region_scope):
     """Create an xml tree for the XML in the specified view region."""
     xml_string = view.substr(region_scope)
-    return lxml_etree_parse_xml_string_with_location(xml_string, view.rowcol(region_scope.begin())[0])
+    tree = None
+    line_number_offset = view.rowcol(region_scope.begin())[0]
+    try:
+        tree = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset)
+    except SAXParseException as e:
+        global parse_error
+        text = str(e.getLineNumber() - 1 + line_number_offset) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
+        view.set_status('xpath_error', parse_error + text)
+        
+    return tree
 
 def ensureTreeCacheIsCurrent(view):
     """If the document has been modified since the xml was parsed, parse it again to recreate the trees."""
@@ -213,17 +222,7 @@ def ensureTreeCacheIsCurrent(view):
         change_counters[view.id()] = new_count
         view.set_status('xpath', 'XML being parsed...')
         view.erase_status('xpath_error')
-        trees = None
-        try:
-            trees = buildTreesForView(view)
-        #except Exception as e:
-        except SAXParseException as e:
-            global parse_error
-            #text = str(e)
-            text = str(e.getLineNumber()) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
-            view.set_status('xpath_error', parse_error + text)
-            #trees = None
-        
+        trees = buildTreesForView(view)
         view.erase_status('xpath')
         xml_trees[view.id()] = trees
         global previous_first_selection
@@ -237,7 +236,7 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         global parse_error
         detail = view.get_status('xpath_error')[len(parse_error):].split(' - ')[0].split(':')
         
-        point = view.text_point(int(detail[0]) - 1, int(detail[1]))
+        point = view.text_point(int(detail[0]), int(detail[1]))
         
         view.sel().clear()
         view.sel().add(point)
