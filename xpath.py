@@ -360,7 +360,7 @@ def getXPathOfNodes(nodes, args):
     include_indexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
-    show_default_namespace_prefix = getBoolValueFromArgsOrSettings('show_default_namespace_prefix', args, False)
+    show_namespace_prefixes_from_query = getBoolValueFromArgsOrSettings('show_namespace_prefixes_from_query', args, False)
     case_sensitive = getBoolValueFromArgsOrSettings('case_sensitive', args, False)
     all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
     
@@ -369,15 +369,21 @@ def getXPathOfNodes(nodes, args):
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
     
-    namespaces = {}
+    show_namespace_prefixes_from_query = True # TODO: remove this test code
+    case_sensitive = False
     
-    def getNodePathPart(node):
-        tag = getTagName(node) # TODO: default namespace prefix if applicable
+    def getNodePathPart(node, namespaces):
+        tag = getTagName(node)
+        
+        if show_namespace_prefixes_from_query and tag[0] is not None: # if the element belongs to a namespace
+            prefix = next((prefix for prefix in namespaces.keys() if namespaces[prefix] == tag[0]), None) # find the first prefix in the map that relates to this uri
+            if prefix is not None:
+                tag = (tag[0], tag[1], prefix + ':' + tag[1]) # ensure that the path we display can be used to query the element
         
         output = tag[2]
         
         if not case_sensitive:
-            tag[2] = tag[2].lower()
+            tag = (tag[0], tag[1].lower(), tag[2].lower())
         
         if include_indexes:
             siblings = node.itersiblings(preceding = True)
@@ -386,9 +392,9 @@ def getXPathOfNodes(nodes, args):
             def compare(sibling):
                 sibling_tag = getTagName(sibling)
                 if not case_sensitive:
-                    sibling_tag[2] = sibling_tag.lower()
+                    sibling_tag = (sibling_tag[0], sibling_tag[1].lower(), sibling_tag[2].lower())
                 return sibling_tag == tag # namespace uri, prefix and tag name must all match
-                    
+            
             for sibling in siblings:
                 if compare(sibling):
                     index += 1
@@ -427,19 +433,23 @@ def getXPathOfNodes(nodes, args):
                 output += '[' + ' and '.join(attributes_to_show) + ']'
         
         return output
-                
+    
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
         
     def getNodePathSegments(node):
         tree = node.getroottree()
         root = tree.getroot()
         
-        if root not in namespaces and show_default_namespace_prefix: # TODO: mayb ealso necessary if a prefix is used more than once
-            namespaces[tree] = get_all_namespaces_in_tree(tree)
+        namespaces = None # TODO: more efficient way of doing this!
+        if show_namespace_prefixes_from_query:
+            namespaces = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
         
         while node != root:
-            yield getNodePathPart(node)
+            yield getNodePathPart(node, namespaces)
             node = node.getparent()
-        yield getNodePathPart(node)
+        yield getNodePathPart(node, namespaces)
         yield ''
     
     def getNodePath(node):
@@ -662,7 +672,7 @@ def getTagName(node):
     local_name = items[-1]
     full_name = local_name
     if len(items) == 2:
-        namespace = items[0]
+        namespace = items[0][len('{'):]
         if node.prefix is not None:
             full_name = node.prefix + ':' + full_name
     
@@ -839,14 +849,17 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
-            # if previous input is blank, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
-            prefill = self.previous_input
-            if not self.previous_input:
+            # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
+            prefill = None
+            if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not self.previous_input:
                 global previous_first_selection
                 prev = previous_first_selection.get(self.view.id(), None)
                 if prev is not None:
-                    xpaths = getXPathOfNodes([prev[1]], None)
+                    xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True })
                     prefill = xpaths[0]
+            else:
+                prefill = self.previous_input
+            
             self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
     
     def change(self, value):

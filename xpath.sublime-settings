@@ -24,6 +24,6 @@
 	"relative_mode": false,
 	// default namespace prefix for xpath query when elements have xmlns attribute set
 	"default_namespace_prefix": "default",
-	// whether or not to show the default namespace prefix when the path of an element is shown
-	"show_default_namespace_prefix": false
+	// whether or not to show the namespace prefix that the xpath query will expect
+	"show_namespace_prefixes_from_query": false
 }
