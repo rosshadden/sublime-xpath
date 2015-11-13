@@ -475,7 +475,7 @@ def updateStatusToCurrentXPathIfSGML(view):
     """Update the status bar with the relevant xpath at the first cursor."""
     status = None
     if isCursorInsideSGML(view):
-        if not getBoolValueFromArgsOrSettings('only_show_xpath_if_saved', None, False) or not view.is_dirty():
+        if not getBoolValueFromArgsOrSettings('only_show_xpath_if_saved', None, False) or not view.is_dirty() or view.is_read_only():
             trees = ensureTreeCacheIsCurrent(view)
             if trees is None: # don't hide parse errors by overwriting status
                 return
@@ -519,18 +519,21 @@ def copyXPathsToClipboard(view, args):
     """Copy the XPath(s) at the cursor(s) to the clipboard."""
     if isCursorInsideSGML(view):
         trees = ensureTreeCacheIsCurrent(view)
-        
-        cursors = []
-        for result in getSGMLRegionsContainingCursors(view):
-            cursors.append(result[2])
-        results = getNodesAtPositions(view, trees, cursors)
-        paths = getXPathOfNodes([result[0] for result in results], args)
-        
-        if len(paths) > 0:
-            sublime.set_clipboard(os.linesep.join(paths))
-            message = str(len(paths)) + ' xpath(s) copied to clipboard'
+        if trees is not None:
+            
+            cursors = []
+            for result in getSGMLRegionsContainingCursors(view):
+                cursors.append(result[2])
+            results = getNodesAtPositions(view, trees, cursors)
+            paths = getXPathOfNodes([result[0] for result in results], args)
+            
+            if len(paths) > 0:
+                sublime.set_clipboard(os.linesep.join(paths))
+                message = str(len(paths)) + ' xpath(s) copied to clipboard'
+            else:
+                message = 'no xpath at cursor to copy to clipboard'
         else:
-            message = 'no xpath at cursor to copy to clipboard'
+            message = 'xml is not valid, unable to copy xpaths to clipboard'
     else:
         message = 'xpath not copied to clipboard - ensure syntax is set to xml or html'
     sublime.status_message(message)
@@ -574,32 +577,33 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
         view = self.view
         
         trees = ensureTreeCacheIsCurrent(view)
-        
-        cursors = []
-        for result in getSGMLRegionsContainingCursors(view):
-            cursors.append(result[2])
-        results = getNodesAtPositions(view, trees, cursors)
-        
-        new_nodes_under_cursors = []
-        for result in results:
-            allFound = True
-            desired_node = self.find_node(result[0], args['direction'])
-            if desired_node is None:
-                allFound = False
-                break
+        if trees is not None:
+            
+            cursors = []
+            for result in getSGMLRegionsContainingCursors(view):
+                cursors.append(result[2])
+            results = getNodesAtPositions(view, trees, cursors)
+            
+            new_nodes_under_cursors = []
+            for result in results:
+                allFound = True
+                desired_node = self.find_node(result[0], args['direction'])
+                if desired_node is None:
+                    allFound = False
+                    break
+                else:
+                    new_nodes_under_cursors.append(desired_node)
+            
+            if not allFound:
+                message = args['direction'] + ' node not found'
+                if len(cursors) > 1:
+                    message += ' for at least one selection'
+                sublime.status_message(message)
             else:
-                new_nodes_under_cursors.append(desired_node)
-        
-        if not allFound:
-            message = args['direction'] + ' node not found'
-            if len(cursors) > 1:
-                message += ' for at least one selection'
-            sublime.status_message(message)
-        else:
-            position_type = 'open'
-            if args['direction'] == 'close':
-                position_type = 'close'
-            move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
+                position_type = 'open'
+                if args['direction'] == 'close':
+                    position_type = 'close'
+                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
     
     def find_node(self, relative_to, direction):
         def return_specific(node):
@@ -799,47 +803,48 @@ def get_results_for_xpath_query(view, query, from_root):
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
     trees = ensureTreeCacheIsCurrent(view)
-    
-    regions_cursors = {}
-    for result in getSGMLRegionsContainingCursors(view):
-        regions_cursors.setdefault(result[1], []).append(result[2])
-    
-    for region_index in regions_cursors.keys():
-        tree = trees[region_index]
+    if trees is not None:
         
-        nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix, 1)
+        regions_cursors = {}
+        for result in getSGMLRegionsContainingCursors(view):
+            regions_cursors.setdefault(result[1], []).append(result[2])
         
-        try:
-            xpath = etree.XPath(query, namespaces = nsmap)
-        except Exception as e:
-            sublime.status_message(str(e)) # show parsing error in status bar
-            return None
-        
-        contexts = []
-        
-        if from_root:
-            contexts.append(tree)
-        else:
-            # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
-            for node in getNodesAtPositions(view, [tree], regions_cursors[region_index]):
-                contexts.append(node[1])
-        
-        for context in contexts:
+        for region_index in regions_cursors.keys():
+            tree = trees[region_index]
+            
+            nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix, 1)
+            
             try:
-                result = xpath(context)
-                if isinstance(result, list):
-                    is_nodeset = True
-                    matches += result
-                else:
-                    is_nodeset = False
-                    matches.append(result)
+                xpath = etree.XPath(query, namespaces = nsmap)
             except Exception as e:
                 sublime.status_message(str(e)) # show parsing error in status bar
                 return None
-    
-    if not from_root and is_nodeset: # if multiple contexts were used, get unique items only
-        matches = getUniqueItems(matches)
-    
+            
+            contexts = []
+            
+            if from_root:
+                contexts.append(tree)
+            else:
+                # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
+                for node in getNodesAtPositions(view, [tree], regions_cursors[region_index]):
+                    contexts.append(node[1])
+            
+            for context in contexts:
+                try:
+                    result = xpath(context)
+                    if isinstance(result, list):
+                        is_nodeset = True
+                        matches += result
+                    else:
+                        is_nodeset = False
+                        matches.append(result)
+                except Exception as e:
+                    sublime.status_message(str(e)) # show parsing error in status bar
+                    return None
+        
+        if not from_root and is_nodeset: # if multiple contexts were used, get unique items only
+            matches = getUniqueItems(matches)
+        
     return (is_nodeset, matches)
 
 class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
