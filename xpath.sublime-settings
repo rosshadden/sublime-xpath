@@ -25,5 +25,7 @@
 	// default namespace prefix for xpath query when elements have xmlns attribute set
 	"default_namespace_prefix": "default",
 	// whether or not to show the namespace prefix that the xpath query will expect
-	"show_namespace_prefixes_from_query": false
+	"show_namespace_prefixes_from_query": false,
+	// whether or not to only show the current xpath in the status bar if the view is not dirty. Useful to save CPU cycles when editing a document
+	"only_show_xpath_if_saved": false
 }

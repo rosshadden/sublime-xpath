@@ -475,39 +475,40 @@ def updateStatusToCurrentXPathIfSGML(view):
     """Update the status bar with the relevant xpath at the first cursor."""
     status = None
     if isCursorInsideSGML(view):
-        trees = ensureTreeCacheIsCurrent(view)
-        if trees is None: # don't hide parse errors by overwriting status
-            return
-        else:
-            # use cache of previous first selection if it exists
-            global previous_first_selection
-            prev = previous_first_selection[view.id()]
-            
-            current_first_sel = view.sel()[0]
-            nodes = []
-            if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), prev[2]): # current first selection matches xpath region from previous first selection
-                nodes.append(prev[1])
-            else: # current first selection doesn't match xpath region from previous first selection or is not cached
-                results = getNodesAtPositions(view, trees, [current_first_sel]) # get nodes at first selection
-                if len(results) > 0:
-                    result = results[0]
-                    previous_first_selection[view.id()] = (sublime.Region(result[2], result[3]), result[0], result[4]) # cache node and xpath region
-                    nodes.append(result[0])
-            
-            # calculate xpath of node
-            xpaths = getXPathOfNodes(nodes, None)
-            if len(xpaths) == 1:
-                xpath = xpaths[0]
-                intro = 'XPath'
-                if len(view.sel()) > 1:
-                    intro = intro + ' (at first selection)'
+        if not getBoolValueFromArgsOrSettings('only_show_xpath_if_saved', None, False) or not view.is_dirty():
+            trees = ensureTreeCacheIsCurrent(view)
+            if trees is None: # don't hide parse errors by overwriting status
+                return
+            else:
+                # use cache of previous first selection if it exists
+                global previous_first_selection
+                prev = previous_first_selection[view.id()]
                 
-                text = intro + ': ' + xpath
-                maxLength = 234 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortunately we have to truncate it...
-                if len(text) > maxLength:
-                    append = ' (truncated)'
-                    text = text[0:maxLength - len(append)] + append
-                status = text
+                current_first_sel = view.sel()[0]
+                nodes = []
+                if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), prev[2]): # current first selection matches xpath region from previous first selection
+                    nodes.append(prev[1])
+                else: # current first selection doesn't match xpath region from previous first selection or is not cached
+                    results = getNodesAtPositions(view, trees, [current_first_sel]) # get nodes at first selection
+                    if len(results) > 0:
+                        result = results[0]
+                        previous_first_selection[view.id()] = (sublime.Region(result[2], result[3]), result[0], result[4]) # cache node and xpath region
+                        nodes.append(result[0])
+                
+                # calculate xpath of node
+                xpaths = getXPathOfNodes(nodes, None)
+                if len(xpaths) == 1:
+                    xpath = xpaths[0]
+                    intro = 'XPath'
+                    if len(view.sel()) > 1:
+                        intro = intro + ' (at first selection)'
+                    
+                    text = intro + ': ' + xpath
+                    maxLength = 234 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortunately we have to truncate it...
+                    if len(text) > maxLength:
+                        append = ' (truncated)'
+                        text = text[0:maxLength - len(append)] + append
+                    status = text
     
     if status is None:
         view.erase_status('xpath')
@@ -656,6 +657,9 @@ class XpathListener(sublime_plugin.EventListener):
         updateStatusToCurrentXPathIfSGML(view)
     def on_activated_async(self, view):
         updateStatusToCurrentXPathIfSGML(view)
+    def on_post_save_async(self, view):
+        if getBoolValueFromArgsOrSettings('only_show_xpath_if_saved', None, False):
+            updateStatusToCurrentXPathIfSGML(view)
     def on_pre_close(self, view):
         global change_counters
         global xml_trees
@@ -794,8 +798,7 @@ def get_results_for_xpath_query(view, query, from_root):
     settings = sublime.load_settings('xpath.sublime-settings')
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
-    global xml_trees
-    trees = xml_trees[view.id()]
+    trees = ensureTreeCacheIsCurrent(view)
     
     regions_cursors = {}
     for result in getSGMLRegionsContainingCursors(view):
@@ -858,15 +861,13 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
             # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
-            prefill = None
+            prefill = self.previous_input
             if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not self.previous_input:
                 global previous_first_selection
                 prev = previous_first_selection.get(self.view.id(), None)
                 if prev is not None:
                     xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True }) # ensure the path matches this node and only this node
                     prefill = xpaths[0]
-            else:
-                prefill = self.previous_input
             
             self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
     
