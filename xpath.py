@@ -433,30 +433,38 @@ def getXPathOfNodes(nodes, args):
         
         return output
     
-    global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
-    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-        
-    def getNodePathSegments(node):
-        tree = node.getroottree()
-        root = tree.getroot()
-        
-        namespaces = None # TODO: more efficient way of doing this!
-        if show_namespace_prefixes_from_query:
-            namespaces = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
-        
+    def getNodePathSegments(node, namespaces, root):
         while node != root:
             yield getNodePathPart(node, namespaces)
             node = node.getparent()
         yield getNodePathPart(node, namespaces)
         yield ''
     
-    def getNodePath(node):
-        return '/'.join(reversed(list(getNodePathSegments(node))))
+    def getNodePath(node, namespaces, root):
+        return '/'.join(reversed(list(getNodePathSegments(node, namespaces, root))))
+    
+    
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
+        
+    roots = {}
+    for node in nodes:
+        tree = node.getroottree()
+        root = tree.getroot()
+        roots.setdefault(root, []).append(node)
+    
+    namespaces = {}
+    for root in roots:
+        namespaces = None
+        if show_namespace_prefixes_from_query:
+            namespaces = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(root.getroottree()), defaultNamespacePrefix)
+        namespaces[root] = namespaces
     
     paths = []
-    for node in nodes:
-        paths.append(getNodePath(node))
+    for root in roots.keys():
+        for node in roots[root]:
+            paths.append(getNodePath(node, namespaces[root], root))
     
     if unique:
         paths = getUniqueItems(paths)
@@ -748,6 +756,7 @@ def getElementXMLPreview(node, maxlen):
     return response[0:maxlen]
 
 def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start = 1):
+    # TODO: docstring, about how it requires unique items
     flattened = {}
     for item in items:
         flattened.setdefault(item[0] or replaceNoneWith, []).append(item[1])
@@ -758,15 +767,15 @@ def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start =
             unique[key] = flattened[key][0]
         else: # find next available number. we can't just append the number, because it is possible that a namespace with the new prefix already exists
             index = start
-            for item in flattened[key]:
+            for item in flattened[key]: # for each item that has the same prefix but a different namespace
                 while True:
                     try_key = key + str(index)
-                    if try_key in unique.keys():
-                        index += 1
+                    if try_key in unique.keys(): # if the key we are trying already exists
+                        index += 1 # try again with the next index
                     else:
-                        break
+                        break # the key we are trying is new
                 unique[key + str(index)] = item
-                index += 1
+                index += 1 # update the next key to try
     return unique
 
 def get_all_namespaces_in_tree(tree):
