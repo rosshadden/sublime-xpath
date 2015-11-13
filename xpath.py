@@ -3,12 +3,13 @@ import sublime_plugin
 import os
 from lxml.sax import ElementTreeContentHandler
 from lxml import etree
-from xml.sax import make_parser, ContentHandler#, parseString, handler
+from xml.sax import make_parser, ContentHandler, SAXParseException#, parseString, handler
 
 change_counters = {}
 xml_trees = {}
 previous_first_selection = {}
 settings = None
+parse_error = 'XPath - error parsing XML: '
 
 def settingsChanged():
     """Clear change counters and cached xpath regions for all views, and reparse xml regions for the current view."""
@@ -211,17 +212,42 @@ def ensureTreeCacheIsCurrent(view):
     if old_count is None or new_count > old_count:
         change_counters[view.id()] = new_count
         view.set_status('xpath', 'XML being parsed...')
+        view.erase_status('xpath_error')
         trees = None
         try:
             trees = buildTreesForView(view)
-            view.erase_status('xpath')
-        except Exception as e:
-            view.set_status('xpath', 'XPath: Error parsing XML: ' + str(e))
+        #except Exception as e:
+        except SAXParseException as e:
+            global parse_error
+            #text = str(e)
+            text = str(e.getLineNumber()) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
+            view.set_status('xpath_error', parse_error + text)
+            #trees = None
         
+        view.erase_status('xpath')
         xml_trees[view.id()] = trees
         global previous_first_selection
         previous_first_selection[view.id()] = None
     return xml_trees[view.id()]
+
+class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        view = self.view
+        
+        global parse_error
+        detail = view.get_status('xpath_error')[len(parse_error):].split(' - ')[0].split(':')
+        
+        point = view.text_point(int(detail[0]) - 1, int(detail[1]))
+        
+        view.sel().clear()
+        view.sel().add(point)
+        
+        view.show_at_center(point)
+    def is_enabled(self, **args):
+        global parse_error
+        return containsSGML(self.view) and self.view.get_status('xpath_error').startswith(parse_error)
+    def is_visible(self, **args):
+        return containsSGML(self.view)
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getSpecificNodePosition(node, position_name):

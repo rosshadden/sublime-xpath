@@ -29,5 +29,8 @@
 	}, {
 		"caption": "XPath: Query document",
 		"command": "query_xpath"
+	}, {
+		"caption": "XPath: Goto XML Parse Error",
+		"command": "goto_xml_parse_error"
 	}
 ]
