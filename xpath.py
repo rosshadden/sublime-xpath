@@ -23,7 +23,7 @@ def settingsChanged():
 
 def getSGMLRegions(view):
     """Find all xml and html scopes in the specified view."""
-    return view.find_by_selector('text.xml') + view.find_by_selector('text.html')
+    return view.find_by_selector('text.xml') + view.find_by_selector('text.html') # TODO: exclude text.html.markdown
 
 def containsSGML(view):
     """Return True if the view contains XML or HTML syntax."""
@@ -365,7 +365,6 @@ def getXPathOfNodes(nodes, args):
     all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
     
     global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
     wanted_attributes = settings.get('attributes_to_include', [])
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
@@ -642,7 +641,6 @@ def getBoolValueFromArgsOrSettings(key, args, default):
     """Retrieve the value for the given key from the args if present, otherwise the settings if present, otherwise use the supplied default."""
     if args is None or not key in args:
         global settings
-        settings = sublime.load_settings('xpath.sublime-settings')
         return bool(settings.get(key, default))
     else:
         return args[key]
@@ -806,7 +804,6 @@ def get_results_for_xpath_query(view, query, from_root):
     is_nodeset = None
     
     global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
     trees = ensureTreeCacheIsCurrent(view)
@@ -895,7 +892,6 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.pending.append(value)
             
             global settings
-            settings = sublime.load_settings('xpath.sublime-settings')
             delay = settings.get('live_query_timeout', 0)
             async = settings.get('live_query_async', True)
             
