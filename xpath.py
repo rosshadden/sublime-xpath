@@ -23,7 +23,7 @@ def settingsChanged():
 
 def getSGMLRegions(view):
     """Find all xml and html scopes in the specified view."""
-    return view.find_by_selector('text.xml') + view.find_by_selector('text.html') # TODO: exclude text.html.markdown
+    return view.find_by_selector('text.xml') + view.find_by_selector('text.html') # TODO: exclude text.html.markdown, but allow include html or xml code regions in markdown
 
 def containsSGML(view):
     """Return True if the view contains XML or HTML syntax."""
@@ -707,8 +707,10 @@ def isTagSelfClosing(node):
 
 def getElementXMLPreview(node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
-    # NOTE: we can't use built in tostring method because it repeats all xmlns attributes unnecessarily
+    # NOTE: we can't use built in tostring method because it repeats all xmlns attributes unnecessarily and will include our location attributes
     # response = etree.tostring(node, encoding='unicode')
+    # 
+    # # TODO: allow a maxlen of -1 to mean infinite
     
     # add opening tag
     tag_name = getTagName(node)[2]
