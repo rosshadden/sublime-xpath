@@ -10,6 +10,7 @@ xml_trees = {}
 previous_first_selection = {}
 settings = None
 parse_error = 'XPath - error parsing XML: '
+ns_loc = 'lxml'
 
 def settingsChanged():
     """Clear change counters and cached xpath regions for all views, and reparse xml regions for the current view."""
@@ -62,6 +63,7 @@ def buildTreesForView(view):
 
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
     parser = make_parser()
+    global ns_loc
     
     class ETreeContent(ElementTreeContentHandler):
         _locator = None
@@ -134,7 +136,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
             super().startElementNS(name, tagName, attrs)
             
             current = self._element_stack[-1]
-            current.set('{lxml}open_tag_start_pos', self._getParsePosition())
+            self._recordPosition(current, 'open_tag_start_pos')
             
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
@@ -163,7 +165,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
             self._prefix_hierarchy.pop()
         
         def _recordPosition(self, node, position_name, position = None):
-            position_name = '{lxml}' + position_name
+            position_name = '{' + ns_loc + '}' + position_name
             if position is not None or position_name not in node.attrib.keys():
                 node.set(position_name, position or self._getParsePosition())
         
@@ -178,8 +180,8 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
                         last_child = current[-1] # get the last child
                         if last_child.tail is None and self._last_action is not None:
                             self._recordPosition(last_child, self._last_action + '_tag_end_pos')
-                            if self._last_action == 'close' and last_child.get('{lxml}close_tag_end_pos') == last_child.get('{lxml}open_tag_end_pos'): # self-closing tag, update the start position of the "close tag" to the start position of the open tag
-                                self._recordPosition(last_child, 'close_tag_start_pos', last_child.get('{lxml}open_tag_start_pos'))
+                            if self._last_action == 'close' and last_child.get('{' + ns_loc + '}close_tag_end_pos') == last_child.get('{' + ns_loc + '}open_tag_end_pos'): # self-closing tag, update the start position of the "close tag" to the start position of the open tag
+                                self._recordPosition(last_child, 'close_tag_start_pos', last_child.get('{' + ns_loc + '}open_tag_start_pos'))
         
         def characters(self, data):
             self._recordEndPosition()
@@ -251,8 +253,8 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getSpecificNodePosition(node, position_name):
     """Given a node and a position name, return the row and column that relates to the node's position."""
-    
-    row, col = node.get('{lxml}' + position_name).split('/')
+    global ns_loc
+    row, col = node.get('{' + ns_loc + '}' + position_name).split('/')
     return (int(row), int(col))
 
 def getNodeTagRange(node, position_type):
@@ -357,6 +359,8 @@ def getNodesAtPositions(view, trees, positions):
     return matches
 
 def getXPathOfNodes(nodes, args):
+    global ns_loc
+    
     include_indexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
@@ -414,7 +418,7 @@ def getXPathOfNodes(nodes, args):
             attributes_to_show = []
             for attr_name in node.attrib:
                 include_attribue = False
-                if not attr_name.startswith('{lxml}'):
+                if not attr_name.startswith('{' + ns_loc + '}'):
                     if all_attributes:
                         include_attribute = True
                     else:
@@ -712,6 +716,8 @@ def getElementXMLPreview(node, maxlen):
     # 
     # # TODO: allow a maxlen of -1 to mean infinite
     
+    global ns_loc
+    
     # add opening tag
     tag_name = getTagName(node)[2]
     response = '<' + tag_name
@@ -722,7 +728,7 @@ def getElementXMLPreview(node, maxlen):
         prefix = ''
         if len(splitNS) == 2:
             splitNS[0] = splitNS[0][len('{'):]
-            if splitNS[0] == 'lxml':
+            if splitNS[0] == ns_loc:
                 continue
             for prefix in node.nsmap:
                 if node.nsmap[prefix] == splitNS[0]:
@@ -740,7 +746,7 @@ def getElementXMLPreview(node, maxlen):
         differences = node.nsmap
     
     for ns in differences:
-        if node.nsmap[ns] != 'lxml': # ignore our lxml node position namespace
+        if node.nsmap[ns] != ns_loc: # ignore our lxml node position namespace
             response += ' xmlns'
             if ns is not None:
                 response += ':' + ns
@@ -797,8 +803,9 @@ def get_all_namespaces_in_tree(tree):
     # find all namespaces in the document, so that the same prefixes can be used for the xpath
     # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
     # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
+    global ns_loc
     getNamespaces = etree.XPath('//namespace::*')
-    return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != 'lxml'])
+    return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
 
 def get_results_for_xpath_query(view, query, from_root):
     """Execute the specified xpath query on all SGML regions that contain a cursor, and return the results."""
