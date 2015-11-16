@@ -569,8 +569,26 @@ def move_cursors_to_nodes(view, nodes, position_type):
     
     view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
 
+def getRelativeNode(relative_to, direction):
+    def return_specific(node):
+        yield node
+    generator = None
+    if direction == 'next':
+        generator = relative_to.itersiblings()
+    elif direction in ('prev', 'previous'):
+        generator = relative_to.itersiblings(preceding = True)
+    elif direction in ('open', 'close'):
+        generator = return_specific(relative_to) # return self
+    elif direction == 'parent':
+        generator = return_specific(relative_to.getparent())
+    
+    if generator is None:
+        raise StandardError('Unknown direction "' + direction + '"')
+    else:
+        return next(generator, None)
+
 class GotoRelativeCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', 'direction': 'prev'})
+    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', {'direction': 'prev'})
         """Move cursor(s) to specified relative tag(s)."""
         view = self.view
         
@@ -585,7 +603,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             new_nodes_under_cursors = []
             for result in results:
                 allFound = True
-                desired_node = self.find_node(result[0], args['direction'])
+                desired_node = getRelativeNode(result[0], args['direction'])
                 if desired_node is None:
                     allFound = False
                     break
@@ -602,24 +620,6 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                 if args['direction'] == 'close':
                     position_type = 'close'
                 move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
-    
-    def find_node(self, relative_to, direction):
-        def return_specific(node):
-            yield node
-        generator = None
-        if direction == 'next':
-            generator = relative_to.itersiblings()
-        elif direction in ('prev', 'previous'):
-            generator = relative_to.itersiblings(preceding = True)
-        elif direction in ('open', 'close'):
-            generator = return_specific(relative_to) # return self
-        elif direction == 'parent':
-            generator = return_specific(relative_to.getparent())
-        
-        if generator is None:
-            raise StandardError('Unknown direction "' + direction + '"')
-        else:
-            return next(generator, None)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
