@@ -19,10 +19,10 @@
 		<unique:example></unique:example><!-- path here is "/test/default3:more[2]/unique:example" -->
 	</more>
 	<foo xmlns="world_ns" /><!-- same uri as default2 used, path is therefore "/test/default2:foo" -->
-	<numeric xmlns:an3="numbered_ns"><!-- specific namespace prefix with a numeric suffix declared -->
-		<an3:test /><!-- /test/numeric/an3:test -->
+	<numeric xmlns:an="yans"><!-- this one becomes "an4", because "an" has been used twice already and "an3" is explicitly defined later in the document -->
+		<an:test /><!-- /test/numeric/an4:test -->
 	</numeric>
-	<numeric xmlns:an="yans"><!-- this one becomes "an4", because "an" has been used twice already and "an3" already exists -->
-		<an:okay></an:okay>
+	<numeric xmlns:an3="numbered_ns"><!-- specific namespace prefix with a numeric suffix declared -->
+		<an3:okay></an3:okay>
 	</numeric>
 </test>
