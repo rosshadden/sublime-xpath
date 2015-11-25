@@ -846,7 +846,9 @@ def get_results_for_xpath_query(view, query, from_root):
                 try:
                     result = xpath(context)
                     if isinstance(result, list):
-                        is_nodeset = True
+                        if len(result) > 0:
+                            is_nodeset = isinstance(result[0], etree.ElementBase)
+                        
                         matches += result
                     else:
                         is_nodeset = False
