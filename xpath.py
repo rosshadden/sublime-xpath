@@ -559,6 +559,8 @@ def move_cursors_to_nodes(view, nodes, position_type):
     cursors = []
     
     for node in nodes:
+        if isinstance(node, etree._ElementUnicodeResult):
+            node = node.getparent()
         pos = getNodeTagRegion(view, node, position_type)
         tag = getTagName(node)[2]
         
@@ -846,8 +848,7 @@ def get_results_for_xpath_query(view, query, from_root):
                 try:
                     result = xpath(context)
                     if isinstance(result, list):
-                        if len(result) > 0:
-                            is_nodeset = isinstance(result[0], etree._Element)
+                        is_nodeset = True
                         
                         matches += result
                     else:
@@ -945,7 +946,8 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         maxlen = 70
-        if self.results[0]:
+        is_element_nodeset = self.results[0] and len(self.results[1]) > 0 and isinstance(self.results[1][0], etree._Element)
+        if is_element_nodeset:
             list_comp = [[getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results[1]]
         else:
             list_comp = [str(result)[0:maxlen] for result in self.results[1]]
