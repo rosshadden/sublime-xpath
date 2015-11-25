@@ -559,8 +559,8 @@ def move_cursors_to_nodes(view, nodes, position_type):
     cursors = []
     
     for node in nodes:
-        if isinstance(node, etree._ElementUnicodeResult):
-            node = node.getparent()
+        if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
+            node = node.getparent() # get the parent
         pos = getNodeTagRegion(view, node, position_type)
         tag = getTagName(node)[2]
         
@@ -946,11 +946,25 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         maxlen = 70
-        is_element_nodeset = self.results[0] and len(self.results[1]) > 0 and isinstance(self.results[1][0], etree._Element)
-        if is_element_nodeset:
-            list_comp = [[getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)] for e in self.results[1]]
+        
+        show_text_preview = lambda result: str(result)[0:maxlen]
+        
+        if self.results[0]:
+            result_unique_type_count = len(getUniqueItems([type(item) for item in self.results[1]]))
+            
+            show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)]
+            def show_preview(item):
+                if isinstance(item, etree._Element):
+                    return show_element_preview(item)
+                else:
+                    show = show_text_preview(item)
+                    if result_unique_type_count > 1: # if some items are elements (where we show 3 lines) and some are other node types (where we show 1 line), we need to return 3 lines to ensure Sublime will show the results correctly
+                        show = [show, '', '']
+                    return show
+            
+            list_comp = [show_preview(item) for item in self.results[1]]
         else:
-            list_comp = [str(result)[0:maxlen] for result in self.results[1]]
+            list_comp = [show_text_preview(result) for result in self.results[1]]
         self.view.window().show_quick_panel(list_comp, self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
         
     def xpath_selection_changed(self, selected_index):
