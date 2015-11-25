@@ -327,7 +327,7 @@ def getNodesAtPositions(view, trees, positions):
         
         found_match_at_last_expected_position_in_node = False
         for span_node, pos_start, pos_end, is_final in spans:
-            matches, first_match_index, last_match_index = matchSpan(sublime.Region(pos_start, pos_end), next_match_index, max_index, span_node == node)
+            matches, first_match_index, last_match_index = matchSpan(sublime.Region(pos_start, pos_end), next_match_index, max_index, span_node == node) # TODO: only include beginning if selection size is empty? so can select <hello>text|<world>|</hello> and xpath will show as 'hello/world' rather than '/hello'?
             
             if len(matches) > 0: # if matches were found
                 if last_match_index == max_index: # if the last index that matched is the maximum index that could match inside this node
@@ -561,6 +561,11 @@ def move_cursors_to_nodes(view, nodes, position_type):
     for node in nodes:
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             node = node.getparent() # get the parent
+        
+        # TODO: support position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
+        # TODO: support position type 'content' <name>|content<subcontent />|</name> "Goto content"
+        # TODO: support position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
+        # TODO: once done, add to Command Palette
         pos = getNodeTagRegion(view, node, position_type)
         tag = getTagName(node)[2]
         
@@ -583,7 +588,7 @@ def getRelativeNode(relative_to, direction):
         generator = relative_to.itersiblings()
     elif direction in ('prev', 'previous'):
         generator = relative_to.itersiblings(preceding = True)
-    elif direction in ('open', 'close'):
+    elif direction in ('open', 'close', 'names', 'entire', 'content'):
         generator = return_specific(relative_to) # return self
     elif direction == 'parent':
         generator = return_specific(relative_to.getparent())
@@ -622,9 +627,10 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                     message += ' for at least one selection'
                 sublime.status_message(message)
             else:
+                non_open_positions = ['close', 'content', 'entire', 'names']
                 position_type = 'open'
-                if args['direction'] == 'close':
-                    position_type = 'close'
+                if args['direction'] in non_open_positions:
+                    position_type = args['direction']
                 move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
     
     def is_enabled(self, **args):
