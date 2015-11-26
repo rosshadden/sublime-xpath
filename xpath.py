@@ -488,13 +488,13 @@ def updateStatusToCurrentXPathIfSGML(view):
                 
                 current_first_sel = view.sel()[0]
                 nodes = []
-                if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), prev[2] and current_first_sel.empty()): # current first selection matches xpath region from previous first selection
+                if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), False): # current first selection matches xpath region from previous first selection
                     nodes.append(prev[1])
                 else: # current first selection doesn't match xpath region from previous first selection or is not cached
                     results = getNodesAtPositions(view, trees, [current_first_sel]) # get nodes at first selection
                     if len(results) > 0:
                         result = results[0]
-                        previous_first_selection[view.id()] = (sublime.Region(result[2], result[3]), result[0], result[4]) # cache node and xpath region
+                        previous_first_selection[view.id()] = (sublime.Region(result[2], result[3]), result[0]) # cache node and xpath region
                         nodes.append(result[0])
                 
                 # calculate xpath of node
