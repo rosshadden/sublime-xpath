@@ -562,18 +562,29 @@ def move_cursors_to_nodes(view, nodes, position_type):
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             node = node.getparent() # get the parent
         
-        # TODO: support position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
-        # TODO: support position type 'content' <name>|content<subcontent />|</name> "Goto content"
-        # TODO: support position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
-        # TODO: once done, add to Command Palette
-        pos = getNodeTagRegion(view, node, position_type)
-        tag = getTagName(node)[2]
+        open_pos = getNodeTagRegion(view, node, 'open')
+        close_pos = getNodeTagRegion(view, node, 'close')
         
-        chars_before_tag = len('<')
-        if position_type == 'close' and not isTagSelfClosing(node):
-            chars_before_tag += len('/')
-        # select only the tag name with the prefix
-        cursors.append(sublime.Region(pos.begin() + chars_before_tag, pos.begin() + chars_before_tag + len(tag)))
+        # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
+        # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
+        # position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
+        # support position type 'content' <name>|content<subcontent />|</name> "Goto content"
+        # support position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
+        
+        if position_type in ('open', 'close', 'names'):
+            tag = getTagName(node)[2]
+            
+            # select only the tag name with the prefix
+            chars_before_tag = len('<')
+            if position_type in ('open', 'names'):
+                cursors.append(sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag)))
+            if position_type in ('close', 'names') and not isTagSelfClosing(node):
+                chars_before_tag += len('/')
+                cursors.append(sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag)))
+        elif position_type == 'content':
+            cursors.append(sublime.Region(open_pos.end(), close_pos.begin()))
+        elif position_type == 'entire':
+            cursors.append(sublime.Region(open_pos.begin(), close_pos.end()))
     
     view.sel().clear()
     view.sel().add_all(cursors)
@@ -594,7 +605,7 @@ def getRelativeNode(relative_to, direction):
         generator = return_specific(relative_to.getparent())
     
     if generator is None:
-        raise StandardError('Unknown direction "' + direction + '"')
+        raise exceptions.StandardError('Unknown direction "' + direction + '"')
     else:
         return next(generator, None)
 

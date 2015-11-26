@@ -27,6 +27,15 @@
 		"caption": "XPath: Goto close tag",
 		"command": "goto_relative", "args": { "direction": "close" }
 	}, {
+		"caption": "XPath: Goto open and close tag",
+		"command": "goto_relative", "args": { "direction": "names" }
+	}, {
+		"caption": "XPath: Goto content",
+		"command": "goto_relative", "args": { "direction": "content" }
+	}, {
+		"caption": "XPath: Select entire element",
+		"command": "goto_relative", "args": { "direction": "entire" }
+	}, {
 		"caption": "XPath: Query document",
 		"command": "query_xpath"
 	}, {
