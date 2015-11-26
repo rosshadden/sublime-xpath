@@ -576,7 +576,7 @@ def move_cursors_to_nodes(view, nodes, position_type):
             
             # select only the tag name with the prefix
             chars_before_tag = len('<')
-            if position_type in ('open', 'names'):
+            if position_type in ('open', 'names') or isTagSelfClosing(node):
                 cursors.append(sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag)))
             if position_type in ('close', 'names') and not isTagSelfClosing(node):
                 chars_before_tag += len('/')
