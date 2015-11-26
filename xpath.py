@@ -728,72 +728,13 @@ def isTagSelfClosing(node):
     close_pos = getNodeTagRange(node, 'close')
     return open_pos == close_pos
 
-def getElementXMLPreview(node, maxlen):
+def getElementXMLPreview(view, node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
-    # NOTE: we can't use built in tostring method because it repeats all xmlns attributes unnecessarily and will include our location attributes
-    # response = etree.tostring(node, encoding='unicode')
-    # 
-    # # TODO: allow a maxlen of -1 to mean infinite
-    
-    global ns_loc
-    
-    # add opening tag
-    tag_name = getTagName(node)[2]
-    response = '<' + tag_name
-    # add attributes
-    for attrib in node.attrib:
-        splitNS = attrib.split('}')
-        localName = splitNS[-1]
-        prefix = ''
-        if len(splitNS) == 2:
-            splitNS[0] = splitNS[0][len('{'):]
-            if splitNS[0] == ns_loc:
-                continue
-            for prefix in node.nsmap:
-                if node.nsmap[prefix] == splitNS[0]:
-                    prefix += ':'
-                    break
-                
-        response += ' ' + prefix + localName + '="' + node.get(attrib) + '"'
-    
-    # add namespaces that were not on the parent element
-    parent = node.getparent()
-    differences = None
-    if parent is not None:
-        differences = set(node.nsmap).difference(set(parent.nsmap))
-    else:
-        differences = node.nsmap
-    
-    for ns in differences:
-        if node.nsmap[ns] != ns_loc: # ignore our lxml node position namespace
-            response += ' xmlns'
-            if ns is not None:
-                response += ':' + ns
-            response += '="' + node.nsmap[ns] + '"'
-    
-    if isTagSelfClosing(node):
-        response += ' />'
-    else:
-        # end of open tag
-        response += '>'
-        # add text
-        remaining_size = maxlen - len(response)
-        if remaining_size > 0 and node.text is not None:
-            response += collapseWhitespace(node.text, remaining_size) # remove whitespace
-        
-        # loop through children
-        for child in node.iterchildren():
-            remaining_size = maxlen - len(response)
-            if remaining_size <= 0:
-                break
-            else:
-                response += getElementXMLPreview(child, remaining_size) + collapseWhitespace(child.tail, remaining_size) # remove whitespace
-        
-        remaining_size = maxlen - len(response)
-        if remaining_size > 0:
-            response += '</' + tag_name + '>'
-    
-    return response[0:maxlen]
+    open_pos, close_pos = getNodePosition(view, node)
+    cutoff = open_pos.begin() + maxlen
+    if maxlen < 0 or close_pos.end() < cutoff: # a negative maxlen means infinite/no limit
+        cutoff = close_pos.end()
+    return view.substr(sublime.Region(open_pos.begin(), cutoff))
 
 def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start = 1):
     # TODO: docstring, about how it requires unique items
@@ -888,12 +829,15 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     selected_index = None
     live_mode = None
     relative_mode = None
+    max_results_to_show = None
     pending = []
     
     def run(self, edit, **args):
         self.show_query_results = args is None or getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = args is None or getBoolValueFromArgsOrSettings('live_mode', args, True)
         self.relative_mode = args is None or getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
+        global settings
+        self.max_results_to_show = settings.get('max_results_to_show', 1000)
         
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
@@ -951,6 +895,8 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                 else:
                     sublime.status_message('') # clear status message as it is out of date now
                     if self.show_query_results or not self.results[0]: # also show results if results is not a node set, as we can't "go to" them...
+                        if self.max_results_to_show > 0:
+                            self.results = (self.results[0], self.results[1][0:self.max_results_to_show])
                         self.show_results_for_query()
                     else:
                         self.goto_results_for_query()
@@ -969,7 +915,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if self.results[0]:
             result_unique_type_count = len(getUniqueItems([type(item) for item in self.results[1]]))
             
-            show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(e, maxlen)]
+            show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
             def show_preview(item):
                 if isinstance(item, etree._Element):
                     return show_element_preview(item)
