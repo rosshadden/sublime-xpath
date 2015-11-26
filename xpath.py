@@ -861,7 +861,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                 if self.input_panel is not None:
                     self.input_panel.window().focus_view(self.input_panel)
         
-        if self.live_mode and self.show_query_results:
+        if self.live_mode:
             self.pending.append(value)
             
             global settings
