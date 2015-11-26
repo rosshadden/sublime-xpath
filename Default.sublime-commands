@@ -41,5 +41,8 @@
 	}, {
 		"caption": "XPath: Goto XML Parse Error",
 		"command": "goto_xml_parse_error"
+	}, {
+		"caption": "XPath: Show Query History",
+		"command": "show_xpath_query_history"
 	}
 ]

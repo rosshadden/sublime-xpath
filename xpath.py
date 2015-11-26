@@ -821,6 +821,43 @@ def get_results_for_xpath_query(view, query, from_root):
         
     return (is_nodeset, matches)
 
+def get_xpath_query_history():
+    history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
+    return history_settings.get('history', [])
+
+def clear_xpath_query_history():
+    history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
+    return history_settings.erase('history')
+
+def add_to_xpath_query_history(query):
+    history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
+    history = get_xpath_query_history()
+    if query in history:
+        # move item to last by removing and re-adding it
+        history.remove(query)
+    history.append(query)
+    history_settings.set('history', history)
+    sublime.save_settings('xpath_query_history.sublime-settings')
+
+class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        history = get_xpath_query_history()
+        if len(history) == 0:
+            sublime.status_message('no query history to show')
+        else:
+            self.view.window().show_quick_panel(history, self.history_selection_done, 0, len(history) - 1, self.history_selection_changed)
+    def history_selection_done(self, selected_index):
+        if selected_index > -1:
+            add_to_xpath_query_history(get_xpath_query_history()[selected_index])
+            sublime.active_window().active_view().run_command('query_xpath', { 'prefill_path_at_cursor': False })
+    def history_selection_changed(self, selected_index):
+        if not getBoolValueFromArgsOrSettings('live_mode', None, True):
+            self.history_selection_done(selected_index)
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
+    def is_visible(self):
+        return containsSGML(self.view)
+
 class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
@@ -843,7 +880,10 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
             # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
+            history = get_xpath_query_history()
             prefill = self.previous_input
+            if len(history) > 0:
+                prefill = history[-1]
             if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not self.previous_input:
                 global previous_first_selection
                 prev = previous_first_selection.get(self.view.id(), None)
@@ -881,6 +921,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def xpath_input_done(self, value):
         self.input_panel = None
         self.previous_input = value
+        add_to_xpath_query_history(self.previous_input)
         if not self.live_mode:
             self.process_results_for_query(value)
         else:
