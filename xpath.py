@@ -833,9 +833,9 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     pending = []
     
     def run(self, edit, **args):
-        self.show_query_results = args is None or getBoolValueFromArgsOrSettings('show_query_results', args, True)
-        self.live_mode = args is None or getBoolValueFromArgsOrSettings('live_mode', args, True)
-        self.relative_mode = args is None or getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
+        self.show_query_results = getBoolValueFromArgsOrSettings('show_query_results', args, True)
+        self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
+        self.relative_mode = getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
         global settings
         self.max_results_to_show = settings.get('max_results_to_show', 1000)
         
