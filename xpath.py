@@ -931,12 +931,18 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         self.view.window().show_quick_panel(list_comp, self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
         
     def xpath_selection_changed(self, selected_index):
-        self.xpath_selection_done(selected_index)
+        if (selected_index > -1): # quick panel wasn't cancelled
+            self.goto_results_if_relevant(selected_index)
     
     def xpath_selection_done(self, selected_index):
-        if selected_index > -1: # quick panel wasn't cancelled
-            if self.results[0]:
-                self.goto_results_for_query(selected_index)
+        if (selected_index > -1): # quick panel wasn't cancelled
+            self.goto_results_if_relevant(selected_index)
+            self.input_panel = None
+            sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
+    
+    def goto_results_if_relevant(self, selected_index):
+        if self.results[0]:
+            self.goto_results_for_query(selected_index)
     
     def goto_results_for_query(self, specific_index = None):
         cursors = []
