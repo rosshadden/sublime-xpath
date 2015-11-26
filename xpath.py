@@ -294,7 +294,7 @@ def getNodePositions(view, node):
     yield (node, pos, close_pos.end(), True)
 
 def regionIntersects(outer, inner, include_beginning):
-    return outer.intersects(inner) or (include_beginning and outer.contains(inner.begin()))
+    return outer.intersects(inner) or (include_beginning and inner.empty() and outer.contains(inner.begin())) # only include beginning if selection size is empty. so can select <hello>text|<world />|</hello> and xpath will show as 'hello/world' rather than '/hello'
 
 # TODO: consider subclassing tree? and moving function to that class
 def getNodesAtPositions(view, trees, positions):
@@ -327,7 +327,7 @@ def getNodesAtPositions(view, trees, positions):
         
         found_match_at_last_expected_position_in_node = False
         for span_node, pos_start, pos_end, is_final in spans:
-            matches, first_match_index, last_match_index = matchSpan(sublime.Region(pos_start, pos_end), next_match_index, max_index, span_node == node) # TODO: only include beginning if selection size is empty? so can select <hello>text|<world>|</hello> and xpath will show as 'hello/world' rather than '/hello'?
+            matches, first_match_index, last_match_index = matchSpan(sublime.Region(pos_start, pos_end), next_match_index, max_index, span_node == node)
             
             if len(matches) > 0: # if matches were found
                 if last_match_index == max_index: # if the last index that matched is the maximum index that could match inside this node
@@ -488,7 +488,7 @@ def updateStatusToCurrentXPathIfSGML(view):
                 
                 current_first_sel = view.sel()[0]
                 nodes = []
-                if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), prev[2]): # current first selection matches xpath region from previous first selection
+                if prev is not None and regionIntersects(prev[0], sublime.Region(current_first_sel.begin(), current_first_sel.begin()), prev[2] and current_first_sel.empty()): # current first selection matches xpath region from previous first selection
                     nodes.append(prev[1])
                 else: # current first selection doesn't match xpath region from previous first selection or is not cached
                     results = getNodesAtPositions(view, trees, [current_first_sel]) # get nodes at first selection
