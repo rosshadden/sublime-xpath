@@ -29,5 +29,7 @@
 	// whether or not to only show the current xpath in the status bar if the view is not dirty. Useful to save CPU cycles when editing a document
 	"only_show_xpath_if_saved": false,
 	// only show the first x number of results from the xpath query, to speed up result display. Set to <= 0 for no limit
-	"max_results_to_show": 1000
+	"max_results_to_show": 1000,
+	// if you never want to it to remember the most recent query used (you can still get to it by explicitly using the history list), but want it to prefill the path with the path of the node under the first cursor, set this to true
+	"prefill_path_at_cursor": false
 }
