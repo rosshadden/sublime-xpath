@@ -905,7 +905,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             prefill = self.previous_input
             if len(history) > 0:
                 prefill = history[-1]
-            if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not self.previous_input:
+            if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not prefill:
                 global previous_first_selection
                 prev = previous_first_selection.get(self.view.id(), None)
                 if prev is not None:
@@ -958,7 +958,8 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                 else:
                     sublime.status_message('') # clear status message as it is out of date now
                     if self.show_query_results or not self.results[0]: # also show results if results is not a node set, as we can't "go to" them...
-                        if self.max_results_to_show > 0:
+                        if self.max_results_to_show > 0 and len(self.results[1]) > self.max_results_to_show:
+                            print('XPath: query results truncated, showing first ' + str(self.max_results_to_show) + ' results of ' + str(len(self.results[1])) + ' for query: ' + query)
                             self.results = (self.results[0], self.results[1][0:self.max_results_to_show])
                         self.show_results_for_query()
                     else:
