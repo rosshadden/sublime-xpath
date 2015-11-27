@@ -39,10 +39,13 @@
 		"caption": "XPath: Query document",
 		"command": "query_xpath"
 	}, {
-		"caption": "XPath: Goto XML Parse Error",
+		"caption": "XPath: Goto XML parse error",
 		"command": "goto_xml_parse_error"
 	}, {
-		"caption": "XPath: Show Query History",
+		"caption": "XPath: Show query history",
 		"command": "show_xpath_query_history"
+	}, {
+		"caption": "XPath: Re-run last query and select all results",
+		"command": "rerun_last_xpath_query", "args": { "show_query_results": false }
 	}
 ]

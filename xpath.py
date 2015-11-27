@@ -859,6 +859,21 @@ class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
     def is_visible(self):
         return containsSGML(self.view)
 
+class RerunLastXpathQueryCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        history = get_xpath_query_history(self.view)
+        if len(history) == 0:
+            sublime.status_message('no previous query to re-run')
+        else:
+            if args is None:
+                args = {}
+            args['xpath'] = history[-1]
+            sublime.active_window().active_view().run_command('query_xpath', args)
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
+    def is_visible(self):
+        return containsSGML(self.view)
+
 class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
@@ -875,7 +890,10 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
         self.relative_mode = getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
         global settings
-        self.max_results_to_show = settings.get('max_results_to_show', 1000)
+        if 'max_results_to_show' in args:
+            self.max_results_to_show = int(args['max_results_to_show'])
+        else:
+            self.max_results_to_show = settings.get('max_results_to_show', 1000)
         
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
