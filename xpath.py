@@ -469,7 +469,7 @@ def getXPathOfNodes(nodes, args):
             paths.append(getNodePath(node, namespaces[root], root))
     
     if unique:
-        paths = getUniqueItems(paths)
+        paths = list(getUniqueItems(paths))
     
     return paths
 
@@ -674,7 +674,7 @@ def getUniqueItems(items):
     for item in items:
         if item not in unique:
             unique.append(item)
-    return unique
+            yield item
 
 class XpathListener(sublime_plugin.EventListener):
     def on_selection_modified_async(self, view):
@@ -817,8 +817,8 @@ def get_results_for_xpath_query(view, query, from_root):
                     sublime.status_message(str(e)) # show parsing error in status bar
                     return None
         
-        if not from_root and is_nodeset: # if multiple contexts were used, get unique items only
-            matches = getUniqueItems(matches)
+        if not from_root and is_nodeset: # if multiple contexts were used, get unique items only # TODO: only if is a node? (as opposed to simple-type like int or string)
+            matches = list(getUniqueItems(matches))
         
     return (is_nodeset, matches)
 
@@ -973,7 +973,9 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         show_text_preview = lambda result: str(result)[0:maxlen]
         
         if self.results[0]:
-            result_unique_type_count = len(getUniqueItems([type(item) for item in self.results[1]]))
+            unique_types_in_result = getUniqueItems((type(item) for item in self.results[1]))
+            next(unique_types_in_result, None)
+            muliple_types_in_result = next(unique_types_in_result, None) is not None
             
             show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
             def show_preview(item):
@@ -981,7 +983,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                     return show_element_preview(item)
                 else:
                     show = show_text_preview(item)
-                    if result_unique_type_count > 1: # if some items are elements (where we show 3 lines) and some are other node types (where we show 1 line), we need to return 3 lines to ensure Sublime will show the results correctly
+                    if muliple_types_in_result: # if some items are elements (where we show 3 lines) and some are other node types (where we show 1 line), we need to return 3 lines to ensure Sublime will show the results correctly
                         show = [show, '', '']
                     return show
             
