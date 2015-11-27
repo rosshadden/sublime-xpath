@@ -884,8 +884,10 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     relative_mode = None
     max_results_to_show = None
     pending = []
+    most_recent_query = None
     
     def run(self, edit, **args):
+        self.most_recent_query = None
         self.show_query_results = getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
         self.relative_mode = getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
@@ -917,6 +919,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         def cb():
             if self.pending.pop() == value:
                 self.process_results_for_query(value)
+                self.most_recent_query = value
                 if self.input_panel is not None:
                     self.input_panel.window().focus_view(self.input_panel)
         
@@ -998,6 +1001,8 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     
     def xpath_selection_done(self, selected_index):
         if (selected_index > -1): # quick panel wasn't cancelled
+            if self.most_recent_query is not None and self.most_recent_query != '':
+                add_to_xpath_query_history(self.view, self.most_recent_query)
             self.goto_results_if_relevant(selected_index)
             self.input_panel = None
             sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
