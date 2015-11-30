@@ -568,8 +568,8 @@ def move_cursors_to_nodes(view, nodes, position_type):
         # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
         # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
         # position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
-        # support position type 'content' <name>|content<subcontent />|</name> "Goto content"
-        # support position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
+        # position type 'content' <name>|content<subcontent />|</name> "Goto content"
+        # position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
         
         if position_type in ('open', 'close', 'names'):
             tag = getTagName(node)[2]
@@ -691,7 +691,12 @@ class XpathListener(sublime_plugin.EventListener):
         change_counters.pop(view.id(), None)
         xml_trees.pop(view.id(), None)
         previous_first_selection.pop(view.id(), None)
-        clear_xpath_query_history(view)
+        
+        if view.file_name() is None: # if the file has no filename associated with it
+            #if not getBoolValueFromArgsOrSettings('global_query_history', None, True): # if global history isn't enabled
+            #    remove_key_from_xpath_query_history(get_history_key_for_view(view))
+            #else:
+            change_key_for_xpath_query_history(get_history_key_for_view(view), 'global')
 
 def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
@@ -822,35 +827,80 @@ def get_results_for_xpath_query(view, query, from_root):
         
     return (is_nodeset, matches)
 
-def get_xpath_query_history(view):
+def get_xpath_query_history_for_keys(keys):
+    """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
-    return history_settings.get(str(view.id()), [])
+    history = [item[0] for item in history_settings.get('history', []) if keys is None or item[1] in keys]
+    return list(reversed(list(getUniqueItems(reversed(history))))) # get the latest unique items
 
-def clear_xpath_query_history(view):
+def remove_item_from_xpath_query_history(key, query):
+    """If the given query exists in the history for the given key, remove it."""
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
-    return history_settings.erase(str(view.id()))
+    history = history_settings.get('history', [])
+    item = [query, key]
+    if item in history:
+        history.remove(item)
+        history_settings.set('history', history)
+        #sublime.save_settings('xpath_query_history.sublime-settings')
+   
+# def remove_key_from_xpath_query_history(key):
+#     view_history = get_xpath_query_history_for_keys([key])
+#     for item in view_history:
+#         remove_item_from_xpath_query_history(key, item)
+#     return view_history
 
-def add_to_xpath_query_history(view, query):
+def add_to_xpath_query_history_for_key(key, query):
+    """Add the specified query to the history for the given key."""
+    # if it exists in the history for the view already, move the item to the bottom (i.e. make it the most recent item in the history) by removing and re-adding it
+    remove_item_from_xpath_query_history(key, query)
+    
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
-    history = get_xpath_query_history(view)
-    if query in history:
-        # move item to last by removing and re-adding it
-        history.remove(query)
-    history.append(query)
-    history_settings.set(str(view.id()), history)
+    history = history_settings.get('history', [])
+    history.append([query, key])
+    
+    # if there are more than the specified maximum number of history items, remove the excess
+    global settings
+    max_history = settings.get('max_query_history', 100)
+    history = history[-max_history:]
+    
+    history_settings.set('history', history)
     sublime.save_settings('xpath_query_history.sublime-settings')
 
+def change_key_for_xpath_query_history(oldkey, newkey):
+    """For all items in the history with the given oldkey, change the key to the specified newkey."""
+    history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
+    history = history_settings.get('history', [])
+    for item in history:
+        if item[1] == oldkey:
+            item[1] = newkey
+    history_settings.set('history', history)
+    sublime.save_settings('xpath_query_history.sublime-settings')
+
+def get_history_key_for_view(view):
+    """Return the key used to store history items that relate to the specified view."""
+    key = view.file_name()
+    if key is None:
+        key = 'buffer_' + str(view.id())
+    return key
+
 class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
+    history = None
     def run(self, edit, **args):
-        history = get_xpath_query_history(self.view)
-        if len(history) == 0:
+        global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
+        
+        keys = None
+        if not global_history:
+            keys = [get_history_key_for_view(self.view)]
+        
+        self.history = get_xpath_query_history_for_keys(keys)
+        if len(self.history) == 0:
             sublime.status_message('no query history to show')
         else:
-            self.view.window().show_quick_panel(history, self.history_selection_done, 0, len(history) - 1, self.history_selection_changed)
+            self.view.window().show_quick_panel(self.history, self.history_selection_done, 0, len(self.history) - 1, self.history_selection_changed)
     def history_selection_done(self, selected_index):
         if selected_index > -1:
-            add_to_xpath_query_history(self.view, get_xpath_query_history(self.view)[selected_index])
-            sublime.active_window().active_view().run_command('query_xpath', { 'prefill_path_at_cursor': False })
+            #add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.history[selected_index])
+            sublime.active_window().active_view().run_command('query_xpath', { 'prefill_path_at_cursor': False, 'prefill_query': self.history[selected_index] })
     def history_selection_changed(self, selected_index):
         if not getBoolValueFromArgsOrSettings('live_mode', None, True):
             self.history_selection_done(selected_index)
@@ -859,9 +909,15 @@ class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
     def is_visible(self):
         return containsSGML(self.view)
 
-class RerunLastXpathQueryCommand(sublime_plugin.TextCommand):
+class RerunLastXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query', { 'global_query_history': False, 'show_query_results': False })
     def run(self, edit, **args):
-        history = get_xpath_query_history(self.view)
+        global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
+        
+        keys = [get_history_key_for_view(self.view)]
+        if global_history:
+            keys = None
+        
+        history = get_xpath_query_history_for_keys(keys)
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
         else:
@@ -900,17 +956,25 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if args is not None and 'xpath' in args: # if an xpath is supplied, query it
             self.process_results_for_query(args['xpath'])
         else: # show an input prompt where the user can type their xpath query
-            # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
-            history = get_xpath_query_history(self.view)
             prefill = self.previous_input
-            if len(history) > 0:
-                prefill = history[-1]
-            if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not prefill:
-                global previous_first_selection
-                prev = previous_first_selection.get(self.view.id(), None)
-                if prev is not None:
-                    xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True }) # ensure the path matches this node and only this node
-                    prefill = xpaths[0]
+            if args is not None and 'prefill_query' in args:
+                prefill = args['prefill_query']
+            else:
+                global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
+                keys = [get_history_key_for_view(self.view)]
+                if global_history:
+                    keys = None
+                history = get_xpath_query_history_for_keys(keys)
+                
+                if len(history) > 0:
+                    prefill = history[-1]
+                # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
+                if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not prefill:
+                    global previous_first_selection
+                    prev = previous_first_selection.get(self.view.id(), None)
+                    if prev is not None:
+                        xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True }) # ensure the path matches this node and only this node
+                        prefill = xpaths[0]
             
             self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
     
@@ -943,7 +1007,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def xpath_input_done(self, value):
         self.input_panel = None
         self.previous_input = value
-        add_to_xpath_query_history(self.view, self.previous_input)
+        add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.previous_input)
         if not self.live_mode:
             self.process_results_for_query(value)
         else:
@@ -1003,7 +1067,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     def xpath_selection_done(self, selected_index):
         if (selected_index > -1): # quick panel wasn't cancelled
             if self.most_recent_query is not None and self.most_recent_query != '':
-                add_to_xpath_query_history(self.view, self.most_recent_query)
+                add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.most_recent_query)
             self.goto_results_if_relevant(selected_index)
             self.input_panel = None
             sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
