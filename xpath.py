@@ -4,6 +4,7 @@ import os
 from lxml.sax import ElementTreeContentHandler
 from lxml import etree
 from xml.sax import make_parser, ContentHandler, SAXParseException#, parseString, handler
+from lxml.html import fromstring as fromhtmlstring
 
 change_counters = {}
 xml_trees = {}
@@ -60,6 +61,10 @@ def buildTreesForView(view):
     for region in getSGMLRegions(view):
         trees.append(buildTreeForViewRegion(view, region))
     return trees
+
+def clean_html(html_soup):
+    root = fromhtmlstring(html_soup)
+    return etree.tostring(root, encoding='unicode')
 
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
     parser = make_parser()
@@ -211,6 +216,10 @@ def buildTreeForViewRegion(view, region_scope):
         text = str(e.getLineNumber() - 1 + line_number_offset) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
         view.set_status('xpath_error', parse_error + text)
         
+        if view.match_selector(region_scope.begin(), 'text.html'):
+            if sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes'):
+                sublime.active_window().active_view().run_command('clean_html', { 'begin': region_scope.begin(), 'end': region_scope.end() })
+        
     return tree
 
 def ensureTreeCacheIsCurrent(view):
@@ -249,6 +258,15 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         return containsSGML(self.view) and self.view.get_status('xpath_error').startswith(parse_error)
     def is_visible(self, **args):
         return containsSGML(self.view)
+
+class CleanHtmlCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        sublime.status_message('Cleaning HTML...')
+        region_scope = sublime.Region(args['begin'], args['end'])
+        tag_soup = self.view.substr(region_scope)
+        xml_string = clean_html(tag_soup)
+        self.view.replace(edit, region_scope, xml_string)
+        sublime.status_message('HTML cleaned successfully.')
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getSpecificNodePosition(node, position_name):
