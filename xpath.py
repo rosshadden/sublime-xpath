@@ -1038,7 +1038,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         maxlen = 70
         
-        show_text_preview = lambda result: str(result)[0:maxlen]
+        show_text_preview = lambda result: collapseWhitespace(str(result), maxlen)
         
         if self.results[0]:
             unique_types_in_result = getUniqueItems((type(item) for item in self.results[1]))
