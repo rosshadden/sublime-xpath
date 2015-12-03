@@ -271,6 +271,7 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
 class CleanHtmlCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
         sublime.status_message('Cleaning HTML...')
+        # TODO: if no arguments are supplied, find the first html region containing a cursor and clean that. If you want to clean all html regions containing cursors, bear in mind that the offsets will change after tidying the region before it!
         region_scope = sublime.Region(args['begin'], args['end'])
         tag_soup = self.view.substr(region_scope)
         xml_string = clean_html(tag_soup)
