@@ -5,9 +5,10 @@ Sublime Text - XPath Plugin
 
 - Copy XPath at cursor(s) to clipboard.
 - Updates status bar text to XPath of current line.
-- Jump selection to relative tag - previous or next sibling, parent, open or close tag.
+- Jump selection to relative tag - previous or next sibling, parent, open or close tag. It is also possible to select the entire tag contents, optionally including the tag itself.  This works for multiple selections as well, of course.
 - Query document by XPath expression.
 - Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
+- Tidy HTML files into valid XML.
 
 ## Settings:
 
@@ -35,3 +36,4 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 
 - Ross Hadden (@rosshadden)
 - Keith Hall (@keith-hall)
+- @BrutalSimplicity
