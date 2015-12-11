@@ -589,6 +589,8 @@ def move_cursors_to_nodes(view, nodes, position_type):
     for node in nodes:
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             node = node.getparent() # get the parent
+        elif not isinstance(node, etree._Element):
+            continue # unsupported type
         
         open_pos = getNodeTagRegion(view, node, 'open')
         close_pos = getNodeTagRegion(view, node, 'close')
@@ -733,6 +735,25 @@ def plugin_loaded():
     settings.clear_on_change('reparse')
     settings.add_on_change('reparse', settingsChanged)
     sublime.set_timeout_async(settingsChanged, 10)
+    
+    ns = etree.FunctionNamespace(None)
+    
+    def applyFuncToTextForItem(item, func):
+        if isinstance(item, etree._Element):
+            return None
+        #elif isinstance(item, etree._ElementUnicodeResult):
+        #    # TODO: if possible, create a new _ElementUnicodeResult associated with the same getparent()?
+        else:
+            return func(str(item))
+    
+    def applyFuncToTextForItems(nodes, func):
+        if isinstance(nodes, list):
+            return [applyFuncToTextForItem(item, func) for item in nodes]
+        else:
+            return applyFuncToTextForItem(nodes, func)
+    
+    ns['upper-case'] = lambda context, nodes: applyFuncToTextForItems(nodes, str.upper)
+    ns['lower-case'] = lambda context, nodes: applyFuncToTextForItems(nodes, str.lower)
 
 # TODO: move to Element subclass?
 def getTagName(node):
