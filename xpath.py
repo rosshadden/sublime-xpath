@@ -592,8 +592,13 @@ def move_cursors_to_nodes(view, nodes, position_type):
         elif not isinstance(node, etree._Element):
             continue # unsupported type
         
-        open_pos = getNodeTagRegion(view, node, 'open')
-        close_pos = getNodeTagRegion(view, node, 'close')
+        open_pos = None
+        close_pos = None
+        try:
+            open_pos = getNodeTagRegion(view, node, 'open')
+            close_pos = getNodeTagRegion(view, node, 'close')
+        except: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
+            continue
         
         # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
         # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
@@ -616,10 +621,11 @@ def move_cursors_to_nodes(view, nodes, position_type):
         elif position_type == 'entire':
             cursors.append(sublime.Region(open_pos.begin(), close_pos.end()))
     
-    view.sel().clear()
-    view.sel().add_all(cursors)
-    
-    view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
+    if len(cursors) > 0:
+        view.sel().clear()
+        view.sel().add_all(cursors)
+        
+        view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
 
 def getRelativeNode(relative_to, direction):
     def return_specific(node):
@@ -736,6 +742,7 @@ def plugin_loaded():
     settings.add_on_change('reparse', settingsChanged)
     sublime.set_timeout_async(settingsChanged, 10)
     
+    # http://lxml.de/extensions.html
     ns = etree.FunctionNamespace(None)
     
     def applyFuncToTextForItem(item, func):
