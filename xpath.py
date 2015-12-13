@@ -747,12 +747,12 @@ def plugin_loaded():
     
     def applyFuncToTextForItem(item, func):
         if isinstance(item, etree._Element):
-            return None
-        #elif isinstance(item, etree._ElementUnicodeResult):
-        #    # TODO: if possible, create a new _ElementUnicodeResult associated with the same getparent()?
+            return func(item.xpath('string(.)'))
         else:
             return func(str(item))
     
+    # TODO: xpath 1 functions deal with lists by just taking the first node
+    #     - maybe we can provide optional arg to return nodeset by applying to all
     def applyFuncToTextForItems(nodes, func):
         if isinstance(nodes, list):
             return [applyFuncToTextForItem(item, func) for item in nodes]
@@ -761,6 +761,18 @@ def plugin_loaded():
     
     ns['upper-case'] = lambda context, nodes: applyFuncToTextForItems(nodes, str.upper)
     ns['lower-case'] = lambda context, nodes: applyFuncToTextForItems(nodes, str.lower)
+    # TODO: if nodeset, return node in list if True, otherwise skip
+    ns['ends-with'] = lambda context, nodes, ending: applyFuncToTextForItems(nodes, lambda item: item.endswith(ending)) 
+    # tokenize
+    # matches
+    # replace
+    # avg
+    # min
+    # max
+    # abs
+    # ? adjust-dateTime-to-timezone, current-dateTime, day-from-dateTime, month-from-dateTime, days-from-duration, months-from-duration, etc.
+    # insert-before, remove, subsequence, index-of, distinct-values, reverse, unordered, empty, exists
+    # 
 
 # TODO: move to Element subclass?
 def getTagName(node):
