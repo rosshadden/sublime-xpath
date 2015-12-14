@@ -5,6 +5,7 @@ from lxml.sax import ElementTreeContentHandler
 from lxml import etree
 from xml.sax import make_parser, ContentHandler, SAXParseException#, parseString, handler
 from lxml.html import fromstring as fromhtmlstring
+import re
 
 change_counters = {}
 xml_trees = {}
@@ -764,8 +765,22 @@ def register_xpath_extensions():
     ns['lower-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.lower)
     ns['ends-with'] = lambda context, nodes, ending: applyFilterFuncToTextForItems(nodes, lambda item: item.endswith(ending))
     ns['trim'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.strip) # useful for when using ends-with. (the built in normalize-space function can be used for starts-with)
-    # tokenize
-    # matches
+    
+    def xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags):
+        flags = 0
+        if 's' in xpath_regex_flags:
+            flags = flags | re.DOTALL
+        if 'm' in xpath_regex_flags:
+            flags = flags | re.MULTILINE
+        if 'i' in xpath_regex_flags:
+            flags = flags | re.IGNORECASE
+        if 'x' in xpath_regex_flags:
+            flags = flags | re.VERBOSE
+        
+        return flags
+    
+    ns['tokenize'] = lambda context, item, pattern, xpath_regex_flags = None: applyFuncToTextForItem(item, lambda text: re.split(pattern, text, maxsplit = 0, flags = xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags)))
+    ns['matches'] = lambda context, item, pattern, xpath_regex_flags = None: applyFuncToTextForItem(item, lambda text: re.search(pattern, text, flags = xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags)) is not None)
     # replace
     # avg
     # min
