@@ -734,14 +734,7 @@ class XpathListener(sublime_plugin.EventListener):
             #else:
             change_key_for_xpath_query_history(get_history_key_for_view(view), 'global')
 
-def plugin_loaded():
-    """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
-    global settings
-    settings = sublime.load_settings('xpath.sublime-settings')
-    settings.clear_on_change('reparse')
-    settings.add_on_change('reparse', settingsChanged)
-    sublime.set_timeout_async(settingsChanged, 10)
-    
+def register_xpath_extensions():
     # http://lxml.de/extensions.html
     ns = etree.FunctionNamespace(None)
     
@@ -753,16 +746,24 @@ def plugin_loaded():
     
     # TODO: xpath 1 functions deal with lists by just taking the first node
     #     - maybe we can provide optional arg to return nodeset by applying to all
-    def applyFuncToTextForItems(nodes, func):
+    def applyTransformFuncToTextForItems(nodes, func):
+        """If a nodeset is given, apply the transformation function to each item."""
         if isinstance(nodes, list):
             return [applyFuncToTextForItem(item, func) for item in nodes]
         else:
             return applyFuncToTextForItem(nodes, func)
     
-    ns['upper-case'] = lambda context, nodes: applyFuncToTextForItems(nodes, str.upper)
-    ns['lower-case'] = lambda context, nodes: applyFuncToTextForItems(nodes, str.lower)
-    # TODO: if nodeset, return node in list if True, otherwise skip
-    ns['ends-with'] = lambda context, nodes, ending: applyFuncToTextForItems(nodes, lambda item: item.endswith(ending)) 
+    def applyFilterFuncToTextForItems(nodes, func):
+        """If a nodeset is given, filter out items whose transformation function returns False.  Otherwise, return the value from the predicate."""
+        if isinstance(nodes, list):
+            return [item for item in nodes if applyFuncToTextForItem(item, func)]
+        else:
+            return applyFuncToTextForItem(nodes, func)
+    
+    ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
+    ns['lower-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.lower)
+    ns['ends-with'] = lambda context, nodes, ending: applyFilterFuncToTextForItems(nodes, lambda item: item.endswith(ending))
+    ns['trim'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.strip) # useful for when using ends-with. (the built in normalize-space function can be used for starts-with)
     # tokenize
     # matches
     # replace
@@ -773,6 +774,16 @@ def plugin_loaded():
     # ? adjust-dateTime-to-timezone, current-dateTime, day-from-dateTime, month-from-dateTime, days-from-duration, months-from-duration, etc.
     # insert-before, remove, subsequence, index-of, distinct-values, reverse, unordered, empty, exists
     # 
+
+def plugin_loaded():
+    """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
+    global settings
+    settings = sublime.load_settings('xpath.sublime-settings')
+    settings.clear_on_change('reparse')
+    settings.add_on_change('reparse', settingsChanged)
+    sublime.set_timeout_async(settingsChanged, 10)
+    
+    register_xpath_extensions()
 
 # TODO: move to Element subclass?
 def getTagName(node):
