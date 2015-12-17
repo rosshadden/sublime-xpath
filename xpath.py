@@ -779,7 +779,7 @@ def register_xpath_extensions():
     ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
     ns['lower-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.lower)
     ns['ends-with'] = lambda context, nodes, ending: applyFilterFuncToTextForItems(nodes, lambda item: item.endswith(ending))
-    ns['trim'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.strip) # useful for when using ends-with. (the built in normalize-space function can be used for starts-with)
+    #ns['trim'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.strip) # according to the XPath 1.0 spec, the built in normalize-space function will trim the text on both sides, making this unnecessary http://www.w3.org/TR/xpath/#function-normalize-space
     ns['print'] = printValueAndReturnUnchanged
     
     def xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags):
