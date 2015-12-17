@@ -762,13 +762,18 @@ def register_xpath_extensions():
             return applyFuncToTextForItem(nodes, func)
     
     args = { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True } # ensure the exact node path is returned
-    def printValueAndReturnUnchanged(context, nodes):
+    def printValueAndReturnUnchanged(context, nodes, title = None):
         print_value = nodes
         if isinstance(nodes, list):
             if len(nodes) > 0 and isinstance(nodes[0], etree._Element):
                 paths = getXPathOfNodes(nodes, args)
                 print_value = paths
-        print('context_node', getXPathOfNodes([context.context_node], args)[0], 'eval_context', context.eval_context, 'values', print_value)
+        
+        if title is None:
+            title = ''
+        else:
+            title = title + ':'
+        print(title, 'context_node', getXPathOfNodes([context.context_node], args)[0], 'eval_context', context.eval_context, 'values', print_value)
         return nodes
     
     ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
