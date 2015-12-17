@@ -826,12 +826,15 @@ def getTagName(node):
 
 def collapseWhitespace(text, maxlen):
     text = (text or '').strip()[0:maxlen + 1].replace('\n', ' ').replace('\t', ' ')
-    append = ''
-    if len(text) > maxlen:
-        append = '...'
     while '  ' in text:
         text = text.replace('  ', ' ')
-    return text[0:maxlen - len(append)] + append
+    if maxlen < 0: # a negative maxlen means infinite/no limit
+        return text
+    else:
+        append = ''
+        if len(text) > maxlen:
+            append = '...'
+        return text[0:maxlen - len(append)] + append
 
 def isTagSelfClosing(node):
     """If the start and end tag positions are the same, then it is self closing."""
@@ -842,10 +845,8 @@ def isTagSelfClosing(node):
 def getElementXMLPreview(view, node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
     open_pos, close_pos = getNodePosition(view, node)
-    cutoff = open_pos.begin() + maxlen
-    if maxlen < 0 or close_pos.end() < cutoff: # a negative maxlen means infinite/no limit
-        cutoff = close_pos.end()
-    return view.substr(sublime.Region(open_pos.begin(), cutoff))
+    preview = view.substr(sublime.Region(open_pos.begin(), close_pos.end()))
+    return collapseWhitespace(preview, maxlen)
 
 def makeNamespacePrefixesUniqueWithNumericSuffix(items, replaceNoneWith, start = 1):
     # TODO: docstring, about how it requires unique items
@@ -1143,7 +1144,11 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         maxlen = 70
         
-        show_text_preview = lambda result: collapseWhitespace(str(result), maxlen)
+        show_text_preview = None
+        if getBoolValueFromArgsOrSettings('normalize_whitespace_in_preview', None, False):
+            show_text_preview = lambda result: collapseWhitespace(str(result), maxlen)
+        else:
+            show_text_preview = lambda result: str(result)[0:maxlen]
         
         if self.results[0]:
             unique_types_in_result = getUniqueItems((type(item) for item in self.results[1]))

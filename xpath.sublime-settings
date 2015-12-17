@@ -35,5 +35,7 @@
 	// whether or not you want the plugin to show query history for all files, as opposed to only the current file.  Note that query history for documents with no filename will not be preserved after Sublime restart if this setting is false
 	"global_query_history": true,
 	// the maximum number of (non-unique) xpath queries to retain in history.  Note that the history can be manually manipulated at any time in the xpath_query_history.sublime-settings file
-	"max_query_history": 100
+	"max_query_history": 100,
+	// whether or not to normalize whitespace when showing the text results of an xpath query
+	"normalize_whitespace_in_preview": false
 }
