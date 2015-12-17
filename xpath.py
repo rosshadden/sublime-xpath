@@ -761,10 +761,21 @@ def register_xpath_extensions():
         else:
             return applyFuncToTextForItem(nodes, func)
     
+    args = { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True } # ensure the exact node path is returned
+    def printValueAndReturnUnchanged(context, nodes):
+        print_value = nodes
+        if isinstance(nodes, list):
+            if len(nodes) > 0 and isinstance(nodes[0], etree._Element):
+                paths = getXPathOfNodes(nodes, args)
+                print_value = paths
+        print('context_node', getXPathOfNodes([context.context_node], args)[0], 'eval_context', context.eval_context, 'values', print_value)
+        return nodes
+    
     ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
     ns['lower-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.lower)
     ns['ends-with'] = lambda context, nodes, ending: applyFilterFuncToTextForItems(nodes, lambda item: item.endswith(ending))
     ns['trim'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.strip) # useful for when using ends-with. (the built in normalize-space function can be used for starts-with)
+    ns['print'] = printValueAndReturnUnchanged
     
     def xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags):
         flags = 0
