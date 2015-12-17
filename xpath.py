@@ -502,6 +502,10 @@ def getXPathOfNodes(nodes, args):
     
     return paths
 
+def getExactXPathOfNodes(nodes):
+    args = { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True } # ensure the exact node path is returned
+    return getXPathOfNodes(nodes, args)
+
 def updateStatusToCurrentXPathIfSGML(view):
     """Update the status bar with the relevant xpath at the first cursor."""
     status = None
@@ -761,19 +765,18 @@ def register_xpath_extensions():
         else:
             return applyFuncToTextForItem(nodes, func)
     
-    args = { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True } # ensure the exact node path is returned
     def printValueAndReturnUnchanged(context, nodes, title = None):
         print_value = nodes
         if isinstance(nodes, list):
             if len(nodes) > 0 and isinstance(nodes[0], etree._Element):
-                paths = getXPathOfNodes(nodes, args)
+                paths = getExactXPathOfNodes(nodes)
                 print_value = paths
         
         if title is None:
             title = ''
         else:
             title = title + ':'
-        print(title, 'context_node', getXPathOfNodes([context.context_node], args)[0], 'eval_context', context.eval_context, 'values', print_value)
+        print(title, 'context_node', getExactXPathOfNodes([context.context_node])[0], 'eval_context', context.eval_context, 'values', print_value)
         return nodes
     
     ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
@@ -1084,7 +1087,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                     global previous_first_selection
                     prev = previous_first_selection.get(self.view.id(), None)
                     if prev is not None:
-                        xpaths = getXPathOfNodes([prev[1]], { 'show_namespace_prefixes_from_query': True, 'show_hierarchy_only': False, 'case_sensitive': True }) # ensure the path matches this node and only this node
+                        xpaths = getExactXPathOfNodes([prev[1]]) # ensure the path matches this node and only this node
                         prefill = xpaths[0]
             
             self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
