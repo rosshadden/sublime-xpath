@@ -12,9 +12,9 @@ contexts:
       scope: keyword.operator
     - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\b'
       scope: constant.language.xpath.axis_name
-    - match: '(?:"[^"]*?")'
+    - match: '"[^"]*"'
       scope: string.quoted.double
-    - match: "(?:'[^']*?')"
+    - match: "'[^']*'"
       scope: string.quoted.single
     - match: '\b(?:\d*\.\d+|\d+)\b'
       scope: constant.numeric
