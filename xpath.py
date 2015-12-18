@@ -1091,6 +1091,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                         prefill = xpaths[0]
             
             self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
+            self.input_panel.set_syntax_file('xpath.sublime-syntax')
     
     def change(self, value):
         """When the xpath query is changed, after a short delay (so that it doesn't query unnecessarily while the xpath is still being typed), execute the expression."""

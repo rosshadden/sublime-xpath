@@ -1,0 +1,26 @@
+%YAML 1.2
+---
+name: XPath 1.0
+scope: query.xml.xpath
+contexts:
+  main:
+    - match: '[()|\[\]@,]|::|\.(?!\d)'
+      scope: punctuation.separator
+    - match: '\b(comment|text|processing-instruction|node)\b'
+      scope: support.function.builtin.xpath.node_type
+    - match: '\b(?:and|or|mod|div)\b|\*|/+|\||\+|-|!?=|<=?|>=?'
+      scope: keyword.operator
+    - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\b'
+      scope: constant.language.xpath.axis_name
+    - match: '(?:"[^"]*?")'
+      scope: string.quoted.double
+    - match: "(?:'[^']*?')"
+      scope: string.quoted.single
+    - match: '\b(?:\d*\.\d+|\d+)\b'
+      scope: constant.numeric
+    - match: '\s+'
+      scope: white_space
+    - match: '\b(?:\*|(?![\d.\-])[\w.\-]+(?::(?:(?!\d)[\w.\-]+))?)\b'
+      scope: variable.parameter
+    
+  
