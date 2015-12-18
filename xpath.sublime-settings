@@ -37,7 +37,5 @@
 	// the maximum number of (non-unique) xpath queries to retain in history.  Note that the history can be manually manipulated at any time in the xpath_query_history.sublime-settings file
 	"max_query_history": 100,
 	// whether or not to normalize whitespace when showing the text results of an xpath query
-	"normalize_whitespace_in_preview": false,
-	// don't show gutter/line numbers in the xpath query expression input box - this is a syntax specific setting, not a plugin setting
-	"gutter": false
+	"normalize_whitespace_in_preview": false
 }
