@@ -218,11 +218,13 @@ def buildTreeForViewRegion(view, region_scope):
         text = str(e.getLineNumber() - 1 + line_number_offset) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
         view.set_status('xpath_error', parse_error + text)
         
-        if view.match_selector(region_scope.begin(), 'text.html'):
+        if view.match_selector(region_scope.begin(), 'text.html') and not view.match_selector(region_scope.begin(), 'text.html.markdown'):
             global html_cleaning_answer
             previous_answer = html_cleaning_answer.get(view.id(), None)
             
             if previous_answer is None: # if the user has answered previously, don't prompt again for this view (so until either Sublime Text is restarted or the file is closed and re-opened).
+                print('Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'region', region_scope)
+                # TODO: ensure view has focus? or show file name (if it has one) in the question?
                 answer = sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes')
                 html_cleaning_answer[view.id()] = answer
             else:
