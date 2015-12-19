@@ -1,26 +1,26 @@
 %YAML 1.2
 ---
 name: XPath 1.0
-scope: query.xml.xpath
+scope: query.xml.xpath # http://www.w3.org/TR/xpath/
 contexts:
-  main:
+  main: # TODO: obey 3.7 Lexical Structure rules
     - match: '[()|\[\]@,]|::|\.(?!\d)'
-      scope: punctuation.separator
+      scope: punctuation.separator # ExprToken
     - match: '\b(comment|text|processing-instruction|node)\b'
-      scope: support.function.builtin.xpath.node_type
+      scope: support.function.builtin.xpath.node_type # NodeType
     - match: '\b(?:and|or|mod|div)\b|\*|/+|\||\+|-|!?=|<=?|>=?'
-      scope: keyword.operator
+      scope: keyword.operator # Operator
     - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\b'
-      scope: constant.language.xpath.axis_name
+      scope: constant.language.xpath.axis_name # AxisName
     - match: '"[^"]*"'
-      scope: string.quoted.double
+      scope: string.quoted.double # Literal
     - match: "'[^']*'"
-      scope: string.quoted.single
+      scope: string.quoted.single # Literal
     - match: '\b(?:\d*\.\d+|\d+)\b'
-      scope: constant.numeric
+      scope: constant.numeric # Number
     - match: '\s+'
-      scope: white_space
+      scope: white_space # ExprWhitespace
     - match: '\b(?:\*|(?![\d.\-])[\w.\-]+(?::(?:(?!\d)[\w.\-]+))?)\b'
-      scope: variable.parameter
+      scope: variable.parameter # NameTest
     
   
