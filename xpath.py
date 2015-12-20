@@ -225,6 +225,7 @@ def buildTreeForViewRegion(view, region_scope):
             if previous_answer is None: # if the user has answered previously, don't prompt again for this view (so until either Sublime Text is restarted or the file is closed and re-opened).
                 print('Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'region', region_scope)
                 # TODO: ensure view has focus? or show file name (if it has one) in the question?
+                # TODO: only clean when user is not typing... otherwise impossible to add tags without pasting them in...
                 answer = sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes')
                 html_cleaning_answer[view.id()] = answer
             else:
@@ -619,7 +620,8 @@ def move_cursors_to_nodes(view, nodes, position_type):
             # select only the tag name with the prefix
             chars_before_tag = len('<')
             if position_type in ('open', 'names') or isTagSelfClosing(node):
-                cursors.append(sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag)))
+                cursors.append(sublime.Region(op
+                                              en_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag)))
             if position_type in ('close', 'names') and not isTagSelfClosing(node):
                 chars_before_tag += len('/')
                 cursors.append(sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag)))
@@ -889,7 +891,7 @@ def get_all_namespaces_in_tree(tree):
     getNamespaces = etree.XPath('//namespace::*')
     return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
 
-def get_results_for_xpath_query(view, query, from_root):
+def get_results_for_xpath_query(view, query):
     """Execute the specified xpath query on all SGML regions that contain a cursor, and return the results."""
     matches = []
     is_nodeset = None
@@ -915,31 +917,24 @@ def get_results_for_xpath_query(view, query, from_root):
                 sublime.status_message(str(e)) # show parsing error in status bar
                 return None
             
-            contexts = []
+            # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
+            # TODO: allow as parameter, so that it works in live results mode?
+            nodes_at_cursors = getNodesAtPositions(view, [tree], regions_cursors[region_index])
+            contexts = [item[0] for item in nodes_at_cursors]
+            print('$contexts set to', getExactXPathOfNodes(contexts))
             
-            if from_root:
-                contexts.append(tree)
-            else:
-                # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
-                for node in getNodesAtPositions(view, [tree], regions_cursors[region_index]):
-                    contexts.append(node[1])
-            
-            for context in contexts:
-                try:
-                    result = xpath(context)
-                    if isinstance(result, list):
-                        is_nodeset = True
-                        
-                        matches += result
-                    else:
-                        is_nodeset = False
-                        matches.append(result)
-                except Exception as e:
-                    sublime.status_message(str(e)) # show parsing error in status bar
-                    return None
-        
-        if not from_root and is_nodeset: # if multiple contexts were used, get unique items only # TODO: only if is a node? (as opposed to simple-type like int or string)
-            matches = list(getUniqueItems(matches))
+            try:
+                result = xpath(tree, contexts = contexts) # set the $contexts variable to the context nodes
+                if isinstance(result, list):
+                    is_nodeset = True
+                    
+                    matches += result
+                else:
+                    is_nodeset = False
+                    matches.append(result)
+            except Exception as e:
+                sublime.status_message(str(e)) # show parsing error in status bar
+                return None
         
     return (is_nodeset, matches)
 
@@ -1053,7 +1048,6 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
     selected_index = None
     live_mode = None
-    relative_mode = None
     max_results_to_show = None
     pending = []
     most_recent_query = None
@@ -1062,7 +1056,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         self.most_recent_query = None
         self.show_query_results = getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
-        self.relative_mode = getBoolValueFromArgsOrSettings('relative_mode', args, False) # TODO: cache context nodes now? to allow live mode to work with it
+        # TODO: cache context nodes now to allow live mode to work with it. obviously behaviour is undefined if document is modified while input panel is open...
         global settings
         if 'max_results_to_show' in args:
             self.max_results_to_show = int(args['max_results_to_show'])
@@ -1133,7 +1127,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     
     def process_results_for_query(self, query):
         if len(query) > 0:
-            self.results = get_results_for_xpath_query(self.view, query, not self.relative_mode)
+            self.results = get_results_for_xpath_query(self.view, query)
             if self.results is not None:
                 if self.results[0] and len(self.results[1]) == 0:
                     sublime.status_message('no results found matching xpath expression "' + query + '"')
