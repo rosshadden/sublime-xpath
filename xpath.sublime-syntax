@@ -2,7 +2,9 @@
 ---
 name: XPath 1.0
 scope: query.xml.xpath # http://www.w3.org/TR/xpath/
-contexts:
+variables:
+  QName: '(?![\d.\-])[\w.\-]+'
+contexts: # NOTE: these scope names don't represent what they should, they are set for best syntax highlighting
   main: # TODO: obey 3.7 Lexical Structure rules
     - match: '[()|\[\]@,]|::|\.(?!\d)'
       scope: punctuation.separator # ExprToken
@@ -20,7 +22,9 @@ contexts:
       scope: constant.numeric # Number
     - match: '\s+'
       scope: white_space # ExprWhitespace
-    - match: '\b(?:\*|(?![\d.\-])[\w.\-]+(?::(?:(?!\d)[\w.\-]+))?)\b'
+    - match: '\${{QName}}\b'
+      scope: entity.name.function # VariableReference
+    - match: '\b(?:\*|{{QName}}(?::{{QName}})?)\b'
       scope: variable.parameter # NameTest
     
   
