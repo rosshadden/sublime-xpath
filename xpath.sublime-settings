@@ -20,8 +20,6 @@
 	"live_mode": true,
 	// show results of xpath query (if false, cursor will move directly to all results)
 	"show_query_results": true,
-	// query xpath from cursors as the context node (if false, context will be document root)
-	"relative_mode": false,
 	// default namespace prefix for xpath query when elements have xmlns attribute set
 	"default_namespace_prefix": "default",
 	// whether or not to show the namespace prefix that the xpath query will expect
