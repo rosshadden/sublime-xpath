@@ -6,8 +6,12 @@ variables:
   QName: '(?![\d.\-])[\w.\-]+'
 contexts: # NOTE: these scope names don't represent what they should, they are set for best syntax highlighting
   main: # TODO: obey 3.7 Lexical Structure rules
-    - match: '[()|\[\]@,]|::|\.(?!\d)'
-      scope: punctuation.separator # ExprToken
+    - match: '[,/]|::'
+      scope: punctuation.separator
+    - match: '@{{QName}}|(?<!\.)\.(?!\d)\.?(?!\.)'
+      scope: keyword.control.flow # AxisStep | AxisSpecifier
+    - match: '[()\[\]]'
+      scope: punctuation.definition.arguments.begin comment # ExprToken
     - match: '\b(comment|text|processing-instruction|node)\b'
       scope: support.function.builtin.xpath.node_type # NodeType
     - match: '\b(?:and|or|mod|div)\b|\*|/+|\||\+|-|!?=|<=?|>=?'
