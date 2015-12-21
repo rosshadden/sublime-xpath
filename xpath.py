@@ -620,8 +620,7 @@ def move_cursors_to_nodes(view, nodes, position_type):
             # select only the tag name with the prefix
             chars_before_tag = len('<')
             if position_type in ('open', 'names') or isTagSelfClosing(node):
-                cursors.append(sublime.Region(op
-                                              en_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag)))
+                cursors.append(sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag)))
             if position_type in ('close', 'names') and not isTagSelfClosing(node):
                 chars_before_tag += len('/')
                 cursors.append(sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag)))
@@ -924,7 +923,10 @@ def get_results_for_xpath_query(view, query):
             print('$contexts set to', getExactXPathOfNodes(contexts))
             
             try:
-                result = xpath(tree, contexts = contexts) # set the $contexts variable to the context nodes
+                context_node = tree
+                if len(contexts) > 0:
+                    context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
+                result = xpath(context_node, contexts = contexts) # set the $contexts variable to the context nodes
                 if isinstance(result, list):
                     is_nodeset = True
                     
