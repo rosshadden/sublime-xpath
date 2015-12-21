@@ -919,25 +919,31 @@ def get_results_for_xpath_query(view, query):
             # TODO: allow as parameter, so that it works in live results mode?
             nodes_at_cursors = getNodesAtPositions(view, [tree], regions_cursors[region_index])
             contexts = [item[0] for item in nodes_at_cursors]
-            print('$contexts set to', getExactXPathOfNodes(contexts))
             
-            try:
-                context_node = tree
-                if len(contexts) > 0:
-                    context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
-                result = xpath(context_node, contexts = contexts) # set the $contexts variable to the context nodes
-                if isinstance(result, list):
-                    is_nodeset = True
-                    
-                    matches += result
-                else:
-                    is_nodeset = False
-                    matches.append(result)
-            except Exception as e:
-                sublime.status_message(str(e)) # show parsing error in status bar
-                return None
+            is_nodeset, results = execute_xpath_query(tree, xpath, contexts)
+            matches += results
         
     return (is_nodeset, matches)
+
+def execute_xpath_query(tree, xpath, contexts = None):
+    """Execute the precompiled xpath query on the tree and return the results."""
+    
+    try:
+        context_node = tree
+        print_contexts = False
+        if contexts is not None and len(contexts) > 0:
+            print_contexts = True
+            context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
+        result = xpath(context_node, contexts = contexts) # set the $contexts variable to the context nodes
+        if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
+            print('$contexts set to', getExactXPathOfNodes(contexts))
+        if isinstance(result, list):
+            return (True, result)
+        else:
+            return (False, [result])
+    except Exception as e:
+        sublime.status_message(str(e)) # show parsing error in status bar
+        return None
 
 def get_xpath_query_history_for_keys(keys):
     """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
