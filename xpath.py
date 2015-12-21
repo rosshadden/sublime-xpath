@@ -221,15 +221,14 @@ def buildTreeForViewRegion(view, region_scope):
         if view.match_selector(region_scope.begin(), 'text.html') and not view.match_selector(region_scope.begin(), 'text.html.markdown'):
             global html_cleaning_answer
             previous_answer = html_cleaning_answer.get(view.id(), None)
-            
+            answer = None
             if previous_answer is None: # if the user has answered previously, don't prompt again for this view (so until either Sublime Text is restarted or the file is closed and re-opened).
                 print('Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'region', region_scope)
                 # TODO: ensure view has focus? or show file name (if it has one) in the question?
-                # TODO: only clean when user is not typing... otherwise impossible to add tags without pasting them in...
                 answer = sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes')
-                html_cleaning_answer[view.id()] = answer
-            else:
-                answer = previous_answer
+                html_cleaning_answer[view.id()] = (answer, view.change_count())
+            elif previous_answer[0] and view.change_count() == previous_answer[1]: # if there have been no changes since the question was answered positively (i.e. probably this is a different html region that is being parsed for the first time)
+                answer = True
             if answer:
                 sublime.active_window().active_view().run_command('clean_html', { 'begin': region_scope.begin(), 'end': region_scope.end() })
         
