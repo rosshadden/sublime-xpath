@@ -921,7 +921,8 @@ def get_results_for_xpath_query(view, query):
             contexts = [item[0] for item in nodes_at_cursors]
             
             is_nodeset, results = execute_xpath_query(tree, xpath, contexts)
-            matches += results
+            if results is not None:
+                matches += results
         
     return (is_nodeset, matches)
 
@@ -943,7 +944,7 @@ def execute_xpath_query(tree, xpath, contexts = None):
             return (False, [result])
     except Exception as e:
         sublime.status_message(str(e)) # show parsing error in status bar
-        return None
+        return (False, None)
 
 def get_xpath_query_history_for_keys(keys):
     """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
