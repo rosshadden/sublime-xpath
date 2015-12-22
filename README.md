@@ -13,6 +13,7 @@ Sublime Text - XPath Plugin
   - optionally normalize whitespace when displaying text results (via a setting).
   - with history, optionally globally or per document.
   - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
+  - define custom variables in the settings file.
 - Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
 - Tidy HTML files into valid XML. (currently only accessible when the XML parser cannot parse the document (or via the python console for advanced users))
 
@@ -33,6 +34,7 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `only_show_xpath_if_saved` - whether or not to only show the current xpath in the status bar if the view is not dirty. This could be useful to save wasting CPU cycles (from constant parsing) when editing a document, for example.
 - `max_results_to_show` - the maximum number of results to show from the xpath query.  Set to <= 0 for no limit.  Useful to speed up display of results when there are lots.
 - `normalize_whitespace_in_preview` - whether or not to normalize whitespace for text results in the preview.  Defaults to `false`, because there are situations when it is important to see exact results.
+- `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
 
 ## Potential future improvements:
 

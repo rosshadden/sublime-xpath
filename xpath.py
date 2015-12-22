@@ -935,7 +935,13 @@ def execute_xpath_query(tree, xpath, contexts = None):
         if contexts is not None and len(contexts) > 0:
             print_contexts = True
             context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
-        result = xpath(context_node, contexts = contexts) # set the $contexts variable to the context nodes
+        
+        variables = settings.get('variables', None)
+        if variables is None or not isinstance(variables, dict):
+            variables = {}
+        variables['contexts'] = contexts # set the $contexts variable to the context nodes
+        
+        result = xpath(context_node, **variables)
         if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
             print('$contexts set to', getExactXPathOfNodes(contexts))
         if isinstance(result, list):
