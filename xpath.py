@@ -74,21 +74,7 @@ def buildTreeForViewRegion(view, region_scope):
         global parse_error
         text = str(e.getLineNumber() - 1 + line_number_offset) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
         view.set_status('xpath_error', parse_error + text)
-        
-        if view.match_selector(region_scope.begin(), 'text.html') and not view.match_selector(region_scope.begin(), 'text.html.markdown'):
-            global html_cleaning_answer
-            previous_answer = html_cleaning_answer.get(view.id(), None)
-            answer = None
-            if previous_answer is None: # if the user has answered previously, don't prompt again for this view (so until either Sublime Text is restarted or the file is closed and re-opened).
-                print('XPath: Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'region', region_scope)
-                # TODO: ensure view has focus? or show file name (if it has one) in the question?
-                answer = sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes')
-                html_cleaning_answer[view.id()] = (answer, view.change_count())
-            elif previous_answer[0] and view.change_count() == previous_answer[1]: # if there have been no changes since the question was answered positively (i.e. probably this is a different html region that is being parsed for the first time)
-                answer = True
-            if answer:
-                sublime.active_window().active_view().run_command('clean_html', { 'begin': region_scope.begin(), 'end': region_scope.end() })
-        
+    
     return tree
 
 def ensureTreeCacheIsCurrent(view):
@@ -127,16 +113,6 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         return containsSGML(self.view) and self.view.get_status('xpath_error').startswith(parse_error)
     def is_visible(self, **args):
         return containsSGML(self.view)
-
-class CleanHtmlCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args):
-        sublime.status_message('Cleaning HTML...')
-        # TODO: if no arguments are supplied, find the first html region containing a cursor and clean that. If you want to clean all html regions containing cursors, bear in mind that the offsets will change after tidying the region before it!
-        region_scope = sublime.Region(args['begin'], args['end'])
-        tag_soup = self.view.substr(region_scope)
-        xml_string = clean_html(tag_soup)
-        self.view.replace(edit, region_scope, xml_string)
-        sublime.status_message('HTML cleaned successfully.')
 
 def getXPathOfNodes(nodes, args):
     global ns_loc
@@ -691,6 +667,20 @@ class RerunLastXpathQueryCommand(sublime_plugin.TextCommand): # example usage fr
     def is_visible(self):
         return containsSGML(self.view)
 
+class CleanHtmlCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        sublime.status_message('Cleaning HTML...')
+        # TODO: if no arguments are supplied, find the first html region containing a cursor and clean that.
+        
+        # clean all html regions specified, in reverse order, because otherwise the offsets will change after tidying the region before it!
+        for region_tuple in reversed(args['regions']):
+            region_scope = sublime.Region(region_tuple[0], region_tuple[1])
+            tag_soup = self.view.substr(region_scope)
+            xml_string = clean_html(tag_soup)
+            self.view.replace(edit, region_scope, xml_string)
+        
+        sublime.status_message('HTML cleaned successfully.')
+
 class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
     results = None # results from query
@@ -705,16 +695,32 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
+        trees = ensureTreeCacheIsCurrent(self.view)
+        
+        invalid_trees = []
+        
         regions_cursors = {}
         for result in getSGMLRegionsContainingCursors(self.view):
+            if trees[result[1]] is None:
+                invalid_trees.append(result[0])
             regions_cursors.setdefault(result[1], []).append(result[2])
         
-        trees = ensureTreeCacheIsCurrent(self.view)
+        if len(invalid_trees) > 0:
+            invalid_trees = [region_scope for region_scope in invalid_trees if self.view.match_selector(region_scope.begin(), 'text.html') and not self.view.match_selector(region_scope.begin(), 'text.html.markdown')]
+            if len(invalid_trees) > 0:
+                print('XPath: Asking about cleaning HTML for view', 'id', self.view.id(), 'file_name', self.view.file_name(), 'regions', invalid_trees)
+                if sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes'):
+                    self.view.run_command('clean_html', { 'regions': [(region.begin(), region.end()) for region in invalid_trees] })
+                    trees = ensureTreeCacheIsCurrent(self.view)
+                    updateStatusToCurrentXPathIfSGML(self.view)
+        
+        # TODO: show error if any of the XML regions containing the cursor is invalid?
         
         self.contexts = (self.view.change_count(), {})
         for region_index in regions_cursors.keys():
             tree = trees[region_index]
-            self.contexts[1][tree] = [item[0] for item in getNodesAtPositions(self.view, [tree], regions_cursors[region_index])]
+            if tree is not None:
+                self.contexts[1][tree] = [item[0] for item in getNodesAtPositions(self.view, [tree], regions_cursors[region_index])]
         
         self.print_contexts = True
     
