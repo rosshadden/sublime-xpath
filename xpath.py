@@ -223,7 +223,7 @@ def buildTreeForViewRegion(view, region_scope):
             previous_answer = html_cleaning_answer.get(view.id(), None)
             answer = None
             if previous_answer is None: # if the user has answered previously, don't prompt again for this view (so until either Sublime Text is restarted or the file is closed and re-opened).
-                print('Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'region', region_scope)
+                print('XPath: Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'region', region_scope)
                 # TODO: ensure view has focus? or show file name (if it has one) in the question?
                 answer = sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes')
                 html_cleaning_answer[view.id()] = (answer, view.change_count())
@@ -778,7 +778,7 @@ def register_xpath_extensions():
             title = ''
         else:
             title = title + ':'
-        print(title, 'context_node', getExactXPathOfNodes([context.context_node])[0], 'eval_context', context.eval_context, 'values', print_value)
+        print('XPath:', title, 'context_node', getExactXPathOfNodes([context.context_node])[0], 'eval_context', context.eval_context, 'values', print_value)
         return nodes
     
     ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
@@ -889,52 +889,38 @@ def get_all_namespaces_in_tree(tree):
     getNamespaces = etree.XPath('//namespace::*')
     return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
 
-def get_results_for_xpath_query(view, query):
-    """Execute the specified xpath query on all SGML regions that contain a cursor, and return the results."""
+def get_results_for_xpath_query(query, tree_contexts, print_contexts):
+    """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
     is_nodeset = None
     
     global settings
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
-    trees = ensureTreeCacheIsCurrent(view)
-    if trees is not None:
+    for tree in tree_contexts.keys():
+        nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix, 1)
         
-        regions_cursors = {}
-        for result in getSGMLRegionsContainingCursors(view):
-            regions_cursors.setdefault(result[1], []).append(result[2])
-        
-        for region_index in regions_cursors.keys():
-            tree = trees[region_index]
-            
-            nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix, 1)
-            
-            try:
-                xpath = etree.XPath(query, namespaces = nsmap)
-            except Exception as e:
-                sublime.status_message(str(e)) # show parsing error in status bar
-                return None
-            
-            # allow starting the search from the element(s) at the cursor position(s) - i.e. set the context nodes
-            # TODO: allow as parameter, so that it works in live results mode?
-            nodes_at_cursors = getNodesAtPositions(view, [tree], regions_cursors[region_index])
-            contexts = [item[0] for item in nodes_at_cursors]
-            
-            is_nodeset, results = execute_xpath_query(tree, xpath, contexts)
-            if results is not None:
-                matches += results
-        
-    return (is_nodeset, matches)
+        try:
+            xpath = etree.XPath(query, namespaces = nsmap)
+        except Exception as e:
+            sublime.status_message(str(e)) # show parsing error in status bar
+            return (None, None)
+    
+        is_nodeset, results = execute_xpath_query(tree, xpath, tree_contexts[tree], print_contexts)
+        if results is not None:
+            matches += results
+    
+    return is_nodeset, matches
 
-def execute_xpath_query(tree, xpath, contexts = None):
+def execute_xpath_query(tree, xpath, contexts = None, print_contexts = False):
     """Execute the precompiled xpath query on the tree and return the results."""
     
     try:
         context_node = tree
-        print_contexts = False
         if contexts is not None and len(contexts) > 0:
-            print_contexts = True
             context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
+        else:
+            print_contexts = False
         
         variables = settings.get('variables', None)
         if variables is None or not isinstance(variables, dict):
@@ -943,7 +929,7 @@ def execute_xpath_query(tree, xpath, contexts = None):
         
         result = xpath(context_node, **variables)
         if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
-            print('$contexts set to', getExactXPathOfNodes(contexts))
+            print('XPath: $contexts set to', getExactXPathOfNodes(contexts))
         if isinstance(result, list):
             return (True, result)
         else:
@@ -1060,17 +1046,36 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     results = None # results from query
     previous_input = '' # remember previous query so that when the user next runs this command, it will be prepopulated
     show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
-    selected_index = None
     live_mode = None
     max_results_to_show = None
     pending = []
     most_recent_query = None
+    contexts = None
+    print_contexts = None
+    
+    def cache_context_nodes(self):
+        """Cache context nodes to allow live mode to work with them."""
+        regions_cursors = {}
+        for result in getSGMLRegionsContainingCursors(self.view):
+            regions_cursors.setdefault(result[1], []).append(result[2])
+        
+        trees = ensureTreeCacheIsCurrent(self.view)
+        
+        self.contexts = (self.view.change_count(), {})
+        for region_index in regions_cursors.keys():
+            tree = trees[region_index]
+            self.contexts[1][tree] = [item[0] for item in getNodesAtPositions(self.view, [tree], regions_cursors[region_index])]
+        
+        self.print_contexts = True
     
     def run(self, edit, **args):
+        self.pending = []
         self.most_recent_query = None
         self.show_query_results = getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
-        # TODO: cache context nodes now to allow live mode to work with it. obviously behaviour is undefined if document is modified while input panel is open...
+        
+        self.cache_context_nodes()
+        
         global settings
         if 'max_results_to_show' in args:
             self.max_results_to_show = int(args['max_results_to_show'])
@@ -1141,8 +1146,11 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     
     def process_results_for_query(self, query):
         if len(query) > 0:
-            self.results = get_results_for_xpath_query(self.view, query)
-            if self.results is not None:
+            if self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
+                self.cache_context_nodes()
+            self.results = get_results_for_xpath_query(query, self.contexts[1], self.print_contexts)
+            self.print_contexts = False
+            if self.results[0] is not None:
                 if self.results[0] and len(self.results[1]) == 0:
                     sublime.status_message('no results found matching xpath expression "' + query + '"')
                 else:
