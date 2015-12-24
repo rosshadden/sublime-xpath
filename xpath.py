@@ -667,19 +667,36 @@ class RerunLastXpathQueryCommand(sublime_plugin.TextCommand): # example usage fr
     def is_visible(self):
         return containsSGML(self.view)
 
-class CleanHtmlCommand(sublime_plugin.TextCommand):
+class CleanTagSoupCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
-        sublime.status_message('Cleaning HTML...')
-        # TODO: if no arguments are supplied, find the first html region containing a cursor and clean that.
+        self.view.set_status('xpath_clean', 'Cleaning tag soup...')
+        # if no arguments are supplied, find the first SGML region containing a cursor that is invalid and clean that.
+        if args is None or 'regions' not in args:
+            found = False
+            trees = ensureTreeCacheIsCurrent(self.view)
+            for result in getSGMLRegionsContainingCursors(self.view):
+                if trees[result[1]] is None:
+                    args = { 'regions': [(result[0].begin(), result[0].end())] }
+                    found = True
+                    break
+            if not found:
+                self.view.erase_status('xpath_clean')
+                sublime.status_message('Unable to find any SGML tag soup regions to fix.')
+                return
         
-        # clean all html regions specified, in reverse order, because otherwise the offsets will change after tidying the region before it!
+        # clean all html regions specified, in reverse order, because otherwise the offsets will change after tidying the region before it! i.e. args['regions'] must be in ascending position order
         for region_tuple in reversed(args['regions']):
             region_scope = sublime.Region(region_tuple[0], region_tuple[1])
             tag_soup = self.view.substr(region_scope)
             xml_string = clean_html(tag_soup)
             self.view.replace(edit, region_scope, xml_string)
         
-        sublime.status_message('HTML cleaned successfully.')
+        self.view.erase_status('xpath_clean')
+        sublime.status_message('Tag soup cleaned successfully.')
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
+    def is_visible(self):
+        return containsSGML(self.view)
 
 class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
     input_panel = None
@@ -710,7 +727,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             if len(invalid_trees) > 0:
                 print('XPath: Asking about cleaning HTML for view', 'id', self.view.id(), 'file_name', self.view.file_name(), 'regions', invalid_trees)
                 if sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes'):
-                    self.view.run_command('clean_html', { 'regions': [(region.begin(), region.end()) for region in invalid_trees] })
+                    self.view.run_command('clean_tag_soup', { 'regions': [(region.begin(), region.end()) for region in invalid_trees] })
                     trees = ensureTreeCacheIsCurrent(self.view)
                     updateStatusToCurrentXPathIfSGML(self.view)
         

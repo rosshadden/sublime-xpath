@@ -47,5 +47,8 @@
 	}, {
 		"caption": "XPath: Re-run last query and select all results",
 		"command": "rerun_last_xpath_query", "args": { "show_query_results": false }
+	}, {
+		"caption": "XPath: Clean tag soup",
+		"command": "clean_tag_soup"
 	}
 ]

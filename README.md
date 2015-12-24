@@ -15,7 +15,7 @@ Sublime Text - XPath Plugin
   - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
   - define custom variables in the settings file.
 - Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
-- Tidy HTML files into valid XML. (currently only accessible when the XML parser cannot parse the document (or via the python console for advanced users))
+- Tidy HTML or "tag soup" into valid XML.
 
 ## Settings:
 
