@@ -526,12 +526,8 @@ def get_results_for_xpath_query(query, tree_contexts, print_contexts):
     for tree in tree_contexts.keys():
         nsmap = makeNamespacePrefixesUniqueWithNumericSuffix(get_all_namespaces_in_tree(tree), defaultNamespacePrefix, 1)
         
-        try:
-            xpath = etree.XPath(query, namespaces = nsmap)
-        except Exception as e:
-            sublime.status_message(str(e)) # show parsing error in status bar
-            return (None, None)
-    
+        xpath = etree.XPath(query, namespaces = nsmap)
+        
         is_nodeset, results = execute_xpath_query(tree, xpath, tree_contexts[tree], print_contexts)
         if results is not None:
             matches += results
@@ -541,28 +537,24 @@ def get_results_for_xpath_query(query, tree_contexts, print_contexts):
 def execute_xpath_query(tree, xpath, contexts = None, print_contexts = False):
     """Execute the precompiled xpath query on the tree and return the results."""
     
-    try:
-        context_node = tree
-        if contexts is not None and len(contexts) > 0:
-            context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
-        else:
-            print_contexts = False
-        
-        variables = settings.get('variables', None)
-        if variables is None or not isinstance(variables, dict):
-            variables = {}
-        variables['contexts'] = contexts # set the $contexts variable to the context nodes
-        
-        result = xpath(context_node, **variables)
-        if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
-            print('XPath: $contexts set to', getExactXPathOfNodes(contexts))
-        if isinstance(result, list):
-            return (True, result)
-        else:
-            return (False, [result])
-    except Exception as e:
-        sublime.status_message(str(e)) # show parsing error in status bar
-        return (False, None)
+    context_node = tree
+    if contexts is not None and len(contexts) > 0:
+        context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
+    else:
+        print_contexts = False
+    
+    variables = settings.get('variables', None)
+    if variables is None or not isinstance(variables, dict):
+        variables = {}
+    variables['contexts'] = contexts # set the $contexts variable to the context nodes
+    
+    result = xpath(context_node, **variables)
+    if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
+        print('XPath: $contexts set to', getExactXPathOfNodes(contexts))
+    if isinstance(result, list):
+        return (True, result)
+    else:
+        return (False, [result])
 
 def get_xpath_query_history_for_keys(keys):
     """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
@@ -807,6 +799,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         
     def cancel(self):
         self.input_panel = None
+        self.view.erase_status('xpath_query')
     
     def xpath_input_done(self, value):
         self.input_panel = None
@@ -816,25 +809,38 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.process_results_for_query(value)
         else:
             self.close_quick_panel()
+        self.view.erase_status('xpath_query')
     
     def process_results_for_query(self, query):
         if len(query) > 0:
             if self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
                 self.cache_context_nodes()
-            self.results = get_results_for_xpath_query(query, self.contexts[1], self.print_contexts)
-            self.print_contexts = False
-            if self.results[0] is not None:
-                if self.results[0] and len(self.results[1]) == 0:
-                    sublime.status_message('no results found matching xpath expression "' + query + '"')
+            status_text = None
+            try:
+                self.results = get_results_for_xpath_query(query, self.contexts[1], self.print_contexts)
+                self.print_contexts = False
+            except Exception as e:
+                status_text = str(e)
+            
+            show_results = self.show_query_results or not self.results[0] # also show results if results is not a node set, as we can't "go to" them...
+            if status_text is None: # if there was no error
+                status_text = str(len(self.results[1])) + ' result'
+                if len(self.results[1]) != 1:
+                    status_text += 's'
+                status_text += ' from query'
+                if show_results:
+                    if self.max_results_to_show > 0 and len(self.results[1]) > self.max_results_to_show:
+                        status_text += ' (showing first ' + str(self.max_results_to_show) + ')'
+                        self.results = (self.results[0], self.results[1][0:self.max_results_to_show])
+                        
+                    self.show_results_for_query()
                 else:
-                    sublime.status_message('') # clear status message as it is out of date now
-                    if self.show_query_results or not self.results[0]: # also show results if results is not a node set, as we can't "go to" them...
-                        if self.max_results_to_show > 0 and len(self.results[1]) > self.max_results_to_show:
-                            print('XPath: query results truncated, showing first ' + str(self.max_results_to_show) + ' results of ' + str(len(self.results[1])) + ' for query: ' + query)
-                            self.results = (self.results[0], self.results[1][0:self.max_results_to_show])
-                        self.show_results_for_query()
-                    else:
-                        self.goto_results_for_query()
+                    self.goto_results_for_query()
+                    status_text += ' selected'
+            if not show_results:
+                sublime.status_message(status_text or '')
+            else:
+                self.view.set_status('xpath_query', status_text or '')
     
     def close_quick_panel(self):
         sublime.active_window().run_command('hide_overlay', { 'cancel': True }) # close existing quick panel
@@ -882,6 +888,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.goto_results_if_relevant(selected_index)
             self.input_panel = None
             sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
+            self.view.erase_status('xpath_query')
     
     def goto_results_if_relevant(self, selected_index):
         if self.results[0]:
