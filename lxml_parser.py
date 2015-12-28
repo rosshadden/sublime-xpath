@@ -2,6 +2,7 @@ from lxml.sax import ElementTreeContentHandler
 from lxml import etree
 from xml.sax import make_parser
 from lxml.html import fromstring as fromhtmlstring
+from xml.sax.handler import feature_external_pes, feature_external_ges
 
 ns_loc = 'lxml'
 
@@ -11,6 +12,8 @@ def clean_html(html_soup):
 
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
     parser = make_parser()
+    parser.setFeature(feature_external_pes, False)
+    parser.setFeature(feature_external_ges, False)
     global ns_loc
     
     class ETreeContent(ElementTreeContentHandler):
@@ -134,6 +137,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
         def characters(self, data):
             self._recordEndPosition()
             super().characters(data)
+        
+        def processingInstruction(self, target, data):
+            pass # ignore processing instructions
         
         def endDocument(self):
             self._recordPosition(self.etree.getroot(), 'close_tag_end_pos')
