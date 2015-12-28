@@ -645,6 +645,7 @@ class RerunLastXpathQueryCommand(sublime_plugin.TextCommand): # example usage fr
         if global_history:
             keys = None
         
+        # TODO: somehow preserve original $contexts variable?
         history = get_xpath_query_history_for_keys(keys)
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
