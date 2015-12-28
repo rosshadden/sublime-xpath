@@ -518,7 +518,6 @@ def get_all_namespaces_in_tree(tree):
 def get_results_for_xpath_query(query, tree_contexts, print_contexts):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
-    is_nodeset = None
     
     global settings
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
@@ -528,11 +527,11 @@ def get_results_for_xpath_query(query, tree_contexts, print_contexts):
         
         xpath = etree.XPath(query, namespaces = nsmap)
         
-        is_nodeset, results = execute_xpath_query(tree, xpath, tree_contexts[tree], print_contexts)
+        results = execute_xpath_query(tree, xpath, tree_contexts[tree], print_contexts)
         if results is not None:
             matches += results
     
-    return is_nodeset, matches
+    return matches
 
 def execute_xpath_query(tree, xpath, contexts = None, print_contexts = False):
     """Execute the precompiled xpath query on the tree and return the results."""
@@ -552,9 +551,9 @@ def execute_xpath_query(tree, xpath, contexts = None, print_contexts = False):
     if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
         print('XPath: $contexts set to', getExactXPathOfNodes(contexts))
     if isinstance(result, list):
-        return (True, result)
+        return result
     else:
-        return (False, [result])
+        return [result]
 
 def get_xpath_query_history_for_keys(keys):
     """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
@@ -822,22 +821,21 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             except Exception as e:
                 status_text = str(e)
             
-            show_results = self.show_query_results or not self.results[0] # also show results if results is not a node set, as we can't "go to" them...
             if status_text is None: # if there was no error
-                status_text = str(len(self.results[1])) + ' result'
-                if len(self.results[1]) != 1:
+                status_text = str(len(self.results)) + ' result'
+                if len(self.results) != 1:
                     status_text += 's'
                 status_text += ' from query'
-                if show_results:
-                    if self.max_results_to_show > 0 and len(self.results[1]) > self.max_results_to_show:
+                if self.show_query_results:
+                    if self.max_results_to_show > 0 and len(self.results) > self.max_results_to_show:
                         status_text += ' (showing first ' + str(self.max_results_to_show) + ')'
-                        self.results = (self.results[0], self.results[1][0:self.max_results_to_show])
+                        self.results = self.results[0:self.max_results_to_show]
                         
                     self.show_results_for_query()
                 else:
                     self.goto_results_for_query()
                     status_text += ' selected'
-            if not show_results:
+            if not self.show_query_results:
                 sublime.status_message(status_text or '')
             else:
                 self.view.set_status('xpath_query', status_text or '')
@@ -857,47 +855,40 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         else:
             show_text_preview = lambda result: str(result)[0:maxlen]
         
-        if self.results[0]:
-            unique_types_in_result = getUniqueItems((type(item) for item in self.results[1]))
-            next(unique_types_in_result, None)
-            muliple_types_in_result = next(unique_types_in_result, None) is not None
-            
-            show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
-            def show_preview(item):
-                if isinstance(item, etree._Element):
-                    return show_element_preview(item)
-                else:
-                    show = show_text_preview(item)
-                    if muliple_types_in_result: # if some items are elements (where we show 3 lines) and some are other node types (where we show 1 line), we need to return 3 lines to ensure Sublime will show the results correctly
-                        show = [show, '', '']
-                    return show
-            
-            list_comp = [show_preview(item) for item in self.results[1]]
-        else:
-            list_comp = [show_text_preview(result) for result in self.results[1]]
+        unique_types_in_result = getUniqueItems((type(item) for item in self.results))
+        next(unique_types_in_result, None)
+        muliple_types_in_result = next(unique_types_in_result, None) is not None
+        
+        show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
+        def show_preview(item):
+            if isinstance(item, etree._Element):
+                return show_element_preview(item)
+            else:
+                show = show_text_preview(item)
+                if muliple_types_in_result: # if some items are elements (where we show 3 lines) and some are other node types (where we show 1 line), we need to return 3 lines to ensure Sublime will show the results correctly
+                    show = [show, '', '']
+                return show
+        
+        list_comp = [show_preview(item) for item in self.results]
         self.view.window().show_quick_panel(list_comp, self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
         
     def xpath_selection_changed(self, selected_index):
         if (selected_index > -1): # quick panel wasn't cancelled
-            self.goto_results_if_relevant(selected_index)
+            self.goto_results_for_query(selected_index)
     
     def xpath_selection_done(self, selected_index):
         if (selected_index > -1): # quick panel wasn't cancelled
             if self.most_recent_query is not None and self.most_recent_query != '':
                 add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.most_recent_query)
-            self.goto_results_if_relevant(selected_index)
+            self.goto_results_for_query(selected_index)
             self.input_panel = None
             sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
             self.view.erase_status('xpath_query')
     
-    def goto_results_if_relevant(self, selected_index):
-        if self.results[0]:
-            self.goto_results_for_query(selected_index)
-    
     def goto_results_for_query(self, specific_index = None):
         cursors = []
         
-        results = self.results[1]
+        results = self.results
         if specific_index is not None and specific_index > -1:
             results = [results[specific_index]]
         
