@@ -3,15 +3,15 @@ Sublime Text - XPath Plugin
 
 ## Features:
 
+- Updates status bar text to XPath of first selection.
 - Copy XPath at cursor(s) to clipboard.
-- Updates status bar text to XPath of current line.
 - Jump selection to relative tag - previous or next sibling, parent, open or close tag. It is also possible to select the entire tag contents, optionally including the tag itself.  This works for multiple selections as well, of course.
 - Query XML and (X)HTML documents by XPath 1.0 expression.
   - with syntax highlighting.
   - with a custom `print` function that can be used as a debugging aid by logging nodesets etc. to the console.
-  - option to display results or select the corresponding nodes in the document.
-  - optionally normalize whitespace when displaying text results (via a setting).
+  - option to display results in real-time, as you type the query, or to select the corresponding nodes in the document.
   - with history, optionally globally or per document.
+  - optionally normalize whitespace when displaying text results (via a setting).
   - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
   - define custom variables in the settings file.
 - Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
