@@ -134,12 +134,15 @@ def get_regions_of_nodes(view, nodes, position_type):
             yield sublime.Region(open_pos.begin(), close_pos.end())
 
 def move_cursors_to_nodes(view, nodes, position_type):
+    nodes = list(nodes)
     cursors = list(get_regions_of_nodes(view, nodes, position_type))
     if len(cursors) > 0:
         view.sel().clear()
         view.sel().add_all(cursors)
         
         view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
+        
+    return (len(cursors) == len(nodes), len(cursors))
 
 def getElementXMLPreview(view, node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""

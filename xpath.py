@@ -834,8 +834,13 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                         
                     self.show_results_for_query()
                 else:
-                    self.goto_results_for_query()
+                    all_success = self.goto_results_for_query()
+                    if not all_success[0]:
+                        status_text += ' (' + str(all_success[1])
                     status_text += ' selected'
+                    if not all_success[0]:
+                        status_text += ')'
+            
             if not self.show_query_results:
                 sublime.status_message(status_text or '')
             else:
@@ -893,10 +898,12 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         if specific_index is not None and specific_index > -1:
             results = [results[specific_index]]
         
-        move_cursors_to_nodes(self.view, results, 'open')
+        all_success = move_cursors_to_nodes(self.view, results, 'open')
         
         if specific_index is None or specific_index == -1:
             self.results = None
+        
+        return all_success
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
