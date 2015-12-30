@@ -798,6 +798,9 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                 delay = settings.get('live_query_timeout', 0)
                 async = settings.get('live_query_async', True)
                 
+                if self.most_recent_query is None: # if this is the first query, execute it immediately
+                    delay = 0
+                
                 if async:
                     sublime.set_timeout_async(lambda: self.process(), delay)
                 else:
