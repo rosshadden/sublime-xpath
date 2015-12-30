@@ -701,7 +701,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
     show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
     live_mode = None
     max_results_to_show = None
-    pending = []
+    pending_query = None
     most_recent_query = None
     contexts = None
     print_contexts = None
@@ -738,7 +738,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         self.print_contexts = True
     
     def run(self, edit, **args):
-        self.pending = []
+        self.pending_query = None
         self.most_recent_query = None
         self.show_query_results = getBoolValueFromArgsOrSettings('show_query_results', args, True)
         self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
@@ -778,28 +778,30 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
             self.input_panel.set_syntax_file('xpath.sublime-syntax')
             self.input_panel.settings().set('gutter', False)
     
+    def process(self):
+        if self.most_recent_query != self.pending_query: # no point executing the same query again
+            self.process_results_for_query(self.pending_query)
+            self.most_recent_query = self.pending_query
+        self.pending_query = None
+        if self.input_panel is not None:
+            self.input_panel.window().focus_view(self.input_panel)
+    
     def change(self, value):
         """When the xpath query is changed, after a short delay (so that it doesn't query unnecessarily while the xpath is still being typed), execute the expression."""
-        def cb():
-            if self.pending.pop() == value:
-                self.process_results_for_query(value)
-                self.most_recent_query = value
-                if self.input_panel is not None:
-                    self.input_panel.window().focus_view(self.input_panel)
-        
         if self.live_mode:
-            self.pending.append(value)
+            existing_timeout = self.pending_query is not None
             
-            global settings
-            delay = settings.get('live_query_timeout', 0)
-            async = settings.get('live_query_async', True)
+            self.pending_query = value
             
-            if async:
-                sublime.set_timeout_async(cb, delay)
-            elif delay == 0:
-                cb()
-            else:
-                sublime.set_timeout(cb, delay)
+            if not existing_timeout:
+                global settings
+                delay = settings.get('live_query_timeout', 0)
+                async = settings.get('live_query_async', True)
+                
+                if async:
+                    sublime.set_timeout_async(lambda: self.process(), delay)
+                else:
+                    sublime.set_timeout(lambda: self.process(), delay)
         
     def cancel(self):
         self.input_panel = None
