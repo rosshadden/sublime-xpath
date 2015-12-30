@@ -10,7 +10,8 @@ def clean_html(html_soup):
     root = fromhtmlstring(html_soup)
     return etree.tostring(root, encoding='unicode')
 
-def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
+def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop = None):
+    """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
     parser.setFeature(feature_external_pes, False)
     parser.setFeature(feature_external_ges, False)
@@ -147,11 +148,20 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset):
     createETree = ETreeContent()
     
     parser.setContentHandler(createETree)
-    parser.feed(xml_string)
+    
+    for chunk in chunks(xml_string, 1024 * 8): # read in 8 KiB chunks
+        if stop is not None:
+            if stop():
+                break
+        parser.feed(chunk)
     
     parser.close()
     
     return createETree.etree
+
+def chunks(entire, chunk_size):
+    """Return a generator that will split the input into chunks of the specified size."""
+    return (entire[0 + i : chunk_size + i] for i in range(0, len(entire), chunk_size))
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getSpecificNodePosition(node, position_name):

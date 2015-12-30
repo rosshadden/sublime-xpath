@@ -68,8 +68,12 @@ def buildTreeForViewRegion(view, region_scope):
     xml_string = view.substr(region_scope)
     tree = None
     line_number_offset = view.rowcol(region_scope.begin())[0]
+    change_count = view.change_count()
+    stop = lambda: change_count < view.change_count() # stop parsing if the document is modified
+    if view.is_read_only():
+        stop = None # no need to check for modifications if the view is read only
     try:
-        tree = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset)
+        tree = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
     except SAXParseException as e:
         global parse_error
         text = str(e.getLineNumber() - 1 + line_number_offset) + ':' + str(e.getColumnNumber()) + ' - ' + e.getMessage()
