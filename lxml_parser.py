@@ -159,9 +159,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, st
     
     return createETree.etree
 
-def chunks(entire, chunk_size):
+def chunks(entire, chunk_size): # http://stackoverflow.com/a/18854817/4473405
     """Return a generator that will split the input into chunks of the specified size."""
-    return (entire[0 + i : chunk_size + i] for i in range(0, len(entire), chunk_size))
+    return (entire[i : chunk_size + i] for i in range(0, len(entire), chunk_size))
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getSpecificNodePosition(node, position_name):
