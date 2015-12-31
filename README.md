@@ -9,10 +9,11 @@ Sublime Text - XPath Plugin
 - Query XML and (X)HTML documents by XPath 1.0 expression.
   - with syntax highlighting.
   - with a custom `print` function that can be used as a debugging aid by logging nodesets etc. to the console.
-  - option to display results in real-time, as you type the query, or to select the corresponding nodes in the document.
+  - display results in real-time (i.e. as you type the query, fitting in perfectly with Sublime's other actions). (With an option to customize this, if desired.)
+  - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
+  - Re-run the previous query and select the corresponding nodes in the document. (Note that it doesn't preserve the context nodes at the moment.)
   - with history, optionally globally or per document.
   - optionally normalize whitespace when displaying text results (via a setting).
-  - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
   - define custom variables in the settings file.
 - Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
 - Tidy HTML or "tag soup" into valid XML.
