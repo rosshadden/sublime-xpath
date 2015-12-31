@@ -6,6 +6,7 @@ from xml.sax import SAXParseException
 import re
 from .lxml_parser import *
 from .sublime_lxml import *
+from .sublime_input_quickpanel import QuickPanelFromInputCommand
 
 change_counters = {}
 xml_trees = {}
@@ -641,7 +642,7 @@ class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
     def is_visible(self):
         return containsSGML(self.view)
 
-class RerunLastXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query', { 'global_query_history': False, 'show_query_results': False })
+class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })
     def run(self, edit, **args):
         global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
         
@@ -654,10 +655,12 @@ class RerunLastXpathQueryCommand(sublime_plugin.TextCommand): # example usage fr
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
         else:
-            if args is None:
-                args = {}
-            args['xpath'] = history[-1]
-            sublime.active_window().active_view().run_command('query_xpath', args)
+            nodes = get_results_for_xpath_query(history[-1], get_context_nodes_from_cursors(self.view), False)
+            total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
+            if total_results == total_selections:
+                sublime.status_message(str(total_results) + ' nodes selected')
+            else:
+                sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self):
@@ -694,172 +697,115 @@ class CleanTagSoupCommand(sublime_plugin.TextCommand):
     def is_visible(self):
         return containsSGML(self.view)
 
-class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'xpath': '//prefix:LocalName', 'show_query_results': True })
-    input_panel = None
-    results = None # results from query
-    previous_input = '' # remember previous query so that when the user next runs this command, it will be prepopulated
-    show_query_results = None # whether to show the results of the query, so the user can pick *one* to move the cursor to. If False, cursor will automatically move to all results. Has no effect if result of query is not a node set.
-    live_mode = None
+def get_context_nodes_from_cursors(view):
+    """Get nodes under the cursors for the specified view."""
+    trees = ensureTreeCacheIsCurrent(view)
+    
+    invalid_trees = []
+    
+    regions_cursors = {}
+    for result in getSGMLRegionsContainingCursors(view):
+        if trees[result[1]] is None:
+            invalid_trees.append(result[0])
+        regions_cursors.setdefault(result[1], []).append(result[2])
+    
+    if len(invalid_trees) > 0:
+        invalid_trees = [region_scope for region_scope in invalid_trees if view.match_selector(region_scope.begin(), 'text.html') and not view.match_selector(region_scope.begin(), 'text.html.markdown')]
+        if len(invalid_trees) > 0:
+            print('XPath: Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'regions', invalid_trees)
+            if sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes'):
+                view.run_command('clean_tag_soup', { 'regions': [(region.begin(), region.end()) for region in invalid_trees] })
+                trees = ensureTreeCacheIsCurrent(view)
+                updateStatusToCurrentXPathIfSGML(view)
+    
+    # TODO: show error if any of the XML regions containing the cursor is invalid?
+    
+    contexts = {}
+    for region_index in regions_cursors.keys():
+        tree = trees[region_index]
+        if tree is not None:
+            contexts[tree] = [item[0] for item in getNodesAtPositions(view, [tree], regions_cursors[region_index])]
+    
+    return contexts
+
+class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'prefill_query': '//prefix:LocalName', 'live_mode': True })
     max_results_to_show = None
-    pending_query = None
-    most_recent_query = None
     contexts = None
     print_contexts = None
+    previous_input = None # remember previous query so that when the user next runs this command, it will be prepopulated
     
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
-        trees = ensureTreeCacheIsCurrent(self.view)
-        
-        invalid_trees = []
-        
-        regions_cursors = {}
-        for result in getSGMLRegionsContainingCursors(self.view):
-            if trees[result[1]] is None:
-                invalid_trees.append(result[0])
-            regions_cursors.setdefault(result[1], []).append(result[2])
-        
-        if len(invalid_trees) > 0:
-            invalid_trees = [region_scope for region_scope in invalid_trees if self.view.match_selector(region_scope.begin(), 'text.html') and not self.view.match_selector(region_scope.begin(), 'text.html.markdown')]
-            if len(invalid_trees) > 0:
-                print('XPath: Asking about cleaning HTML for view', 'id', self.view.id(), 'file_name', self.view.file_name(), 'regions', invalid_trees)
-                if sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes'):
-                    self.view.run_command('clean_tag_soup', { 'regions': [(region.begin(), region.end()) for region in invalid_trees] })
-                    trees = ensureTreeCacheIsCurrent(self.view)
-                    updateStatusToCurrentXPathIfSGML(self.view)
-        
-        # TODO: show error if any of the XML regions containing the cursor is invalid?
-        
-        self.contexts = (self.view.change_count(), {})
-        for region_index in regions_cursors.keys():
-            tree = trees[region_index]
-            if tree is not None:
-                self.contexts[1][tree] = [item[0] for item in getNodesAtPositions(self.view, [tree], regions_cursors[region_index])]
-        
+        self.contexts = (self.view.change_count(), get_context_nodes_from_cursors(self.view))
         self.print_contexts = True
     
     def run(self, edit, **args):
-        self.pending_query = None
-        self.most_recent_query = None
-        self.show_query_results = getBoolValueFromArgsOrSettings('show_query_results', args, True)
-        self.live_mode = getBoolValueFromArgsOrSettings('live_mode', args, True)
-        
         self.cache_context_nodes()
+        super().run(edit, **args)
+    
+    def parse_args(self):
+        self.arguments['initial_value'] = self.get_value_from_args('prefill_query', self.previous_input)
+        if self.arguments['initial_value'] is None:
+            global_history = getBoolValueFromArgsOrSettings('global_query_history', self.arguments, True)
+            keys = [get_history_key_for_view(self.view)]
+            if global_history:
+                keys = None
+            history = get_xpath_query_history_for_keys(keys)
+            
+            if len(history) > 0:
+                self.arguments['initial_value'] = history[-1]
+        # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
+        if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', self.arguments, False) or not self.arguments['initial_value']:
+            global previous_first_selection
+            prev = previous_first_selection.get(self.view.id(), None)
+            if prev is not None:
+                xpaths = getExactXPathOfNodes([prev[1]]) # ensure the path matches this node and only this node
+                self.arguments['initial_value'] = xpaths[0]
+        
+        self.arguments['label'] = 'enter xpath'
+        self.arguments['syntax'] = 'xpath.sublime-syntax'
         
         global settings
-        if 'max_results_to_show' in args:
-            self.max_results_to_show = int(args['max_results_to_show'])
-        else:
-            self.max_results_to_show = settings.get('max_results_to_show', 1000)
+        self.max_results_to_show = int(self.get_value_from_args('max_results_to_show', settings.get('max_results_to_show', 1000)))
         
-        if args is not None and 'xpath' in args: # if an xpath is supplied, query it
-            self.process_results_for_query(args['xpath'])
-        else: # show an input prompt where the user can type their xpath query
-            prefill = self.previous_input
-            if args is not None and 'prefill_query' in args:
-                prefill = args['prefill_query']
-            else:
-                global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
-                keys = [get_history_key_for_view(self.view)]
-                if global_history:
-                    keys = None
-                history = get_xpath_query_history_for_keys(keys)
-                
-                if len(history) > 0:
-                    prefill = history[-1]
-                # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
-                if getBoolValueFromArgsOrSettings('prefill_path_at_cursor', args, False) or not prefill:
-                    global previous_first_selection
-                    prev = previous_first_selection.get(self.view.id(), None)
-                    if prev is not None:
-                        xpaths = getExactXPathOfNodes([prev[1]]) # ensure the path matches this node and only this node
-                        prefill = xpaths[0]
-            
-            self.input_panel = self.view.window().show_input_panel('enter xpath', prefill, self.xpath_input_done, self.change, self.cancel)
-            self.input_panel.set_syntax_file('xpath.sublime-syntax')
-            self.input_panel.settings().set('gutter', False)
+        self.arguments['async'] = getBoolValueFromArgsOrSettings('live_query_async', self.arguments, True)
+        self.arguments['delay'] = int(settings.get('live_query_delay', 0))
+        self.arguments['live_mode'] = getBoolValueFromArgsOrSettings('live_mode', self.arguments, True)
+        super().parse_args()
     
-    def process(self):
-        if self.most_recent_query != self.pending_query: # no point executing the same query again
-            self.process_results_for_query(self.pending_query)
-            self.most_recent_query = self.pending_query
-        self.pending_query = None
-        if self.input_panel is not None:
-            self.input_panel.window().focus_view(self.input_panel)
-    
-    def change(self, value):
-        """When the xpath query is changed, after a short delay (so that it doesn't query unnecessarily while the xpath is still being typed), execute the expression."""
-        if self.live_mode:
-            existing_timeout = self.pending_query is not None
-            
-            self.pending_query = value
-            
-            if not existing_timeout:
-                global settings
-                delay = settings.get('live_query_timeout', 0)
-                async = settings.get('live_query_async', True)
-                
-                if self.most_recent_query is None: # if this is the first query, execute it immediately
-                    delay = 0
-                
-                if async:
-                    sublime.set_timeout_async(lambda: self.process(), delay)
-                else:
-                    sublime.set_timeout(lambda: self.process(), delay)
-        
-    def cancel(self):
-        self.input_panel = None
-        self.view.erase_status('xpath_query')
-    
-    def xpath_input_done(self, value):
-        self.input_panel = None
-        self.previous_input = value
-        add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.previous_input)
-        if not self.live_mode:
-            self.process_results_for_query(value)
+    def get_query_results(self, query):
+        results = None
+        status_text = None
+        if len(query) == 0:
+            status_text = 'No query entered'
         else:
-            self.close_quick_panel()
-        self.view.erase_status('xpath_query')
-    
-    def process_results_for_query(self, query):
-        if len(query) > 0:
             if self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
                 self.cache_context_nodes()
-            status_text = None
+            
             try:
-                self.results = get_results_for_xpath_query(query, self.contexts[1], self.print_contexts)
+                results = get_results_for_xpath_query(query, self.contexts[1], self.print_contexts)
                 self.print_contexts = False
             except Exception as e:
                 status_text = str(e)
             
             if status_text is None: # if there was no error
-                status_text = str(len(self.results)) + ' result'
-                if len(self.results) != 1:
+                status_text = str(len(results)) + ' result'
+                if len(results) != 1:
                     status_text += 's'
                 status_text += ' from query'
-                if self.show_query_results:
-                    if self.max_results_to_show > 0 and len(self.results) > self.max_results_to_show:
-                        status_text += ' (showing first ' + str(self.max_results_to_show) + ')'
-                        self.results = self.results[0:self.max_results_to_show]
-                        
-                    self.show_results_for_query()
-                else:
-                    all_success = self.goto_results_for_query()
-                    if not all_success[0]:
-                        status_text += ' (' + str(all_success[1])
-                    status_text += ' selected'
-                    if not all_success[0]:
-                        status_text += ')'
-            
-            if not self.show_query_results:
-                sublime.status_message(status_text or '')
-            else:
-                self.view.set_status('xpath_query', status_text or '')
+                if self.max_results_to_show > 0 and len(results) > self.max_results_to_show:
+                    status_text += ' (showing first ' + str(self.max_results_to_show) + ')'
+                    results = results[0:self.max_results_to_show]
+        self.view.set_status('xpath_query', status_text or '')
+        return results
     
-    def close_quick_panel(self):
-        sublime.active_window().run_command('hide_overlay', { 'cancel': True }) # close existing quick panel
+    def get_items_from_input(self):
+        return self.get_query_results(self.current_value)
     
-    def show_results_for_query(self):
-        self.close_quick_panel()
+    def get_items_to_show_in_quickpanel(self):
+        results = self.items
+        if results is None:
+            return None
         
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         maxlen = 70
@@ -870,7 +816,7 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
         else:
             show_text_preview = lambda result: str(result)[0:maxlen]
         
-        unique_types_in_result = getUniqueItems((type(item) for item in self.results))
+        unique_types_in_result = getUniqueItems((type(item) for item in results))
         next(unique_types_in_result, None)
         muliple_types_in_result = next(unique_types_in_result, None) is not None
         
@@ -884,35 +830,20 @@ class QueryXpathCommand(sublime_plugin.TextCommand): # example usage from python
                     show = [show, '', '']
                 return show
         
-        list_comp = [show_preview(item) for item in self.results]
-        self.view.window().show_quick_panel(list_comp, self.xpath_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.xpath_selection_changed)
+        return [show_preview(item) for item in results]
         
-    def xpath_selection_changed(self, selected_index):
-        if (selected_index > -1): # quick panel wasn't cancelled
-            self.goto_results_for_query(selected_index)
+    def quickpanel_selection_changed(self, selected_index):
+        if selected_index > -1: # quick panel wasn't cancelled
+            move_cursors_to_nodes(self.view, [self.items[selected_index]], 'open')
     
-    def xpath_selection_done(self, selected_index):
-        if (selected_index > -1): # quick panel wasn't cancelled
-            if self.most_recent_query is not None and self.most_recent_query != '':
-                add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.most_recent_query)
-            self.goto_results_for_query(selected_index)
-            self.input_panel = None
-            sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
-            self.view.erase_status('xpath_query')
+    def commit_input(self):
+        self.previous_input = self.current_value
+        add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.current_value)
+        self.view.erase_status('xpath_query')
     
-    def goto_results_for_query(self, specific_index = None):
-        cursors = []
-        
-        results = self.results
-        if specific_index is not None and specific_index > -1:
-            results = [results[specific_index]]
-        
-        all_success = move_cursors_to_nodes(self.view, results, 'open')
-        
-        if specific_index is None or specific_index == -1:
-            self.results = None
-        
-        return all_success
+    def input_cancelled(self):
+        super().input_cancelled()
+        self.view.erase_status('xpath_query')
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)

@@ -18,8 +18,6 @@
 	"copy_unique_path_only": true,
 	// query xpath in live mode
 	"live_mode": true,
-	// show results of xpath query (if false, cursor will move directly to all results)
-	"show_query_results": true,
 	// default namespace prefix for xpath query when elements have xmlns attribute set
 	"default_namespace_prefix": "default",
 	// whether or not to show the namespace prefix that the xpath query will expect

@@ -142,7 +142,7 @@ def move_cursors_to_nodes(view, nodes, position_type):
         
         view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
         
-    return (len(cursors) == len(nodes), len(cursors))
+    return (len(cursors), len(nodes))
 
 def getElementXMLPreview(view, node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
