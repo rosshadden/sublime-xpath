@@ -1,7 +1,7 @@
 import sublime
 import sublime_plugin
 
-class RequestInputCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('request_input', { 'label': 'Enter text here:', 'initial_value': 'Hello World' })
+class RequestInputCommand(sublime_plugin.TextCommand): # this command should be overidden, and not used directly
     input_panel = None
     pending_value = None
     current_value = None
@@ -17,6 +17,9 @@ class RequestInputCommand(sublime_plugin.TextCommand): # example usage from pyth
         self.set_args(**args)
         self.parse_args()
         
+        self.show_input_panel()
+    
+    def show_input_panel(self):
         self.input_panel = self.view.window().show_input_panel(self.get_value_from_args('label', ''), self.get_value_from_args('initial_value', ''), self.input_done, self.input_changed, self.input_cancelled)
         syntax = self.get_value_from_args('syntax', None)
         if syntax is not None:

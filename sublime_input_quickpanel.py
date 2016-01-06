@@ -1,13 +1,15 @@
 import sublime
 import sublime_plugin
-from .sublime_input import RequestInputCommand
+from .sublime_input_view import RequestViewInputCommand
 
-class QuickPanelFromInputCommand(RequestInputCommand): # example usage from python console: sublime.active_window().active_view().run_command('quick_panel_from_input', { 'label': 'Enter text here:', 'initial_value': 'Hello World' })
+class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should be overidden and not used directly
     items = None
+    ignore_view_activations = False
     
     def run(self, edit, **args):
-        super().run(edit, **args)
         self.items = None
+        self.ignore_view_activations = False
+        super().run(edit, **args)
     
     def close_quick_panel(self):
         """Close existing quick panel."""
@@ -33,12 +35,20 @@ class QuickPanelFromInputCommand(RequestInputCommand): # example usage from pyth
             else:
                 self.items = None
         
+        self.ignore_view_activations = True
         self.close_quick_panel()
         if items is not None:
-            self.view.window().show_quick_panel(self.get_items_to_show_in_quickpanel(), self.quickpanel_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.quickpanel_selection_changed)
+            self.view.window().show_quick_panel(self.get_items_to_show_in_quickpanel(), self.quickpanel_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.quickpanel_selection_changed) # TODO: consider restoring the selected index when the input panel was hidden and is now re-shown?
             if self.input_panel is not None:
                 self.input_panel.window().focus_view(self.input_panel)
-        
+    
+    def on_activated_async(self, view):
+        if self.ignore_view_activations:
+            if view not in self.associated_views():
+                self.ignore_view_activations = False
+        else:
+            super().on_activated_async(view)
+    
     def get_items_from_input(self):
         return None
     
@@ -53,6 +63,9 @@ class QuickPanelFromInputCommand(RequestInputCommand): # example usage from pyth
             self.close_input_panel()
             if self.live_mode:
                 self.commit_input()
-
+    
+    def associated_views(self):
+        return super().associated_views() + [] # NOTE: ideally we would be able to return the quick panel view here, but as it is not exposed by the Sublime API, we instead use "ignore_view_activations"
+    
     def commit_input(self):
         pass
