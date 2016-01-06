@@ -30,6 +30,9 @@ class RequestViewInputCommand(RequestInputCommand): # this command should be ove
         self.show_input_panel(self.pending_value)
     
     def on_activated_async(self, view):
+        if view is None:
+            self.close_input_panel()
+            return
         if view not in self.associated_views():
             if self.input_panel is not None and not self.input_panel_hidden:
                 self.hide_input_panel()
@@ -44,4 +47,6 @@ class InputViewListener(sublime_plugin.EventListener):
             callback(view)
     def on_pre_close(self, view):
         global on_activation_callbacks
+        if view.id() in on_activation_callbacks.keys():
+            on_activation_callbacks[view.id()](None)
         on_activation_callbacks.pop(view.id(), None) # remove callback if present

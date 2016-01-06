@@ -43,7 +43,7 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
                 self.input_panel.window().focus_view(self.input_panel)
     
     def on_activated_async(self, view):
-        if self.ignore_view_activations:
+        if self.ignore_view_activations and view is not None:
             if view not in self.associated_views():
                 self.ignore_view_activations = False
         else:
