@@ -5,6 +5,7 @@ from .sublime_input import RequestInputCommand
 on_activation_callbacks = {}
 
 class RequestViewInputCommand(RequestInputCommand): # this command should be overidden, and not used directly
+    """Create an input panel specific to the view that this command was run on (by default, Sublime's API makes it apply to the whole window)."""
     input_panel_hidden = None
     
     def parse_args(self):
@@ -16,18 +17,17 @@ class RequestViewInputCommand(RequestInputCommand): # this command should be ove
     def associated_views(self):
         return [self.view, self.input_panel]
     
-    def show_input_panel(self):
+    def show_input_panel(self, initial_value):
         self.input_panel_hidden = False
-        super().show_input_panel()
+        super().show_input_panel(initial_value)
     
     def hide_input_panel(self):
         self.close_input_panel()
         self.input_panel_hidden = True
     
     def restore_input_panel(self):
-        self.arguments['initial_value'] = self.pending_value
         self.current_value = None
-        self.show_input_panel()
+        self.show_input_panel(self.pending_value)
     
     def on_activated_async(self, view):
         if view not in self.associated_views():
