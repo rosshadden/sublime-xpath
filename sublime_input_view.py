@@ -22,8 +22,8 @@ class RequestViewInputCommand(RequestInputCommand): # this command should be ove
         super().show_input_panel(initial_value)
     
     def hide_input_panel(self):
-        self.close_input_panel()
         self.input_panel_hidden = True
+        self.close_input_panel()
     
     def restore_input_panel(self):
         self.current_value = None
@@ -39,6 +39,19 @@ class RequestViewInputCommand(RequestInputCommand): # this command should be ove
         elif view == self.view:
             if self.input_panel_hidden:
                 self.restore_input_panel()
+    
+    def unregister_callback(self):
+        global on_activation_callbacks
+        on_activation_callbacks.pop(self.view.id(), None)
+    
+    def input_cancelled(self):
+        if not self.input_panel_hidden:
+            self.unregister_callback()
+        super().input_cancelled()
+    
+    def input_done(self, value):
+        self.unregister_callback()
+        super().input_done(value)
 
 class InputViewListener(sublime_plugin.EventListener):
     def on_activated_async(self, view):
@@ -47,6 +60,6 @@ class InputViewListener(sublime_plugin.EventListener):
             callback(view)
     def on_pre_close(self, view):
         global on_activation_callbacks
-        if view.id() in on_activation_callbacks.keys():
-            on_activation_callbacks[view.id()](None)
-        on_activation_callbacks.pop(view.id(), None) # remove callback if present
+        callback = on_activation_callbacks.pop(view.id(), None) # remove callback if present
+        if callback is not None:
+            callback(view)
