@@ -15,16 +15,6 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
         """Close existing quick panel."""
         sublime.active_window().run_command('hide_overlay', { 'cancel': True })
     
-    def input_cancelled(self):
-        self.close_quick_panel()
-        super().input_cancelled()
-    
-    def input_done(self, value):
-        if self.live_mode:
-            self.close_quick_panel()
-        super().input_done(value)
-        self.commit_input()
-    
     def process_current_input(self):
         items = self.get_items_from_input()
         if items is not None:
@@ -63,9 +53,22 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
             self.close_input_panel()
             if self.live_mode:
                 self.commit_input()
+        if not self.live_mode:
+            self.command_complete(selected_index == -1)
     
     def associated_views(self):
         return super().associated_views() + [] # NOTE: ideally we would be able to return the quick panel view here, but as it is not exposed by the Sublime API, we instead use "ignore_view_activations"
+    
+    def input_cancelled(self):
+        self.close_quick_panel()
+        super().input_cancelled()
+    
+    def command_complete(self, cancelled):
+        super().command_complete(cancelled)
+        self.close_quick_panel()
+        if not cancelled and self.live_mode:
+            self.commit_input()
+        self.items = None
     
     def commit_input(self):
         pass

@@ -835,15 +835,17 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     def quickpanel_selection_changed(self, selected_index):
         if selected_index > -1: # quick panel wasn't cancelled
             move_cursors_to_nodes(self.view, [self.items[selected_index]], 'open')
+            #self.view.window().focus_view(self.view) # focus the view to try getting the cursor positions to update while the quick panel is open
+            #if self.input_panel is not None:
+            #    self.input_panel.window().focus_view(self.input_panel)
     
     def commit_input(self):
         self.previous_input = self.current_value
         add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.current_value)
-        self.view.erase_status('xpath_query')
     
-    def input_cancelled(self):
-        super().input_cancelled()
+    def command_complete(self, cancelled):
         self.view.erase_status('xpath_query')
+        super().command_complete(cancelled)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
