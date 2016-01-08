@@ -12,7 +12,7 @@ change_counters = {}
 xml_trees = {}
 previous_first_selection = {}
 settings = None
-parse_error = 'XPath - error parsing XML: '
+parse_error = 'XPath - error parsing XML at '
 html_cleaning_answer = {}
 
 def settingsChanged():
@@ -77,7 +77,7 @@ def buildTreeForViewRegion(view, region_scope):
         tree = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
     except SAXParseException as e:
         global parse_error
-        text = str(e.getLineNumber() + line_number_offset) + ':' + str(e.getColumnNumber() + 1) + ' - ' + e.getMessage()
+        text = 'line ' + str(e.getLineNumber() + line_number_offset) + ', column ' + str(e.getColumnNumber() + 1) + ' - ' + e.getMessage()
         view.set_status('xpath_error', parse_error + text)
     
     return tree
@@ -105,7 +105,7 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         view = self.view
         
         global parse_error
-        detail = view.get_status('xpath_error')[len(parse_error):].split(' - ')[0].split(':')
+        detail = view.get_status('xpath_error')[len(parse_error + 'line '):].split(' - ')[0].split(', column ')
         point = view.text_point(int(detail[0]) - 1, int(detail[1]) - 1)
         
         view.sel().clear()
