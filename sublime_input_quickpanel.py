@@ -2,6 +2,8 @@ import sublime
 import sublime_plugin
 from .sublime_input_view import RequestViewInputCommand
 
+on_modified_callbacks = {}
+
 class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should be overidden and not used directly
     items = None
     ignore_view_activations = False
@@ -10,6 +12,12 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
         self.items = None
         self.ignore_view_activations = False
         super().run(edit, **args)
+    
+    def parse_args(self):
+        super().parse_args()
+        
+        global on_modified_callbacks
+        on_modified_callbacks[self.view.id()] = lambda view: self.on_modified_async(view)
     
     def close_quick_panel(self):
         """Close existing quick panel."""
@@ -38,6 +46,9 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
                 self.ignore_view_activations = False
         else:
             super().on_activated_async(view)
+    
+    def on_modified_async(self, view):
+        self.close_quick_panel()
     
     def get_items_from_input(self):
         return None
@@ -70,5 +81,19 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
             self.commit_input()
         self.items = None
     
+    def unregister_callback(self):
+        global on_modified_callbacks
+        on_modified_callbacks.pop(self.view.id(), None)
+        super().unregister_callback()
+    
     def commit_input(self):
         pass
+
+class QuickPanelInputViewListener(sublime_plugin.EventListener):
+    def on_modified_async(self, view):
+        global on_modified_callbacks
+        for callback in on_modified_callbacks.values():
+            callback(view)
+    def on_pre_close(self, view):
+        global on_modified_callbacks
+        on_modified_callbacks.pop(view.id(), None) # remove callback if present
