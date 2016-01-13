@@ -36,8 +36,11 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
         self.ignore_view_activations = True
         self.close_quick_panel()
         if items is not None:
-            self.view.window().show_quick_panel(self.get_items_to_show_in_quickpanel(), self.quickpanel_selection_done, sublime.KEEP_OPEN_ON_FOCUS_LOST, -1, self.quickpanel_selection_changed) # TODO: consider restoring the selected index when the input panel was hidden and is now re-shown?
-            if self.input_panel is not None:
+            flags = 0
+            if self.live_mode:
+                flags = sublime.KEEP_OPEN_ON_FOCUS_LOST
+            self.view.window().show_quick_panel(self.get_items_to_show_in_quickpanel(), self.quickpanel_selection_done, flags, -1, self.quickpanel_selection_changed) # TODO: consider restoring the selected index when the input panel was hidden and is now re-shown?
+            if self.live_mode and self.input_panel is not None:
                 self.input_panel.window().focus_view(self.input_panel)
     
     def on_activated_async(self, view):
@@ -48,7 +51,8 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
             super().on_activated_async(view)
     
     def on_modified_async(self, view):
-        self.close_quick_panel()
+        if not self.input_panel_hidden:
+            self.close_quick_panel()
     
     def get_items_from_input(self):
         return None
