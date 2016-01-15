@@ -7,11 +7,12 @@ from xml.sax.handler import feature_external_pes, feature_external_ges
 ns_loc = 'lxml'
 
 def clean_html(html_soup):
+    """Convert the given html tag soup string into a valid xml string."""
     root = fromhtmlstring(html_soup)
     return etree.tostring(root, encoding='unicode')
 
-def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop = None):
-    """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the stop method is provided, stop/interrupt parsing if it returns True."""
+def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, should_stop = None):
+    """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the should_stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
     parser.setFeature(feature_external_pes, False)
     parser.setFeature(feature_external_ges, False)
@@ -150,8 +151,8 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, st
     parser.setContentHandler(createETree)
     
     for chunk in chunks(xml_string, 1024 * 8): # read in 8 KiB chunks
-        if stop is not None:
-            if stop():
+        if should_stop is not None:
+            if should_stop():
                 break
         parser.feed(chunk)
     
@@ -177,6 +178,7 @@ def getNodeTagRange(node, position_type):
     return (begin, end)
 
 def getRelativeNode(relative_to, direction):
+    """Given a node and a direction, return the node that is relative to it in the specified direction, or None if there isn't one."""
     def return_specific(node):
         yield node
     generator = None
@@ -196,6 +198,7 @@ def getRelativeNode(relative_to, direction):
 
 # TODO: move to Element subclass?
 def getTagName(node):
+    """Return the namespace URI, the local name of the element, and the full name of the element including the prefix."""
     items = node.tag.split('}')
     namespace = None
     local_name = items[-1]
@@ -208,6 +211,7 @@ def getTagName(node):
     return (namespace, local_name, full_name)
 
 def collapseWhitespace(text, maxlen):
+    """Replace tab characters and new line characters with spaces, trim the text and convert multiple spaces into a single space, and optionally truncate the result at maxlen characters."""
     text = (text or '').strip()[0:maxlen + 1].replace('\n', ' ').replace('\t', ' ')
     while '  ' in text:
         text = text.replace('  ', ' ')
