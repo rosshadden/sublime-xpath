@@ -88,7 +88,7 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
     def process_current_input(self):
         pass
     
-    def on_query_completions(self, prefix, locations):
+    def on_query_completions(self, prefix, locations): # http://docs.sublimetext.info/en/latest/reference/api.html#sublime_plugin.EventListener.on_query_completions
         pass
 
 class InputCompletionsListener(sublime_plugin.EventListener):
