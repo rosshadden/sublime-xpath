@@ -863,7 +863,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         
         if self.input_panel.substr(locations[0] - len(prefix) - len('$')) == '$': # if user is typing a variable
             completions = variable_completions
-            flags = flags | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+            flags = flags | sublime.INHIBIT_EXPLICIT_COMPLETIONS # don't show completions from the sublime-completions file, as they are not relevant
         else:
             #completions += [['$' + item[0], '$' + item[1]] for item in variable_completions] # add possible variables # commented out because sublime doesn't seem to support a $ (maybe any non-word char?) at the beginning of a completion entry
             # TODO: analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.

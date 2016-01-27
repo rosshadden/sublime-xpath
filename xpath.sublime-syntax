@@ -8,7 +8,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
   main: # TODO: obey 3.7 Lexical Structure rules
     - match: '[,/]|::'
       scope: punctuation.separator
-    - match: '@{{QName}}|(?<!\.)\.(?!\d)\.?(?!\.)'
+    - match: '@({{QName}})?|(?<!\.)\.(?!\d)\.?(?!\.)'
       scope: keyword.control.flow # AxisStep | AxisSpecifier
     - match: '[()\[\]]'
       scope: punctuation.definition.arguments.begin comment # ExprToken
@@ -40,7 +40,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: constant.numeric # Number
     - match: '\s+'
       scope: white_space # ExprWhitespace
-    - match: '\${{QName}}\b'
+    - match: '\$({{QName}}\b)?'
       scope: entity.name.function # VariableReference
     - match: '\b(?:\*|{{QName}}(?::{{QName}})?)\b'
       scope: variable.parameter # NameTest
