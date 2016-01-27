@@ -18,10 +18,24 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: keyword.operator # Operator
     - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\b'
       scope: constant.language.xpath.axis_name # AxisName
-    - match: '"[^"]*"'
-      scope: string.quoted.double # Literal
-    - match: "'[^']*'"
-      scope: string.quoted.single # Literal
+    - match: '"'
+      captures:
+        0: punctuation.definition.string.begin.xpath
+      push:
+        - meta_scope: string.quoted.double.xpath # Literal
+        - match: '"'
+          captures:
+            0: punctuation.definition.string.end.xpath
+          pop: true
+    - match: "'"
+      captures:
+        0: punctuation.definition.string.begin.xpath
+      push:
+        - meta_scope: string.quoted.single.xpath # Literal
+        - match: "'"
+          captures:
+            0: punctuation.definition.string.end.xpath
+          pop: true
     - match: '\b(?:\d*\.\d+|\d+)\b'
       scope: constant.numeric # Number
     - match: '\s+'

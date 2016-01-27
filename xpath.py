@@ -848,10 +848,31 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def show_input_panel(self, initial_value):
         super().show_input_panel(initial_value)
-        self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath', 'characters': '/['} ])
+        self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': '/[$'} ])
     
     def on_query_completions(self, prefix, locations):
-        pass # TODO: analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
+        if self.input_panel.match_selector(locations[0], 'string'):
+            return None
+        
+        completions = []
+        flags = sublime.INHIBIT_WORD_COMPLETIONS
+        
+        variables = settings.get('variables', {})
+        variables['contexts'] = None
+        variable_completions = [[key + '\tvariable', key] for key in sorted(variables.keys()) if key.startswith(prefix)]
+        
+        if self.input_panel.substr(locations[0] - len(prefix) - len('$')) == '$': # if user is typing a variable
+            completions = variable_completions
+            flags = flags | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+        else:
+            #completions += [['$' + item[0], '$' + item[1]] for item in variable_completions] # add possible variables # commented out because sublime doesn't seem to support a $ (maybe any non-word char?) at the beginning of a completion entry
+            # TODO: analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
+            pass
+        
+        if len(completions) == 0:
+            return None
+        else:
+            return (completions, flags)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)

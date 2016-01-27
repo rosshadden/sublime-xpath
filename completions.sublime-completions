@@ -1,5 +1,5 @@
 {
-	"scope": "query.xml.xpath",
+	"scope": "query.xml.xpath - string",
 
 	"completions":
 	[
