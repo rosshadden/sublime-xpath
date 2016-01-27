@@ -1,6 +1,8 @@
 import sublime
 import sublime_plugin
 
+on_query_completions_callbacks = {}
+
 class RequestInputCommand(sublime_plugin.TextCommand): # this command should be overidden, and not used directly
     input_panel = None
     pending_value = None
@@ -25,6 +27,9 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
         if syntax is not None:
             self.input_panel.assign_syntax(syntax)
         self.input_panel.settings().set('gutter', False)
+        
+        global on_query_completions_callbacks
+        on_query_completions_callbacks[self.input_panel.id()] = lambda prefix, locations: self.on_query_completions(prefix, locations)
     
     def set_args(self, **args):
         self.arguments = args or {}
@@ -40,7 +45,7 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
     
     def close_input_panel(self):
         sublime.active_window().run_command('hide_panel', { 'cancel': True }) # close input panel
-        self.input_panel = None
+        #self.input_panel = None # not necessary as input_cancelled method is called
     
     def compare_to_previous(self):
         """Compare the pending_value with the current_value and process it if it is different."""
@@ -50,7 +55,7 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
             self.process_current_input()
     
     def input_changed(self, value):
-        """When the input is changed in live mode, after a short delay (so that it doesn't report unnecessarily while the text is still being typed), report the current value."""
+        """When the input is changed in live mode, after a short delay (so that it doesn't report unnecessarily while the text is still being typed), report the current value.""" # TODO: consider having a "pending" report in non-live mode, so that, for example, the xpath query can still be validated while it is being typed?
         self.pending_value = value
         
         if self.live_mode:
@@ -64,15 +69,33 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
                     sublime.set_timeout_async(lambda: self.compare_to_previous(), use_delay)
                 else:
                     sublime.set_timeout(lambda: self.compare_to_previous(), use_delay)
-        
-    def input_cancelled(self):
+    
+    def input_panel_closed(self):
+        if self.input_panel is not None:
+            global on_query_completions_callbacks
+            on_query_completions_callbacks.pop(self.input_panel.id(), None) # remove callback if present
         self.input_panel = None
+    
+    def input_cancelled(self):
+        self.input_panel_closed()
     
     def input_done(self, value):
         """When input is completed, if the current value hasn't already been processed, process it now."""
-        self.input_panel = None
+        self.input_panel_closed()
         self.pending_value = value
         self.compare_to_previous()
     
     def process_current_input(self):
         pass
+    
+    def on_query_completions(self, prefix, locations):
+        pass
+
+class InputCompletionsListener(sublime_plugin.EventListener):
+    def on_query_completions(self, view, prefix, locations):
+        global on_query_completions_callbacks
+        if view.id() in on_query_completions_callbacks.keys():
+            return on_query_completions_callbacks[view.id()](prefix, locations)
+    def on_pre_close(self, view):
+        global on_query_completions_callbacks
+        on_query_completions_callbacks.pop(view.id(), None) # remove callback if present

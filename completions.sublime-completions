@@ -1,0 +1,21 @@
+{
+	"scope": "query.xml.xpath",
+
+	"completions":
+	[
+		{ "trigger": "ancestor\taxis", "contents": "ancestor::" },
+		{ "trigger": "ancestor-or-self\taxis", "contents": "ancestor-or-self::" },
+		{ "trigger": "attribute\taxis", "contents": "attribute::" },
+		{ "trigger": "child\taxis", "contents": "child::" },
+		{ "trigger": "descendant\taxis", "contents": "descendant::" },
+		{ "trigger": "descendant-or-self\taxis", "contents": "descendant-or-self::" },
+		{ "trigger": "following\taxis", "contents": "following::" },
+		{ "trigger": "following-sibling\taxis", "contents": "following-sibling::" },
+		{ "trigger": "namespace\taxis", "contents": "namespace::" },
+		{ "trigger": "parent\taxis", "contents": "parent::" },
+		{ "trigger": "preceding\taxis", "contents": "preceding::" },
+		{ "trigger": "preceding-sibling\taxis", "contents": "preceding-sibling::" },
+		{ "trigger": "self\taxis", "contents": "self::" },
+		{ "trigger": "text\tnode type", "contents": "text()" }
+	]
+}

@@ -846,6 +846,13 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         self.view.erase_status('xpath_query')
         super().command_complete(cancelled)
     
+    def show_input_panel(self, initial_value):
+        super().show_input_panel(initial_value)
+        self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath', 'characters': '/['} ])
+    
+    def on_query_completions(self, prefix, locations):
+        pass # TODO: analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self):
