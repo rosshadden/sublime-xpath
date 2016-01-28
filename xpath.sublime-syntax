@@ -6,17 +6,37 @@ variables:
   QName: '(?![\d.\-])[\w.\-]+'
 contexts: # NOTE: these scope names don't represent what they should, they are set for best syntax highlighting
   main: # TODO: obey 3.7 Lexical Structure rules
-    - match: '[,/]|::'
-      scope: punctuation.separator
+    - match: '/'
+      scope: punctuation.separator.xpath.location_step
+    - match: ','
+      scope: punctuation.separator.xpath.arguments
     - match: '@({{QName}})?|(?<!\.)\.(?!\d)\.?(?!\.)'
-      scope: keyword.control.flow # AxisStep | AxisSpecifier
-    - match: '[()\[\]]'
-      scope: punctuation.definition.arguments.begin comment # ExprToken
-    - match: '\b(comment|text|processing-instruction|node)\b'
-      scope: support.function.builtin.xpath.node_type # NodeType
+      scope: keyword.control.flow.xpath # AxisStep | AxisSpecifier
+    - match: '\['
+      captures:
+        0: punctuation.definition.arguments.begin.xpath.predicate comment
+      push:
+        - meta_scope: xpath.predicate
+        - include: main
+        - match: '\]'
+          captures:
+            0: punctuation.definition.arguments.end.xpath.predicate comment
+          pop: true
+    - match: '\('
+      captures:
+        0: punctuation.definition.arguments.begin.xpath.subexpression comment
+      push:
+        - meta_scope: punctuation.section.block.xpath
+        - include: main
+        - match: '\)'
+          captures:
+            0: punctuation.definition.arguments.end.xpath.subexpression comment
+          pop: true
+    - match: '\b(comment|text|processing-instruction|node)\(\)'
+      scope: storage.type.xpath.node_type # NodeType
     - match: '\b(?:and|or|mod|div)\b|\*|/+|\||\+|-|!?=|<=?|>=?'
-      scope: keyword.operator # Operator
-    - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\b'
+      scope: keyword.operator.xpath # Operator
+    - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)::'
       scope: constant.language.xpath.axis_name # AxisName
     - match: '"'
       captures:
@@ -37,12 +57,23 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
             0: punctuation.definition.string.end.xpath
           pop: true
     - match: '\b(?:\d*\.\d+|\d+)\b'
-      scope: constant.numeric # Number
+      scope: constant.numeric.xpath # Number
     - match: '\s+'
-      scope: white_space # ExprWhitespace
+      scope: white_space.xpath # ExprWhitespace
     - match: '\$({{QName}}\b)?'
-      scope: entity.name.function # VariableReference
+      scope: entity.name.variable.xpath support.function.builtin.xpath.variable # VariableReference
+    - match: '\b{{QName}}(?::{{QName}})?(\()'
+      captures:
+        0: entity.name.function.xpath # NameTest
+        1: punctuation.definition.arguments.begin.xpath.subexpression comment
+      push:
+        - meta_scope: meta.function-call.xpath
+        - include: main
+        - match: '\)'
+          captures:
+            0: punctuation.definition.arguments.end.xpath.subexpression comment
+          pop: true
     - match: '\b(?:\*|{{QName}}(?::{{QName}})?)\b'
-      scope: variable.parameter # NameTest
+      scope: variable.parameter.xpath # NameTest
     
   
