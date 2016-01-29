@@ -6,7 +6,7 @@ from .lxml_parser import *
 class RunXpathTestsCommand(sublime_plugin.TextCommand): #sublime.active_window().active_view().run_command('run_xpath_tests')
 	def run(self, edit):
 		xml = sublime.load_resource(sublime.find_resources('example_xml_ns.xml')[0])
-		tree = lxml_etree_parse_xml_string_with_location(xml, 1)
+		tree, namespaces = lxml_etree_parse_xml_string_with_location(xml, 1)
 		
 		def lxml_parser_tests():
 			def TestLocation(element, positions):

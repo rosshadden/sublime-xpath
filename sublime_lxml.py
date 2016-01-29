@@ -36,7 +36,7 @@ def regionIntersects(outer, inner, include_beginning):
     return outer.intersects(inner) or (include_beginning and inner.empty() and outer.contains(inner.begin())) # only include beginning if selection size is empty. so can select <hello>text|<world />|</hello> and xpath will show as 'hello/world' rather than '/hello'
 
 # TODO: consider subclassing tree? and moving function to that class
-def getNodesAtPositions(view, trees, positions):
+def getNodesAtPositions(view, roots, positions):
     """Given a sorted list of trees and non-overlapping positions, return the nodes that relate to each position - efficiently, without searching through unnecessary children and stop once all are found."""
     
     def relevance(span, start_index, max_index, include_beginning):
@@ -83,12 +83,11 @@ def getNodesAtPositions(view, trees, positions):
     
     matches = []
     start_match_index = 0
-    for tree in trees:
-        if tree is not None:
+    for root in roots:
+        if root is not None:
             last_match_index = len(positions) - 1
-            root = tree.getroot()
             get_matches_in_tree = True
-            if len(trees) > 1: # if there is only one tree, we can skip the optimization check, because we know for sure the matches will be in the tree
+            if len(roots) > 1: # if there is only one tree, we can skip the optimization check, because we know for sure the matches will be in the tree
                 open_pos, close_pos = getNodePosition(view, root)
                 root_matches, start_match_index, last_match_index = matchSpan(open_pos.cover(close_pos), start_match_index, last_match_index, True)
                 get_matches_in_tree = len(root_matches) > 0 # determine if it is worth checking this tree
@@ -120,7 +119,6 @@ def get_regions_of_nodes(view, nodes, position_type):
         
         if position_type in ('open', 'close', 'names'):
             tag = getTagName(node)[2]
-            
             # select only the tag name with the prefix
             chars_before_tag = len('<')
             if position_type in ('open', 'names') or isTagSelfClosing(node):

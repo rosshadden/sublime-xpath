@@ -3,6 +3,7 @@ from lxml import etree
 from xml.sax import make_parser
 from lxml.html import fromstring as fromhtmlstring
 from xml.sax.handler import feature_external_pes, feature_external_ges
+import collections
 
 ns_loc = 'lxml'
 
@@ -22,6 +23,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         _locator = None
         _prefix_hierarchy = []
         _last_action = None
+        _prefixes_doc_order = []
         
         def setDocumentLocator(self, locator):
             self._locator = locator
@@ -95,7 +97,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             self._prefix_hierarchy[-1][prefix] = uri
             if prefix is None:
                 self._default_ns = uri
-            # TODO: record all used namespace uri and prefix combinations used in document, to avoid looking them all up again later
+            # record all used unique namespace uri and prefix combinations used in document, to avoid any need to look them all up again later
+            if (prefix, uri) not in self._prefixes_doc_order:
+                self._prefixes_doc_order.append((prefix, uri))
         
         def endPrefixMapping(self, prefix):
             self._prefix_hierarchy[-1].pop(prefix)
@@ -157,8 +161,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         parser.feed(chunk)
     
     parser.close()
-    
-    return createETree.etree
+    return (createETree.etree, createETree._prefixes_doc_order)
 
 def chunks(entire, chunk_size): # http://stackoverflow.com/a/18854817/4473405
     """Return a generator that will split the input into chunks of the specified size."""
@@ -228,3 +231,26 @@ def isTagSelfClosing(node):
     open_pos = getNodeTagRange(node, 'open')
     close_pos = getNodeTagRange(node, 'close')
     return open_pos == close_pos
+
+def unique_namespaces(namespaces, replaceNoneWith = 'default', start = 1):
+    """Given a list of unique namespace tuples in document order, make sure each prefix is unique and has a mapping back to the original prefix."""
+    flattened = collections.OrderedDict()
+    for item in namespaces:
+        flattened.setdefault(item[0], []).append(item[1])
+    
+    unique = collections.OrderedDict()
+    for key in flattened.keys():
+        if len(flattened[key]) == 1:
+            try_key = key or replaceNoneWith
+            unique[try_key] = (flattened[key][0], key)
+        else: # find next available number. we can't just append the number, because it is possible that the new numbered prefix already exists
+            index = start - 1
+            for item in flattened[key]: # for each item that has the same prefix but a different namespace
+                while True:
+                    index += 1 # try with the next index
+                    try_key = (key or replaceNoneWith) + str(index)
+                    if try_key not in unique.keys() and try_key not in flattened.keys():
+                        break # the key we are trying is new
+                unique[try_key] = (item, key)
+    
+    return unique
