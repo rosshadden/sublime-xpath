@@ -855,16 +855,25 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         super().show_input_panel(initial_value)
         self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': '/[$@:('} ])
     
-    def completions_axis_specifiers(self):
+    def on_query_completions(self, prefix, locations): # moved from .sublime-completions file here - https://github.com/SublimeTextIssues/Core/issues/819
+        return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2]), sublime.INHIBIT_WORD_COMPLETIONS)
+    
+    def is_enabled(self, **args):
+        return isCursorInsideSGML(self.view)
+    def is_visible(self):
+        return containsSGML(self.view)
+
+def completions_for_xpath_query(view, prefix, locations, contexts, namespaces):
+    def completions_axis_specifiers():
         completions = ['ancestor', 'ancestor-or-self', 'attribute', 'child', 'descendant', 'descendant-or-self', 'following', 'following-sibling', 'namespace', 'parent', 'preceding', 'preceding-sibling', 'self']
         return [(completion + '\taxis', completion + '::') for completion in completions]
-    
-    def completions_node_types(self):
+
+    def completions_node_types():
         completions = ['text', 'node']
         #completions += ['comment', 'processing-instruction'] # commented out because these nodes are ignored during our xml parsing and tree building process
         return [(completion + '\tnode type', completion + '()') for completion in completions]
-    
-    def completions_functions(self):
+
+    def completions_functions():
         funcs = {
             'nodeset': ['last', 'position', 'count', 'local-name', 'namespace-uri', 'name'],
             'string': ['string', 'concat', 'starts-with', 'contains', 'substring-before', 'substring-after', 'substring', 'string-length', 'normalize-space', 'translate'],
@@ -876,74 +885,76 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         for key in funcs.keys():
             for completion in funcs[key]:
                 yield (completion + '\t' + key + ' functions', completion + '($1)')
+
     
-    def on_query_completions(self, prefix, locations): # moved from .sublime-completions file here - https://github.com/SublimeTextIssues/Core/issues/819
-        if self.input_panel.match_selector(locations[0], 'string'):
-            return None
+    if view.match_selector(locations[0], 'string'): # if in a string, nothing to suggest
+        return None
+    
+    completions = []
+    
+    variables = settings.get('variables', {})
+    variables['contexts'] = None
+    variable_completions = [[key + '\tvariable', key] for key in sorted(variables.keys()) if key.startswith(prefix)]
+    
+    pos = locations[0] - len(prefix)
+    prev_char = view.substr(pos - 1)
+    
+    if prev_char == '$': # if user is typing a variable
+        completions = variable_completions
+    else:
+        include_generics = True
+        if prev_char == '@': # if user is typing an attribute
+            include_generics = False
         
-        completions = []
         
-        variables = settings.get('variables', {})
-        variables['contexts'] = None
-        variable_completions = [[key + '\tvariable', key] for key in sorted(variables.keys()) if key.startswith(prefix)]
+        # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
         
-        pos = locations[0] - len(prefix)
-        prev_char = self.input_panel.substr(pos - 1)
+        # TODO: determine where this part of the query starts, based on unmatched opening parenthesis or predicates and preceeding operators
+        subquery_start_pos = 0
+        # TODO: execute previous complete query parts, so that we have the right context nodes for the current sub-expression
+        preceeding_query_text = view.substr(sublime.Region(0, pos))
         
-        if prev_char == '$': # if user is typing a variable
-            completions = variable_completions
-        else:
-            include_generics = True
-            if prev_char == '@': # if user is typing an attribute
-                include_generics = False
-            
-            
-            # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
-            
-            # TODO: determine where this part of the query starts, based on unmatched opening parenthesis or predicates and preceeding operators
-            subquery_start_pos = 0
-            # TODO: execute previous complete query parts, so that we have the right context nodes for the current sub-expression
-            preceeding_query_text = self.input_panel.substr(sublime.Region(0, pos))
-            
-            subquery = self.input_panel.substr(sublime.Region(subquery_start_pos, pos))
+        subquery = view.substr(sublime.Region(subquery_start_pos, pos))
+        if contexts is not None:
             # execute an xpath query to get all possible values
             exec_query = subquery + '*[starts-with(name(), $_prefix)]'
             
             print('completions:', preceeding_query_text, exec_query, 'prefix:', prefix)
             
-            completion_contexts = get_results_for_xpath_query(exec_query, self.contexts[1], self.contexts[2], False, expression_contexts = [], _prefix = prefix)
-            for result in completion_contexts:
-                if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
-                    ns, localname, fullname = getTagName(result)
-                    if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
-                        root = result.getroottree().getroot()
-                        namespaces = self.contexts[2][root]
-                        fullname = next((nsprefix for nsprefix in namespaces.keys() if namespaces[nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
-                    completions.append((fullname + '\tElement', fullname))
-                elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
-                    if prev_char == '@' or result.is_attribute:
-                        global ns_loc
-                        if not result.attrname.startswith('{' + ns_loc + '}'):
-                            completions.append((result.attrname + '\tAttribute', result.attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
-                else: # debug, are we missing something we could suggest?
-                    completions.append((str(result) + '\t' + str(type(result)), str(result)))
+            completion_contexts = None
+            try:
+                completion_contexts = get_results_for_xpath_query(exec_query, contexts, namespaces, False, expression_contexts = [], _prefix = prefix)
+            except: # xpath query invalid, just show static contexts
+                pass
             
-            completions = list(getUniqueItems(completions))
-            
-            if include_generics:
-                generics = []
-                if ':' not in subquery.split('/')[-1]: # if no namespace or axis operator used in the subquery
-                    generics += self.completions_axis_specifiers()
-                    generics += self.completions_node_types()
-                    generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
-                if subquery.strip() == '': # XPath 1.0 functions can only be used at the beginning of a sub-expression
-                    generics += list(self.completions_functions())
+            if completion_contexts is not None:
+                for result in completion_contexts:
+                    if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
+                        ns, localname, fullname = getTagName(result)
+                        if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
+                            root = result.getroottree().getroot()
+                            namespaces = namespaces[root]
+                            fullname = next((nsprefix for nsprefix in namespaces.keys() if namespaces[nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
+                        completions.append((fullname + '\tElement', fullname))
+                    elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
+                        if prev_char == '@' or result.is_attribute:
+                            global ns_loc
+                            if not result.attrname.startswith('{' + ns_loc + '}'):
+                                completions.append((result.attrname + '\tAttribute', result.attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
+                    else: # debug, are we missing something we could suggest?
+                        completions.append((str(result) + '\t' + str(type(result)), str(result)))
                 
-                completions += [completion for completion in generics if completion[0].startswith(prefix)]
-        #return ([completion for completion in completions if completion[0].startswith(prefix)], sublime.INHIBIT_WORD_COMPLETIONS)
-        return (completions, sublime.INHIBIT_WORD_COMPLETIONS)
+                completions = list(getUniqueItems(completions))
+        
+        if include_generics:
+            generics = []
+            if ':' not in subquery.split('/')[-1]: # if no namespace or axis operator used in the subquery
+                generics += completions_axis_specifiers()
+                generics += completions_node_types()
+                generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
+            if subquery.strip() == '': # XPath 1.0 functions can only be used at the beginning of a sub-expression
+                generics += list(completions_functions())
+            
+            completions += [completion for completion in generics if completion[0].startswith(prefix)]
     
-    def is_enabled(self, **args):
-        return isCursorInsideSGML(self.view)
-    def is_visible(self):
-        return containsSGML(self.view)
+    return completions
