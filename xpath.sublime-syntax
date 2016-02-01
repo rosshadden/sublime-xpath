@@ -17,21 +17,25 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
         0: punctuation.definition.arguments.begin.xpath.predicate comment
       push:
         - meta_scope: xpath.predicate
-        - include: main
         - match: '\]'
           captures:
             0: punctuation.definition.arguments.end.xpath.predicate comment
           pop: true
+        - include: main
+    - match: '\]'
+      scope: invalid.illegal.stray-bracket-end
     - match: '\('
       captures:
         0: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
         - meta_scope: punctuation.section.block.xpath
-        - include: main
         - match: '\)'
           captures:
             0: punctuation.definition.arguments.end.xpath.subexpression comment
           pop: true
+        - include: main
+    - match: '\)'
+      scope: invalid.illegal.stray-bracket-end
     - match: '\b(comment|text|processing-instruction|node)\(\)'
       scope: storage.type.xpath.node_type # NodeType
     - match: '\b(?:and|or|mod|div)\b|\*|/+|\||\+|-|!?=|<=?|>=?'
@@ -68,11 +72,11 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
         1: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
         - meta_scope: meta.function-call.xpath
-        - include: main
         - match: '\)'
           captures:
             0: punctuation.definition.arguments.end.xpath.subexpression comment
           pop: true
+        - include: main
     - match: '\b(?:\*|{{QName}}(?::{{QName}})?)\b'
       scope: variable.parameter.xpath # NameTest
     
