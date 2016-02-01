@@ -28,11 +28,15 @@
 #                                                                                    ^ xpath.predicate keyword.operator.xpath
 #                                                                                     ^ xpath.predicate white_space.xpath
 #                                                                                      ^^^^^^^^^^^ xpath.predicate string.quoted.double.xpath
+#                                                                                      ^^^^ xpath.predicate string.quoted.double.xpath - meta.function-call.xpath
+#                                                                                           ^^^^ xpath.predicate string.quoted.double.xpath - meta.function-call.xpath punctuation.definition.arguments
 #                                                                                      ^ xpath.predicate string.quoted.double.xpath punctuation.definition.string.begin.xpath
 #                                                                                                ^ xpath.predicate string.quoted.double.xpath punctuation.definition.string.end.xpath
 #                                                                                                 ^ xpath.predicate punctuation.definition.arguments.end.xpath.predicate comment
 #                                                                                                  ^ punctuation.separator.xpath.location_step
 #                                                                                                   ^^^^^^ storage.type.xpath.node_type
+#                                                                                                       ^^ storage.type.xpath.node_type - punctuation.definition.arguments
+#                                                                                                   ^^^^^^ storage.type.xpath.node_type - meta.function-call.xpath
 
 (/hello/descendant::world)[1]
 # <- meta.block.query.xpath punctuation.definition.arguments.begin.xpath.subexpression comment
