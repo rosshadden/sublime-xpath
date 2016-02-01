@@ -498,7 +498,7 @@ def get_all_namespaces_in_tree(tree):
     getNamespaces = etree.XPath('//namespace::*')
     return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
 
-def get_results_for_xpath_query(query, tree_contexts, print_contexts, **additional_variables):
+def get_results_for_xpath_query(query, tree_contexts, root_namespaces, print_contexts, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
     
@@ -506,10 +506,10 @@ def get_results_for_xpath_query(query, tree_contexts, print_contexts, **addition
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
     
     for tree in tree_contexts.keys():
-        nsmap = unique_namespaces(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
-        for prefix in nsmap.keys():
-            nsmap[prefix] = nsmap[prefix][0]
-        
+        namespaces = root_namespaces.get(tree.getroot(), {})
+        nsmap = {}
+        for prefix in namespaces.keys():
+            nsmap[prefix] = namespaces[prefix][0]
         xpath = etree.XPath(query, namespaces = nsmap)
         
         results = execute_xpath_query(tree, xpath, tree_contexts[tree], print_contexts, **additional_variables)
@@ -625,6 +625,25 @@ class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
     def is_visible(self):
         return containsSGML(self.view)
 
+def namespace_map_from_contexts(contexts):
+    root_namespaces = {}
+    for node in contexts:
+        root = None
+        if isinstance(node, etree._ElementTree):
+            root = node.getroot()
+        else:
+            root = node.getroottree().getroot()
+        if root not in root_namespaces.keys():
+            root_namespaces[root] = namespace_map_for_tree(root.getroottree())
+    
+    return root_namespaces
+
+def namespace_map_for_tree(tree):
+    global settings
+    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
+    namespaces = unique_namespaces(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
+    return namespaces
+
 class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })
     def run(self, edit, **args):
         global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
@@ -638,7 +657,8 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
         else:
-            nodes = get_results_for_xpath_query(history[-1], get_context_nodes_from_cursors(self.view), False)
+            contexts = get_context_nodes_from_cursors(self.view)
+            nodes = get_results_for_xpath_query(history[-1], contexts, namespace_map_from_contexts(contexts), False)
             total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
             if total_results == total_selections:
                 sublime.status_message(str(total_results) + ' nodes selected')
@@ -719,7 +739,8 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
-        self.contexts = (self.view.change_count(), get_context_nodes_from_cursors(self.view))
+        context_nodes = get_context_nodes_from_cursors(self.view)
+        self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
         self.print_contexts = True
     
     def run(self, edit, **args):
@@ -766,7 +787,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = get_results_for_xpath_query(query, self.contexts[1], self.print_contexts)
+                results = get_results_for_xpath_query(query, self.contexts[1], self.contexts[2], self.print_contexts)
                 self.print_contexts = False
             except Exception as e:
                 status_text = str(e)
@@ -876,19 +897,6 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if prev_char == '@': # if user is typing an attribute
                 include_generics = False
             
-            global settings
-            defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-            
-            root_namespaces = {}
-            for element in self.contexts[1]:
-                root = None
-                if isinstance(element, etree._ElementTree):
-                    root = element.getroot()
-                else:
-                    root = element.getroottree().getroot()
-                if root not in root_namespaces.keys():
-                    root_namespaces[root] = unique_namespaces(get_all_namespaces_in_tree(root.getroottree()), defaultNamespacePrefix)
-            
             
             # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
             
@@ -903,13 +911,13 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             
             print('completions:', preceeding_query_text, exec_query, 'prefix:', prefix)
             
-            completion_contexts = get_results_for_xpath_query(exec_query, self.contexts[1], False, expression_contexts = [], _prefix = prefix)
+            completion_contexts = get_results_for_xpath_query(exec_query, self.contexts[1], self.contexts[2], False, expression_contexts = [], _prefix = prefix)
             for result in completion_contexts:
                 if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
                     ns, localname, fullname = getTagName(result)
                     if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
                         root = result.getroottree().getroot()
-                        namespaces = root_namespaces[root]
+                        namespaces = self.contexts[2][root]
                         fullname = next((nsprefix for nsprefix in namespaces.keys() if namespaces[nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
                     completions.append((fullname + '\tElement', fullname))
                 elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
