@@ -28,7 +28,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       captures:
         0: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
-        - meta_scope: punctuation.section.block.xpath
+        - meta_scope: meta.block.query.xpath
         - match: '\)'
           captures:
             0: punctuation.definition.arguments.end.xpath.subexpression comment

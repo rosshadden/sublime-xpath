@@ -1,0 +1,49 @@
+# SYNTAX TEST "xpath.sublime-syntax"
+/element1/ns:element2/child::*[position() > 1  and substring-after(., 'hello world') = "test(123)"]/text()
+# <- punctuation.separator.xpath.location_step
+#^^^^^^^^ variable.parameter.xpath
+#        ^ punctuation.separator.xpath.location_step
+#         ^^^^^^^^^^^ variable.parameter.xpath
+#                     ^^^^^^^ constant.language.xpath.axis_name
+#                            ^ keyword.operator.xpath
+#                             ^ xpath.predicate punctuation.definition.arguments.begin.xpath.predicate
+#                              ^^^^^^^^^ meta.function-call.xpath entity.name.function.xpath
+#                                      ^ punctuation.definition.arguments.begin.xpath.subexpression comment
+#                                       ^ meta.function-call.xpath punctuation.definition.arguments.end.xpath.subexpression comment
+#                                        ^ xpath.predicate white_space.xpath
+#                                         ^ xpath.predicate keyword.operator.xpath
+#                                          ^ xpath.predicate white_space.xpath
+#                                           ^ constant.numeric.xpath
+#                                            ^^ xpath.predicate white_space.xpath
+#                                              ^^^ xpath.predicate keyword.operator.xpath
+#                                                  ^^^^^^^^^^^^^^^^ xpath.predicate meta.function-call.xpath entity.name.function.xpath
+#                                                                  ^ xpath.predicate meta.function-call.xpath keyword.control.flow.xpath
+#                                                                   ^ xpath.predicate meta.function-call.xpath punctuation.separator.xpath.arguments
+#                                                                    ^ xpath.predicate meta.function-call.xpath white_space.xpath
+#                                                                     ^^^^^^^^^^^^^ xpath.predicate meta.function-call.xpath string.quoted.single.xpath
+#                                                                     ^ xpath.predicate meta.function-call.xpath punctuation.definition.string.begin.xpath
+#                                                                                 ^ xpath.predicate meta.function-call.xpath punctuation.definition.string.end.xpath
+#                                                                                  ^ punctuation.definition.arguments.end.xpath.subexpression comment
+#                                                                                   ^ xpath.predicate white_space.xpath
+#                                                                                    ^ xpath.predicate keyword.operator.xpath
+#                                                                                     ^ xpath.predicate white_space.xpath
+#                                                                                      ^^^^^^^^^^^ xpath.predicate string.quoted.double.xpath
+#                                                                                      ^ xpath.predicate string.quoted.double.xpath punctuation.definition.string.begin.xpath
+#                                                                                                ^ xpath.predicate string.quoted.double.xpath punctuation.definition.string.end.xpath
+#                                                                                                 ^ xpath.predicate punctuation.definition.arguments.end.xpath.predicate comment
+#                                                                                                  ^ punctuation.separator.xpath.location_step
+#                                                                                                   ^^^^^^ storage.type.xpath.node_type
+
+(/hello/descendant::world)[1]
+# <- meta.block.query.xpath punctuation.definition.arguments.begin.xpath.subexpression comment
+#^ meta.block.query.xpath punctuation.separator.xpath.location_step
+# ^^^^^ meta.block.query.xpath variable.parameter.xpath
+#       ^^^^^^^^^^^^ meta.block.query.xpath constant.language.xpath.axis_name
+#                   ^^^^^ meta.block.query.xpath variable.parameter.xpath
+#                        ^ meta.block.query.xpath punctuation.definition.arguments.end.xpath.subexpression comment
+#                         ^ xpath.predicate punctuation.definition.arguments.begin.xpath.predicate
+#                          ^ xpath.predicate constant.numeric.xpath
+#                           ^ xpath.predicate punctuation.definition.arguments.end.xpath.predicate
+
+ )]
+#^^ invalid.illegal.stray-bracket-end
