@@ -398,10 +398,10 @@ class XpathListener(sublime_plugin.EventListener):
             updateStatusToCurrentXPathIfSGML(view)
     def on_pre_close(self, view):
         global change_counters
-        global xml_trees
+        global xml_roots
         global previous_first_selection
         change_counters.pop(view.id(), None)
-        xml_trees.pop(view.id(), None)
+        xml_roots.pop(view.id(), None)
         previous_first_selection.pop(view.id(), None)
         
         if view.file_name() is None: # if the file has no filename associated with it
