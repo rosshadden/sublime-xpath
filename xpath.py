@@ -501,9 +501,6 @@ def get_results_for_xpath_query(query, tree_contexts, root_namespaces, print_con
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
     
-    global settings
-    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-    
     for tree in tree_contexts.keys():
         namespaces = root_namespaces.get(tree.getroot(), {})
         nsmap = {}
