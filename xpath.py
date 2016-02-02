@@ -225,8 +225,7 @@ def getXPathOfNodes(nodes, args):
         for node in roots[root]:
             namespaces = None
             if show_namespace_prefixes_from_query:
-                namespaces = get_all_namespaces_in_tree(root.getroottree())
-                namespaces = unique_namespaces(namespaces, defaultNamespacePrefix)
+                namespaces = namespace_map_for_tree(root.getroottree())
             
             paths.append(getNodePath(node, namespaces, root))
     
@@ -641,7 +640,7 @@ def namespace_map_from_contexts(contexts):
 def namespace_map_for_tree(tree):
     global settings
     defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-    namespaces = unique_namespaces(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
+    namespaces = unique_namespace_prefixes(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
     return namespaces
 
 class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })

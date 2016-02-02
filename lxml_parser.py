@@ -232,8 +232,8 @@ def isTagSelfClosing(node):
     close_pos = getNodeTagRange(node, 'close')
     return open_pos == close_pos
 
-def unique_namespaces(namespaces, replaceNoneWith = 'default', start = 1):
-    """Given a list of unique namespace tuples in document order, make sure each prefix is unique and has a mapping back to the original prefix."""
+def unique_namespace_prefixes(namespaces, replaceNoneWith = 'default', start = 1):
+    """Given a list of unique namespace tuples in document order, make sure each prefix is unique and has a mapping back to the original prefix. Return a dictionary with the unique namespace prefixes and their mappings."""
     flattened = collections.OrderedDict()
     for item in namespaces:
         flattened.setdefault(item[0], []).append(item[1])
