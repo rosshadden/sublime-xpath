@@ -7,7 +7,7 @@ Sublime Text - XPath Plugin
 - Copy XPath at cursor(s) to clipboard.
 - Jump selection to relative tag - previous or next sibling, parent, open or close tag. It is also possible to select the entire tag contents, optionally including the tag itself.  This works for multiple selections as well, of course.
 - Query XML and (X)HTML documents by XPath 1.0 expression.
-  - with syntax highlighting.
+  - with syntax highlighting and [intelligent auto-completion](#autocomplete_demo).
   - with a custom `print` function that can be used as a debugging aid by logging nodesets etc. to the console.
   - display results in real-time (i.e. as you type the query, fitting in perfectly with Sublime's other actions). (With an option to customize this, if desired.)
   - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
@@ -35,6 +35,10 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `max_results_to_show` - the maximum number of results to show from the xpath query.  Set to <= 0 for no limit.  Useful to speed up display of results when there are lots.
 - `normalize_whitespace_in_preview` - whether or not to normalize whitespace for text results in the preview.  Defaults to `false`, because there are situations when it is important to see exact results.
 - `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
+
+<a name="autocomplete_demo" />
+## Demonstration
+![Sublime XPath plugin in action](https://cloud.githubusercontent.com/assets/11882719/12841929/245cdbd4-cbf8-11e5-8da0-26119e5213ab.gif "A demonstration of the Sublime XPath plugin, with it's intelligent auto completion")
 
 ## Potential future improvements:
 
