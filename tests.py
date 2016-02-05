@@ -50,6 +50,10 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): #sublime.active_window()
 				
 				assert result == expectation, 'xpath: ' + repr(xpath) + '\nexpected: ' + repr(expectation) + '\nactual: ' + repr(result)
 			
+			test_xpath_completion('', [''])
+			test_xpath_completion('/', ['/'])
+			test_xpath_completion('/root/', ['/root/'])
+			test_xpath_completion('./descendant::', ['./descendant::'])
 			test_xpath_completion('/*[1]/', ['/*[1]/'])
 			test_xpath_completion('/*[1]/test[position() = 1]/', ['/*[1]/test[position() = 1]/'])
 			test_xpath_completion('/*[1]/hello[@world and ./text()]/', ['/*[1]/hello[@world and ./text()]/'])
