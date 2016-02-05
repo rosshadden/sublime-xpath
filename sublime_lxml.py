@@ -1,6 +1,5 @@
 import sublime
 from .lxml_parser import *
-from collections import defaultdict
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getNodeTagRegion(view, node, position_type):
@@ -240,12 +239,6 @@ def parse_xpath_query_for_completions(view, completion_position):
     subqueries = {0: ''}
     def split(node, level):
         children = node['children']
-        # if level > 0: # we are only interested in the last child
-        #     #if 'value' in children[-1] and children[-1]['value'] == '' and len(children) > 1: # if the last child has an empty value, but there are children before it
-        #     #    children = children[0:-2] # ignore the empty value
-        #     children = [children[-1]]
-        #     if 'operator' in children[0] or 'separator' in children[0]: # ignore operators and separators
-        #         children = []
         relevant = []
         for child in reversed(children):
             if 'operator' in child or 'separator' in child: # take the children from the end, until we reach an operator or a separator
