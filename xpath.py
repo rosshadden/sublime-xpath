@@ -928,6 +928,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                         xpath_variables['expression_contexts'] = completion_contexts
                         try:
                             completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
+                            # TODO: if result is not a node, break out as we can't offer any useful suggestions (currently we just get an exception: Non-Element values not supported at this point - got 'example string') when it tries $expression_contexts/*
                         except Exception as e: # xpath query invalid, just show static contexts
                             completion_contexts = None
                             print('XPath completions error', 'query', query, 'exception', e)
@@ -957,7 +958,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
             if ':' not in subqueries[-1].split('/')[-1]: # if no namespace or axis operator used in the last location step of the subquery
                 generics += completions_axis_specifiers()
                 generics += completions_node_types()
-            if subqueries[-1].strip() == '': # XPath 1.0 functions and variables can only be used at the beginning of a sub-expression
+            if subqueries[-1] == '': # XPath 1.0 functions and variables can only be used at the beginning of a sub-expression
                 generics += list(completions_functions())
                 generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
             

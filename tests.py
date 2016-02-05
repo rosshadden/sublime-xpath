@@ -2,6 +2,7 @@ import sublime
 import sublime_plugin
 
 from .lxml_parser import *
+from .sublime_lxml import parse_xpath_query_for_completions
 
 class RunXpathTestsCommand(sublime_plugin.TextCommand): #sublime.active_window().active_view().run_command('run_xpath_tests')
 	def run(self, edit):
@@ -37,6 +38,39 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): #sublime.active_window()
 			
 			assert getRelativeNode(element, 'parent') == element.getparent()
 		
+		def sublime_lxml_tests():
+			def test_xpath_completion(xpath, expectation):
+				view = self.view.window().create_output_panel('xpath_test')
+				
+				view.assign_syntax('xpath.sublime-syntax')
+				
+				view.erase(edit, sublime.Region(0, view.size()))
+				view.insert(edit, 0, xpath)
+				result = parse_xpath_query_for_completions(view, view.size())
+				
+				assert result == expectation, 'xpath: ' + repr(xpath) + '\nexpected: ' + repr(expectation) + '\nactual: ' + repr(result)
+			
+			test_xpath_completion('/*[1]/', ['/*[1]/'])
+			test_xpath_completion('/*[1]/test[position() = 1]/', ['/*[1]/test[position() = 1]/'])
+			test_xpath_completion('/*[1]/hello[@world and ./text()]/', ['/*[1]/hello[@world and ./text()]/'])
+			test_xpath_completion('/*[wsdl:types[xs:schema]/xs:schema]/wsdl:types/', ['/*[wsdl:types[xs:schema]/xs:schema]/wsdl:types/'])
+			test_xpath_completion('name(./hello/', ['./hello/'])
+			test_xpath_completion('substring-after(./hello/text(), @', ['@'])
+			test_xpath_completion('//*[substring-after(./hello/text(), @', ['//*', '@'])
+			test_xpath_completion('//example[1]/test[substring-after(./hello/text(), ./@', ['//example[1]/test', './@'])
+			test_xpath_completion('//example[1]/test[substring-after(./hello/text(), ./@', ['//example[1]/test', './@'])
+			test_xpath_completion('//example[1][substring-after(./hello/text(), ./@', ['//example[1]', './@'])
+			test_xpath_completion('//example[1][substring-after(./hello/text(), ./@attr) = /path/to/value[1]/text()]/child::', ['//example[1][substring-after(./hello/text(), ./@attr) = /path/to/value[1]/text()]/child::'])
+			test_xpath_completion('//example[1]/*[starts-with(local-name(), "hello") and ./text() = "hello[world][1]" + ', ['//example[1]/*', ''])
+			test_xpath_completion('namespace-uri(//example[1][substring-after(./hello/text(), ./@attr) = /path/to/value[1]/text()/child::', ['//example[1]', '/path/to/value[1]/text()/child::'])
+			test_xpath_completion('./example[hello[world] ]/', ['./example[hello[world] ]/'])
+			test_xpath_completion('./example[hello[world]]/', ['./example[hello[world]]/'])
+			test_xpath_completion('name(./example[hello[world]] | /wow:', ['/wow:'])
+			test_xpath_completion('./example[hello[world]] | /wow:', ['/wow:'])
+			test_xpath_completion(' ./example[hello[world]]|/wow:', ['/wow:'])
+		
 		lxml_parser_tests()
+		sublime_lxml_tests()
+		
 		print('all XPath tests passed')
 

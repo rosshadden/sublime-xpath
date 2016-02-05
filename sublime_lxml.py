@@ -170,7 +170,11 @@ def parse_xpath_query_for_completions(view, completion_position):
         if region.end() > completion_position:
             pos = region.begin()
             break
-        regions.append(region)
+        if view.match_selector(region.begin(), 'punctuation.definition.arguments.end') and region.size() > 1: # sometimes we get consecutive instances of the same character and the find_by_selector lumps them into one region rather than separate ones
+            for i in range(region.begin(), region.end()): # split the characters into separate regions
+                regions.append(sublime.Region(i, i + 1))
+        else:
+            regions.append(region)
         pos = region.end()
     regions.append(sublime.Region(pos, completion_position))
     
@@ -233,7 +237,7 @@ def parse_xpath_query_for_completions(view, completion_position):
                     children.append(child)
         return children
     
-    flattened = { 'children': flatten(tree, True) }
+    flattened = { 'children': flatten(tree, False) }
     
     # split the rest of the tree into subqueries that should be executed on the results of the previous one
     subqueries = {0: ''}
