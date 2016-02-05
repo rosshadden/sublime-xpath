@@ -38,7 +38,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: invalid.illegal.stray-bracket-end
     - match: '\b(comment|text|processing-instruction|node)\(\)'
       scope: storage.type.xpath.node_type # NodeType
-    - match: '\b(?:and|or|mod|div)\b|\*|/+|\||\+|-|!?=|<=?|>=?'
+    - match: '\b(?:and|or|mod|div)\b|\*|\||\+|-|!?=|<=?|>=?'
       scope: keyword.operator.xpath # Operator
     - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)::'
       scope: constant.language.xpath.axis_name # AxisName

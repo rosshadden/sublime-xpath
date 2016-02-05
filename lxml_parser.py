@@ -254,3 +254,24 @@ def unique_namespace_prefixes(namespaces, replaceNoneWith = 'default', start = 1
                 unique[try_key] = (item, key)
     
     return unique
+
+def get_results_for_xpath_query(query, tree, context = None, namespaces = None, **variables):
+    """Given a query string and a document trees and optionally some context elements, compile the xpath query and execute it."""
+    nsmap = {}
+    if namespaces is not None:
+        for prefix in namespaces.keys():
+            nsmap[prefix] = namespaces[prefix][0]
+    xpath = etree.XPath(query, namespaces = nsmap)
+    
+    results = execute_xpath_query(tree, xpath, context, **variables)
+    return results
+
+def execute_xpath_query(tree, xpath, context_node = None, **variables):
+    """Execute the precompiled xpath query on the tree and return the results as a list."""
+    if context_node is None: # explicitly check for None rather than using "or", because it is treated as a list
+        context_node = tree
+    result = xpath(context_node, **variables)
+    if isinstance(result, list):
+        return result
+    else:
+        return [result]

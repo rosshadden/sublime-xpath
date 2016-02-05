@@ -27,7 +27,7 @@ def settingsChanged():
 
 def getSGMLRegions(view):
     """Find all xml and html scopes in the specified view."""
-    return view.find_by_selector('text.xml') + view.find_by_selector('text.html') # TODO: exclude text.html.markdown, but allow include html or xml code regions in markdown
+    return view.find_by_selector('text.xml, text.html - text.html.markdown') # TODO: include html or xml code regions in markdown, maybe using scope 'markup.raw.block.fenced.markdown' and checking for a language after the ```
 
 def containsSGML(view):
     """Return True if the view contains XML or HTML syntax."""
@@ -497,48 +497,24 @@ def get_all_namespaces_in_tree(tree):
     getNamespaces = etree.XPath('//namespace::*')
     return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
 
-def get_results_for_xpath_query(query, tree_contexts, root_namespaces, print_contexts, **additional_variables):
+def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namespaces, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
+    global settings
+    variables = settings.get('variables', {})
+    for key in additional_variables:
+        variables[key] = additional_variables[key]
     
     for tree in tree_contexts.keys():
         namespaces = root_namespaces.get(tree.getroot(), {})
-        nsmap = {}
-        for prefix in namespaces.keys():
-            nsmap[prefix] = namespaces[prefix][0]
-        xpath = etree.XPath(query, namespaces = nsmap)
+        variables['contexts'] = tree_contexts[tree]
+        context = None
+        if len(tree_contexts[tree]) > 0:
+            context = tree_contexts[tree][0]
+        matches += get_results_for_xpath_query(query, tree, context, namespaces, **variables)
         
-        results = execute_xpath_query(tree, xpath, tree_contexts[tree], print_contexts, **additional_variables)
-        if results is not None:
-            matches += results
-    
     return matches
-
-def execute_xpath_query(tree, xpath, contexts, print_contexts = False, **additional_variables):
-    """Execute the precompiled xpath query on the tree and return the results."""
     
-    context_node = tree
-    if contexts is not None and len(contexts) > 0:
-        context_node = contexts[0] # set the context node to the first node in the selection, if there is one, otherwise to the tree itself
-    else:
-        print_contexts = False
-    
-    variables = settings.get('variables', None)
-    if variables is None or not isinstance(variables, dict):
-        variables = {}
-    if additional_variables is not None:
-        for key in additional_variables.keys():
-            variables[key] = additional_variables[key]
-    variables['contexts'] = contexts # set the $contexts variable to the context nodes
-    
-    result = xpath(context_node, **variables)
-    if print_contexts: # only print contexts after the function is evaluated, as maybe it has an error
-        print('XPath: $contexts set to', getExactXPathOfNodes(contexts))
-    if isinstance(result, list):
-        return result
-    else:
-        return [result]
-
 def get_xpath_query_history_for_keys(keys):
     """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
@@ -654,7 +630,7 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
             sublime.status_message('no previous query to re-run')
         else:
             contexts = get_context_nodes_from_cursors(self.view)
-            nodes = get_results_for_xpath_query(history[-1], contexts, namespace_map_from_contexts(contexts), False)
+            nodes = get_results_for_xpath_query_multiple_trees(history[-1], contexts, namespace_map_from_contexts(contexts))
             total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
             if total_results == total_selections:
                 sublime.status_message(str(total_results) + ' nodes selected')
@@ -730,14 +706,14 @@ def get_context_nodes_from_cursors(view):
 class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'prefill_query': '//prefix:LocalName', 'live_mode': True })
     max_results_to_show = None
     contexts = None
-    print_contexts = None
     previous_input = None # remember previous query so that when the user next runs this command, it will be prepopulated
     
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
         context_nodes = get_context_nodes_from_cursors(self.view)
         self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
-        self.print_contexts = True
+        for root in context_nodes:
+            print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
     
     def run(self, edit, **args):
         self.cache_context_nodes()
@@ -783,8 +759,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = get_results_for_xpath_query(query, self.contexts[1], self.contexts[2], self.print_contexts)
-                self.print_contexts = False
+                results = get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])
             except Exception as e:
                 status_text = str(e)
             
@@ -849,17 +824,17 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def show_input_panel(self, initial_value):
         super().show_input_panel(initial_value)
-        self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': '/[$@:('} ])
+        self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': '/[$@:( '} ])
     
     def on_query_completions(self, prefix, locations): # moved from .sublime-completions file here - https://github.com/SublimeTextIssues/Core/issues/819
-        return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2]), sublime.INHIBIT_WORD_COMPLETIONS)
+        return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2], settings.get('variables', {})), sublime.INHIBIT_WORD_COMPLETIONS)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     def is_visible(self):
         return containsSGML(self.view)
 
-def completions_for_xpath_query(view, prefix, locations, contexts, namespaces):
+def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, variables):
     def completions_axis_specifiers():
         completions = ['ancestor', 'ancestor-or-self', 'attribute', 'child', 'descendant', 'descendant-or-self', 'following', 'following-sibling', 'namespace', 'parent', 'preceding', 'preceding-sibling', 'self']
         return [(completion + '\taxis', completion + '::') for completion in completions]
@@ -881,76 +856,111 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces):
         for key in funcs.keys():
             for completion in funcs[key]:
                 yield (completion + '\t' + key + ' functions', completion + '($1)')
-
-    
-    if view.match_selector(locations[0], 'string'): # if in a string, nothing to suggest
-        return None
     
     completions = []
     
-    variables = settings.get('variables', {})
     variables['contexts'] = None
     variable_completions = [[key + '\tvariable', key] for key in sorted(variables.keys()) if key.startswith(prefix)]
     
-    pos = locations[0] - len(prefix)
-    prev_char = view.substr(pos - 1)
+    prev_chars = []
+    positions = []
+    for location in locations:
+        if view.match_selector(location, 'string'): # if in a string, nothing to suggest
+            continue
+        pos = locations[0] - len(prefix)
+        positions.append(pos)
+        prev_char = view.substr(pos - 1)
+        if prev_char not in prev_chars:
+            prev_chars.append(prev_char)
     
-    if prev_char == '$': # if user is typing a variable
-        completions = variable_completions
-    else:
-        include_generics = True
-        if prev_char == '@': # if user is typing an attribute
-            include_generics = False
+    if len(positions) == 0:
+        return None # no locations suitable for suggestions
+    
+    include_generics = False
+    include_xpath = False
+    if len(prev_chars) == 1:
+        if prev_chars[0] == '$': # if user is typing a variable
+            completions = variable_completions
+        else:
+            include_xpath = len(locations) == 1
+            include_generics = True
+            if prev_chars[0] == '@': # if user is typing an attribute
+                include_generics = False
+    
+    if include_generics or include_xpath:
+        subqueries = parse_xpath_query_for_completions(view, positions[0])
         
-        
-        # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
-        
-        # TODO: determine where this part of the query starts, based on unmatched opening parenthesis or predicates and preceeding operators
-        subquery_start_pos = 0
-        # TODO: execute previous complete query parts, so that we have the right context nodes for the current sub-expression
-        preceeding_query_text = view.substr(sublime.Region(0, pos))
-        
-        subquery = view.substr(sublime.Region(subquery_start_pos, pos))
-        if contexts is not None:
-            # execute an xpath query to get all possible values
-            exec_query = subquery + '*[starts-with(name(), $_prefix)]'
+        if include_xpath:
+            # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
+            # execute previous complete query parts, so that we have the right context nodes for the current sub-expression
             
-            print('completions:', preceeding_query_text, exec_query, 'prefix:', prefix)
-            
-            completion_contexts = None
-            try:
-                completion_contexts = get_results_for_xpath_query(exec_query, contexts, namespaces, False, expression_contexts = [], _prefix = prefix)
-            except: # xpath query invalid, just show static contexts
-                pass
-            
-            if completion_contexts is not None:
-                for result in completion_contexts:
-                    if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
-                        ns, localname, fullname = getTagName(result)
-                        if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
-                            root = result.getroottree().getroot()
-                            namespaces = namespaces[root]
-                            fullname = next((nsprefix for nsprefix in namespaces.keys() if namespaces[nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
-                        completions.append((fullname + '\tElement', fullname))
-                    elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
-                        if prev_char == '@' or result.is_attribute:
-                            global ns_loc
-                            if not result.attrname.startswith('{' + ns_loc + '}'):
-                                completions.append((result.attrname + '\tAttribute', result.attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
-                    else: # debug, are we missing something we could suggest?
-                        completions.append((str(result) + '\t' + str(type(result)), str(result)))
+            if contexts is not None:
+                # execute an xpath query to get all possible values
+                exec_query = subqueries[-1] + '*'
+                if prefix != '':
+                    exec_query += '[starts-with(name(), $_prefix)]'
                 
-                completions = list(getUniqueItems(completions))
+                # determine if any queries can be skipped, due to using an absolute path
+                relevant_queries = 0
+                for subquery in reversed(subqueries[0:-1]):
+                    relevant_queries += 1
+                    if subquery != '' and subquery[0] in ('/', '$'):
+                        break
+                
+                start_index = len(subqueries) - relevant_queries - 1
+                subqueries = subqueries[start_index:]
+                
+                #print('XPath: completion context queries:', subqueries[0:-1], 'completion query:', exec_query, 'prefix:', prefix)
+                
+                # TODO: check all trees, not just the first one
+                tree = list(contexts.keys())[0]
+                completion_contexts = contexts[tree]
+                
+                xpath_variables = variables.copy()
+                xpath_variables['contexts'] = contexts[tree]
+                xpath_variables['expression_contexts'] = None
+                xpath_variables['_prefix'] = prefix
+                
+                for query in subqueries[0:-1] + [exec_query]:
+                    if query != '':
+                        if query[0] not in ('$', '/', '('):
+                            query = '$expression_contexts/' + query
+                        xpath_variables['expression_contexts'] = completion_contexts
+                        try:
+                            completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
+                        except Exception as e: # xpath query invalid, just show static contexts
+                            completion_contexts = None
+                            print('XPath completions error', 'query', query, 'exception', e)
+                            break
+                
+                if completion_contexts is not None:
+                    for result in completion_contexts:
+                        if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
+                            ns, localname, fullname = getTagName(result)
+                            if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
+                                root = result.getroottree().getroot()
+                                fullname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
+                            completions.append((fullname + '\tElement', fullname))
+                        elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
+                            if prev_char == '@' or result.is_attribute:
+                                global ns_loc
+                                if not result.attrname.startswith('{' + ns_loc + '}'):
+                                    completions.append((result.attrname + '\tAttribute', result.attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
+                        else: # debug, are we missing something we could suggest?
+                            #completions.append((str(result) + '\t' + str(type(result)), str(result)))
+                            pass
+                    
+                    completions = list(getUniqueItems(completions))
         
         if include_generics:
             generics = []
-            if ':' not in subquery.split('/')[-1]: # if no namespace or axis operator used in the subquery
+            if ':' not in subqueries[-1].split('/')[-1]: # if no namespace or axis operator used in the last location step of the subquery
                 generics += completions_axis_specifiers()
                 generics += completions_node_types()
-                generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
-            if subquery.strip() == '': # XPath 1.0 functions can only be used at the beginning of a sub-expression
+            if subqueries[-1].strip() == '': # XPath 1.0 functions and variables can only be used at the beginning of a sub-expression
                 generics += list(completions_functions())
+                generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
             
             completions += [completion for completion in generics if completion[0].startswith(prefix)]
-    
+        
     return completions

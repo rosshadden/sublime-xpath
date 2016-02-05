@@ -1,5 +1,6 @@
 import sublime
 from .lxml_parser import *
+from collections import defaultdict
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getNodeTagRegion(view, node, position_type):
@@ -148,3 +149,132 @@ def getElementXMLPreview(view, node, maxlen):
     preview = view.substr(sublime.Region(open_pos.begin(), close_pos.end()))
     return collapseWhitespace(preview, maxlen)
 
+def parse_xpath_query_for_completions(view, completion_position):
+    """Given a view with XPath syntax and a position where completions are desired, parse the xpath query and return the relevant sub queries."""
+    regions = []
+    pos = 0
+    prev_region = None
+    
+    # query each selector individually, so that any that are next to each other aren't combined
+    selectors = ['punctuation.separator.xpath.arguments', 'punctuation.definition.arguments.begin.xpath.subexpression', 'punctuation.definition.arguments.end.xpath.subexpression', 'punctuation.definition.arguments.begin.xpath.predicate', 'punctuation.definition.arguments.end.xpath.predicate', 'entity.name.function', 'keyword.operator']
+    selector_regions = []
+    for selector in selectors:
+        selector_regions += view.find_by_selector(selector)
+    # split by selector
+    for region in sorted(selector_regions):
+        if prev_region is not None and region.end() == prev_region.end():
+            continue
+        prev_region = region
+        if region.begin() > completion_position:
+            break
+        regions.append(sublime.Region(pos, region.begin()))
+        if region.end() > completion_position:
+            pos = region.begin()
+            break
+        regions.append(region)
+        pos = region.end()
+    regions.append(sublime.Region(pos, completion_position))
+    
+    query_parts = [(region, view.substr(region)) for region in regions if not region.empty()]
+    
+    # parse the xpath expression into a tree
+    tree = {
+        'open': '',
+        'close': '',
+        'children': [{ 'value': '' }],
+        'parent': None
+    }
+    node = tree
+    for region, part in query_parts:
+        if part[-1] in ('[', '('):  # an opening bracket increments the depth
+            child = {}
+            child['open'] = part
+            child['parent'] = node
+            child['children'] = [{ 'value': '' }]
+            node['children'].append(child)
+            node = child
+        elif part in (']', ')'): # a closing bracket decrements the depth, and moves everything in the depth above to the new depth
+            node['close'] = part
+            node = node['parent']
+            node['children'].append({ 'value': '' })
+        elif part == ',':
+            node['children'].append({ 'separator': part })
+        elif part != '*' and view.scope_name(region.begin()).strip().endswith('keyword.operator.xpath'): # TODO: support * operator correctly so that the syntax identifies it as an operator only when it isn't used as a wildcard
+            node['children'].append({ 'operator': part })
+        else:
+            if 'value' not in node['children'][-1]:
+                node['children'].append({ 'value': '' })
+            node['children'][-1]['value'] += part
+    
+    # flatten the tree where possible
+    def flatten(node, everything):
+        children = [{ 'value': '' }]
+        for child in node['children']:
+            if 'value' not in children[-1]:
+                children.append({ 'value': '' })
+            if 'open' in child:
+                if 'close' in child:
+                    children[-1]['value'] += child['open']
+                    children[-1]['value'] += flatten(child, True)[0]['value']
+                    children[-1]['value'] += child['close']
+                else:
+                    newchild = child.copy()
+                    newchild['children'] = flatten(newchild, False)
+                    del newchild['parent']
+                    children.append(newchild)
+                    #if 'value' not in newchild['children'][-1]:
+                    #    children.append({ 'value': '' })
+            else:
+                include = everything or 'value' in child
+                if include:
+                    if 'value' not in children[-1]:
+                        children.append({ 'value': '' })
+                    children[-1]['value'] += child[list(child.keys())[0]]
+                else:
+                    children.append(child)
+        return children
+    
+    flattened = { 'children': flatten(tree, True) }
+    
+    # split the rest of the tree into subqueries that should be executed on the results of the previous one
+    subqueries = {0: ''}
+    def split(node, level):
+        children = node['children']
+        # if level > 0: # we are only interested in the last child
+        #     #if 'value' in children[-1] and children[-1]['value'] == '' and len(children) > 1: # if the last child has an empty value, but there are children before it
+        #     #    children = children[0:-2] # ignore the empty value
+        #     children = [children[-1]]
+        #     if 'operator' in children[0] or 'separator' in children[0]: # ignore operators and separators
+        #         children = []
+        relevant = []
+        for child in reversed(children):
+            if 'operator' in child or 'separator' in child: # take the children from the end, until we reach an operator or a separator
+                break
+            else:
+                relevant.append(child)
+        for child in reversed(relevant):
+            if 'open' in child:
+                if 'close' not in child:
+                    level += 1
+                    subqueries.setdefault(level, '')
+                else:
+                    subqueries[level] += child['open']
+                
+                split(child, level)
+                if 'close' in child:
+                    subqueries[level] += child['close']
+            else:
+                subqueries[level] += child[list(child.keys())[0]]
+    
+    #print(tree)
+    #print(flattened)
+    split(flattened, 0)
+    #print(subqueries)
+    
+    queries = []
+    levels = sorted(subqueries.keys())
+    for key in levels:
+        subquery = subqueries[key].strip()
+        if subquery != '' or key == levels[-1]:
+            queries.append(subquery)
+    return queries
