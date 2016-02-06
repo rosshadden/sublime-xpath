@@ -74,6 +74,11 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): #sublime.active_window()
 			test_xpath_completion(' ./example[hello[world]]|/wow:', ['/wow:'])
 			test_xpath_completion('(/wsdl:definitions/wsdl:types[xs:schema])[1]/xs:schema/', ['(/wsdl:definitions/wsdl:types[xs:schema])[1]/xs:schema/'])
 			test_xpath_completion('(/wsdl:definitions/wsdl:types[xs:schema])[1]/xs:schema/* | /wsdl:definitions/', ['/wsdl:definitions/'])
+			test_xpath_completion('//*[starts-with( name(), "foobar")]/', ['//*[starts-with( name(), "foobar")]/'])
+			test_xpath_completion('//*[starts-with( name(), "foobar") or ', ['//*', ''])
+			test_xpath_completion('//*[starts-with(name(), "foobar") or ', ['//*', ''])
+			test_xpath_completion('//*[starts-with(name(), "foobar")]/', ['//*[starts-with(name(), "foobar")]/'])
+			
 		
 		lxml_parser_tests()
 		sublime_lxml_tests()
