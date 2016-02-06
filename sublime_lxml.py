@@ -148,12 +148,27 @@ def getElementXMLPreview(view, node, maxlen):
     preview = view.substr(sublime.Region(open_pos.begin(), close_pos.end()))
     return collapseWhitespace(preview, maxlen)
 
+def get_scopes(view, start_at_position, stop_at_position):
+    scopes = []
+    current_scope = None
+    for pos in range(start_at_position, stop_at_position):
+        scope = view.scope_name(pos)
+        if current_scope is None:
+            current_scope = (scope, pos, pos)
+        elif current_scope[0] == scope: # if the current scope is exactly the same, extend it
+            current_scope = (current_scope[0], current_scope[1], pos)
+        else: # store the previous scope and register new one
+            scopes.append(current_scope)
+            current_scope = (scope, pos, pos)
+    scopes.append(current_scope)
+    return scopes
+
 def parse_xpath_query_for_completions(view, completion_position):
     """Given a view with XPath syntax and a position where completions are desired, parse the xpath query and return the relevant sub queries."""
     regions = []
     pos = 0
     prev_region = None
-    
+    print(get_scopes(view, 0, completion_position))
     # query each selector individually, so that any that are next to each other aren't combined
     selectors = ['punctuation.separator.xpath.arguments', 'punctuation.definition.arguments.begin.xpath.subexpression', 'punctuation.definition.arguments.end.xpath.subexpression', 'punctuation.definition.arguments.begin.xpath.predicate', 'punctuation.definition.arguments.end.xpath.predicate', 'entity.name.function', 'keyword.operator']
     selector_regions = []
