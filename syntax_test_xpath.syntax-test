@@ -51,3 +51,13 @@
 
  )]
 #^^ invalid.illegal.stray-bracket-end
+
+/ @ hello/ text () / ancestor :: test :*
+# ^ keyword.control.flow.xpath
+#   ^^^^^ keyword.control.flow.xpath
+#          ^^^^ storage.type.xpath.node_type
+#               ^^ storage.type.xpath.node_type
+#                    ^^^^^^^^ constant.language.xpath.axis_name
+#                             ^^ constant.language.xpath.axis_name
+#                                ^^^^ variable.parameter.xpath
+#                                     ^^ variable.parameter.xpath

@@ -4,80 +4,76 @@ name: XPath 1.0
 scope: query.xml.xpath # http://www.w3.org/TR/xpath/
 variables:
   QName: '(?![\d.\-])[\w.\-]+'
+  Prefix: '(?:{{QName}}\s*:)?'
+  NCName: '{{Prefix}}(?:{{QName}}|\*)'
 contexts: # NOTE: these scope names don't represent what they should, they are set for best syntax highlighting
   main: # TODO: obey 3.7 Lexical Structure rules
-    - match: '/'
+    - match: '/{1,2}'
       scope: punctuation.separator.xpath.location_step
     - match: ','
       scope: punctuation.separator.xpath.arguments
-    - match: '@({{QName}})?|(?<!\.)\.(?!\d)\.?(?!\.)'
-      scope: keyword.control.flow.xpath # AxisStep | AxisSpecifier
+    - match: '(?<!\.)\.(?!\d)\.?(?!\.)'
+      scope: keyword.control.flow.xpath # AxisStep
     - match: '\['
-      captures:
-        0: punctuation.definition.arguments.begin.xpath.predicate comment
+      scope: punctuation.definition.arguments.begin.xpath.predicate comment
       push:
         - meta_scope: xpath.predicate
         - match: '\]'
-          captures:
-            0: punctuation.definition.arguments.end.xpath.predicate comment
+          scope: punctuation.definition.arguments.end.xpath.predicate comment
           pop: true
         - include: main
     - match: '\]'
       scope: invalid.illegal.stray-bracket-end
     - match: '\('
-      captures:
-        0: punctuation.definition.arguments.begin.xpath.subexpression comment
+      scope: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
         - meta_scope: meta.block.query.xpath
         - match: '\)'
-          captures:
-            0: punctuation.definition.arguments.end.xpath.subexpression comment
+          scope: punctuation.definition.arguments.end.xpath.subexpression comment
           pop: true
         - include: main
     - match: '\)'
       scope: invalid.illegal.stray-bracket-end
-    - match: '\b(comment|text|processing-instruction|node)\(\)'
+    - match: '@\s*(?:{{NCName}})?'
+      scope: keyword.control.flow.xpath # Attribute
+    - match: '(comment|text|processing-instruction|node)\s*\(\)'
       scope: storage.type.xpath.node_type # NodeType
     - match: '\b(?:and|or|mod|div)\b|\*|\||\+|-|!?=|<=?|>=?'
       scope: keyword.operator.xpath # Operator
-    - match: '\b(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)::'
+    - match: '(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::'
       scope: constant.language.xpath.axis_name # AxisName
     - match: '"'
-      captures:
-        0: punctuation.definition.string.begin.xpath
+      scope: punctuation.definition.string.begin.xpath
       push:
         - meta_scope: string.quoted.double.xpath # Literal
         - match: '"'
-          captures:
-            0: punctuation.definition.string.end.xpath
+          scope: punctuation.definition.string.end.xpath
           pop: true
     - match: "'"
-      captures:
-        0: punctuation.definition.string.begin.xpath
+      scope: punctuation.definition.string.begin.xpath
       push:
         - meta_scope: string.quoted.single.xpath # Literal
         - match: "'"
           captures:
             0: punctuation.definition.string.end.xpath
           pop: true
-    - match: '\b(?:\d*\.\d+|\d+)\b'
+    - match: '\d*\.\d+|\d+'
       scope: constant.numeric.xpath # Number
     - match: '\s+'
       scope: white_space.xpath # ExprWhitespace
-    - match: '\$({{QName}}\b)?'
+    - match: '\$({{QName}})?'
       scope: entity.name.variable.xpath support.function.builtin.xpath.variable # VariableReference
-    - match: '\b{{QName}}(?::{{QName}})?(\()'
+    - match: '({{Prefix}}{{QName}})\s*(\()'
       captures:
         0: entity.name.function.xpath # NameTest
-        1: punctuation.definition.arguments.begin.xpath.subexpression comment
+        2: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
         - meta_scope: meta.function-call.xpath
         - match: '\)'
-          captures:
-            0: punctuation.definition.arguments.end.xpath.subexpression comment
+          scope: punctuation.definition.arguments.end.xpath.subexpression comment
           pop: true
         - include: main
-    - match: '\b(?:\*|{{QName}}(?::{{QName}})?)\b'
+    - match: '{{NCName}}'
       scope: variable.parameter.xpath # NameTest
     
   
