@@ -160,7 +160,8 @@ def get_scopes(view, start_at_position, stop_at_position):
         else: # store the previous scope and register new one
             scopes.append(current_scope)
             current_scope = (scope, pos, pos)
-    scopes.append(current_scope)
+    if current_scope is not None:
+        scopes.append(current_scope)
     return scopes
 
 def parse_xpath_query_for_completions(view, completion_position):
