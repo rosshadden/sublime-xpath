@@ -77,6 +77,8 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): #sublime.active_window()
 			test_xpath_completion('//*[starts-with( name(), "foobar")]/', ['//*[starts-with( name(), "foobar")]/'])
 			test_xpath_completion('//*[starts-with( name(), "foobar") or ', ['//*', ''])
 			test_xpath_completion('//*[starts-with(name(), "foobar") or ', ['//*', ''])
+			test_xpath_completion('/and/', ['/and/'])
+			#test_xpath_completion('and/', ['and/'])
 			test_xpath_completion('//*[starts-with(name(), "foobar")]/', ['//*[starts-with(name(), "foobar")]/'])
 			
 		

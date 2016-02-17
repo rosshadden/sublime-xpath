@@ -6,14 +6,17 @@ variables:
   QName: '(?![\d.\-])[\w.\-]+'
   Prefix: '(?:{{QName}}\s*:)?'
   NCName: '{{Prefix}}(?:{{QName}}|\*)'
+  Attribute: '@\s*(?:{{NCName}})?'
 contexts: # NOTE: these scope names don't represent what they should, they are set for best syntax highlighting
   main: # TODO: obey 3.7 Lexical Structure rules
-    - match: '/{1,2}'
-      scope: punctuation.separator.xpath.location_step
-    - match: ','
-      scope: punctuation.separator.xpath.arguments
+    - match: '(/{1,2})\s*(\*)?'
+      captures:
+        1: punctuation.separator.xpath.location_step
+        2: variable.parameter.xpath # NameTest
     - match: '(?<!\.)\.(?!\d)\.?(?!\.)'
       scope: keyword.control.flow.xpath # AxisStep
+    - match: '\]|\)'
+      scope: invalid.illegal.stray-bracket-end
     - match: '\['
       scope: punctuation.definition.arguments.begin.xpath.predicate comment
       push:
@@ -22,8 +25,6 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
           scope: punctuation.definition.arguments.end.xpath.predicate comment
           pop: true
         - include: main
-    - match: '\]'
-      scope: invalid.illegal.stray-bracket-end
     - match: '\('
       scope: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
@@ -32,16 +33,17 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
           scope: punctuation.definition.arguments.end.xpath.subexpression comment
           pop: true
         - include: main
-    - match: '\)'
-      scope: invalid.illegal.stray-bracket-end
-    - match: '@\s*(?:{{NCName}})?'
+    - match: '{{Attribute}}'
       scope: keyword.control.flow.xpath # Attribute
     - match: '(comment|text|processing-instruction|node)\s*\(\)'
       scope: storage.type.xpath.node_type # NodeType
-    - match: '\b(?:and|or|mod|div)\b|\*|\||\+|-|!?=|<=?|>=?'
+    - match: '(?:\b(?<!/)|(?<=\d))(?:and|or|mod|div)(?:\b|(?=\d))|\*|\||\+|-|!?=|<=?|>=?'
       scope: keyword.operator.xpath # Operator
-    - match: '(?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::'
-      scope: constant.language.xpath.axis_name # AxisName
+    - match: '((?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::)\s*(?:({{NCName}})?|({{Attribute}})?)'
+      captures:
+        1: constant.language.xpath.axis_name # AxisName
+        2: variable.parameter.xpath # NameTest
+        3: keyword.control.flow.xpath # Attribute
     - match: '"'
       scope: punctuation.definition.string.begin.xpath
       push:
@@ -72,6 +74,8 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
         - match: '\)'
           scope: punctuation.definition.arguments.end.xpath.subexpression comment
           pop: true
+        - match: ','
+          scope: punctuation.separator.xpath.arguments
         - include: main
     - match: '{{NCName}}'
       scope: variable.parameter.xpath # NameTest

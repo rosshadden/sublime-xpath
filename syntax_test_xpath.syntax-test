@@ -5,7 +5,7 @@
 #        ^ punctuation.separator.xpath.location_step
 #         ^^^^^^^^^^^ variable.parameter.xpath
 #                     ^^^^^^^ constant.language.xpath.axis_name
-#                            ^ keyword.operator.xpath
+#                            ^ variable.parameter.xpath
 #                             ^ xpath.predicate punctuation.definition.arguments.begin.xpath.predicate
 #                              ^^^^^^^^^ meta.function-call.xpath entity.name.function.xpath
 #                                      ^ punctuation.definition.arguments.begin.xpath.subexpression comment
@@ -61,3 +61,18 @@
 #                             ^^ constant.language.xpath.axis_name
 #                                ^^^^ variable.parameter.xpath
 #                                     ^^ variable.parameter.xpath
+
+1 *2
+# <- constant.numeric.xpath
+#^ white_space.xpath
+# ^ keyword.operator.xpath
+#  ^ constant.numeric.xpath
+
+5mod2
+# <- constant.numeric.xpath
+#^^^ keyword.operator.xpath
+#   ^ constant.numeric.xpath
+
+/and/ *
+#^^^ variable.parameter.xpath
+#     ^ variable.parameter.xpath
