@@ -166,36 +166,24 @@ def get_scopes(view, start_at_position, stop_at_position):
 
 def parse_xpath_query_for_completions(view, completion_position):
     """Given a view with XPath syntax and a position where completions are desired, parse the xpath query and return the relevant sub queries."""
-    regions = []
-    pos = 0
-    prev_region = None
-    print(get_scopes(view, 0, completion_position))
-    # query each selector individually, so that any that are next to each other aren't combined
-    selectors = ['punctuation.separator.xpath.arguments', 'punctuation.definition.arguments.begin.xpath.subexpression', 'punctuation.definition.arguments.end.xpath.subexpression', 'punctuation.definition.arguments.begin.xpath.predicate', 'punctuation.definition.arguments.end.xpath.predicate', 'entity.name.function', 'keyword.operator']
+    
+    selectors = ['punctuation.separator.xpath.arguments', 'punctuation.definition.arguments.begin.xpath.subexpression', 'punctuation.definition.arguments.end.xpath.subexpression', 'punctuation.definition.arguments.begin.xpath.predicate', 'punctuation.definition.arguments.end.xpath.predicate', 'entity.name.function.xpath', 'keyword.operator']
     selector_regions = []
-    for selector in selectors:
-        selector_regions += view.find_by_selector(selector)
-    # split by selector
-    for region in sorted(selector_regions):
-        if prev_region is not None and region.end() == prev_region.end():
-            continue
-        prev_region = region
-        if region.begin() > completion_position:
-            break
-        regions.append(sublime.Region(pos, region.begin()))
-        if region.end() > completion_position:
-            pos = region.begin()
-            break
-        if view.match_selector(region.begin(), 'punctuation.definition.arguments.end') and region.size() > 1: # sometimes we get consecutive instances of the same character and the find_by_selector lumps them into one region rather than separate ones
-            for i in range(region.begin(), region.end()): # split the characters into separate regions
-                regions.append(sublime.Region(i, i + 1))
-        else:
-            regions.append(region)
-        pos = region.end()
-    regions.append(sublime.Region(pos, completion_position))
+    pos = 0
+    for scope in get_scopes(view, 0, completion_position):
+        for selector in selectors:
+            if selector in scope[0]:
+                if scope[0].endswith('entity.name.function.xpath punctuation.definition.arguments.begin.xpath.subexpression comment '): # combine the function name with the open parenthesis
+                    selector_regions[-1] = (scope[0], sublime.Region(selector_regions[-1][1].begin(), scope[2] + 1))
+                else:
+                    selector_regions.append((None, sublime.Region(pos, scope[1])))
+                    selector_regions.append((scope[0], sublime.Region(scope[1], scope[2] + 1)))
+                pos = scope[2] + 1
+                break
+    selector_regions.append((None, sublime.Region(pos, completion_position)))
     
-    query_parts = [(region, view.substr(region)) for region in regions if not region.empty()]
-    
+    query_parts = [(selector_region[0], selector_region[1], view.substr(selector_region[1])) for selector_region in selector_regions if not selector_region[1].empty()]
+    #print(query_parts)
     # parse the xpath expression into a tree
     tree = {
         'open': '',
@@ -204,7 +192,7 @@ def parse_xpath_query_for_completions(view, completion_position):
         'parent': None
     }
     node = tree
-    for region, part in query_parts:
+    for scope, region, part in query_parts:
         if part[-1] in ('[', '('):  # an opening bracket increments the depth
             child = {}
             child['open'] = part
@@ -218,7 +206,7 @@ def parse_xpath_query_for_completions(view, completion_position):
             node['children'].append({ 'value': '' })
         elif part == ',':
             node['children'].append({ 'separator': part })
-        elif part != '*' and view.scope_name(region.begin()).strip().endswith('keyword.operator.xpath'): # TODO: support * operator correctly so that the syntax identifies it as an operator only when it isn't used as a wildcard
+        elif scope is not None and scope.endswith('keyword.operator.xpath '):
             node['children'].append({ 'operator': part })
         else:
             if 'value' not in node['children'][-1]:
