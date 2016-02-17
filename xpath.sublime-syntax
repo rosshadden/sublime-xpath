@@ -35,7 +35,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
         - include: main
     - match: '{{Attribute}}'
       scope: keyword.control.flow.xpath # Attribute
-    - match: '(comment|text|processing-instruction|node)\s*\(\)'
+    - match: '(comment|text|processing-instruction|node)\s*\(\s*\)'
       scope: storage.type.xpath.node_type # NodeType
     - match: '(?:\b(?<!/)|(?<=\d))(?:and|or|mod|div)(?:\b|(?=\d))|\*|\||\+|-|!?=|<=?|>=?'
       scope: keyword.operator.xpath # Operator
