@@ -36,13 +36,21 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `normalize_whitespace_in_preview` - whether or not to normalize whitespace for text results in the preview.  Defaults to `false`, because there are situations when it is important to see exact results.
 - `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
 
-<a name="autocomplete_demo" />
+<a name="autocomplete_demo"></a>
 ## Demonstration
-![Sublime XPath plugin in action](https://cloud.githubusercontent.com/assets/11882719/12841929/245cdbd4-cbf8-11e5-8da0-26119e5213ab.gif "A demonstration of the Sublime XPath plugin, with it's intelligent auto completion")
+Autocompletion in action
+![Autocompletion in action](https://cloud.githubusercontent.com/assets/11882719/12841929/245cdbd4-cbf8-11e5-8da0-26119e5213ab.gif "A demonstration of the Sublime XPath plugin, with it's intelligent auto completion")
 
 ## Potential future improvements:
 
+Feature requests, bug reports/fixes and usability suggestions are always welcome.
+
+In no particular order, here are some ideas of how this plugin could be made even more awesome:
+- Improve syntax highlighting (and therefore also auto completion) accuracy.
 - Optimize writes, especially non-structure-altering changes.
+- Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
+- Allow defining custom XPath functions in the sublime-settings file.
+- Option to disable auto completion completely, or just the intelligent part of auto completion.
 
 ## Contributors
 
