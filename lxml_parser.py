@@ -68,7 +68,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             nsmap = []
             attrmap = []
             for attr_name, attr_value in attrs.items():
-                if attr_name[0] == None: # if there is no namespace URI associated with the attribute already
+                if attr_name[0] is None: # if there is no namespace URI associated with the attribute already
                     if attr_name[1].startswith('xmlns:'): # map the prefix to the namespace URI
                         nsmap.append((attr_name, attr_name[1][len('xmlns:'):], attr_value))
                     elif attr_name[1] == 'xmlns': # map the default namespace URI
@@ -195,7 +195,7 @@ def getRelativeNode(relative_to, direction):
         generator = return_specific(relative_to.getparent())
     
     if generator is None:
-        raise exceptions.StandardError('Unknown direction "' + direction + '"')
+        raise ValueError('Unknown direction "' + direction + '"')
     else:
         return next(generator, None)
 

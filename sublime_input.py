@@ -34,7 +34,7 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
     def set_args(self, **args):
         self.arguments = args or {}
     
-    def parse_args(self):    
+    def parse_args(self):
         self.live_mode = self.get_value_from_args('live_mode', True)
     
     def get_value_from_args(self, key, default):
@@ -96,6 +96,7 @@ class InputCompletionsListener(sublime_plugin.EventListener):
         global on_query_completions_callbacks
         if view.id() in on_query_completions_callbacks.keys():
             return on_query_completions_callbacks[view.id()](prefix, locations)
+    
     def on_pre_close(self, view):
         global on_query_completions_callbacks
         on_query_completions_callbacks.pop(view.id(), None) # remove callback if present

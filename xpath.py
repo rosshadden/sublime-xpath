@@ -119,9 +119,11 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         view.sel().add(point)
         
         view.show_at_center(point)
+    
     def is_enabled(self, **args):
         global parse_error
         return containsSGML(self.view) and self.view.get_status('xpath_error').startswith(parse_error)
+    
     def is_visible(self, **args):
         return containsSGML(self.view)
 
@@ -192,7 +194,7 @@ def getXPathOfNodes(nodes, args):
                         if not case_sensitive:
                             attr_name = attr_name.lower()
                         attr = attr_name.split(':')
-                        include_attribute = attr_name in wanted_attributes 
+                        include_attribute = attr_name in wanted_attributes
                         if not include_attribue and len(attr) == 2:
                             include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
                     
@@ -314,8 +316,10 @@ class CopyXpathCommand(sublime_plugin.TextCommand): # example usage from python 
         view = self.view
         
         copyXPathsToClipboard(view, args)
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
+    
     def is_visible(self, **args):
         return containsSGML(self.view)
 
@@ -360,8 +364,10 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
+    
     def is_visible(self):
         return containsSGML(self.view)
+    
     def description(self, args):
         if args['direction'] in ('open', 'close'):
             descr = 'tag'
@@ -393,11 +399,14 @@ def getUniqueItems(items):
 class XpathListener(sublime_plugin.EventListener):
     def on_selection_modified_async(self, view):
         updateStatusToCurrentXPathIfSGML(view)
+    
     def on_activated_async(self, view):
         updateStatusToCurrentXPathIfSGML(view)
+    
     def on_post_save_async(self, view):
         if getBoolValueFromArgsOrSettings('only_show_xpath_if_saved', None, False):
             updateStatusToCurrentXPathIfSGML(view)
+    
     def on_pre_close(self, view):
         global change_counters
         global xml_roots
@@ -480,7 +489,7 @@ def register_xpath_extensions():
     # abs
     # ? adjust-dateTime-to-timezone, current-dateTime, day-from-dateTime, month-from-dateTime, days-from-duration, months-from-duration, etc.
     # insert-before, remove, subsequence, index-of, distinct-values, reverse, unordered, empty, exists
-    # 
+    
 
 def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
@@ -576,6 +585,7 @@ def get_history_key_for_view(view):
 
 class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
     history = None
+    
     def run(self, edit, **args):
         global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
         
@@ -588,15 +598,19 @@ class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
             sublime.status_message('no query history to show')
         else:
             self.view.window().show_quick_panel(self.history, self.history_selection_done, 0, len(self.history) - 1, self.history_selection_changed)
+    
     def history_selection_done(self, selected_index):
         if selected_index > -1:
             #add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.history[selected_index])
             sublime.active_window().active_view().run_command('query_xpath', { 'prefill_path_at_cursor': False, 'prefill_query': self.history[selected_index] })
+    
     def history_selection_changed(self, selected_index):
         if not getBoolValueFromArgsOrSettings('live_mode', None, True):
             self.history_selection_done(selected_index)
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
+    
     def is_visible(self):
         return containsSGML(self.view)
 
@@ -639,8 +653,10 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
                 sublime.status_message(str(total_results) + ' nodes selected')
             else:
                 sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
+    
     def is_visible(self):
         return containsSGML(self.view)
 
@@ -670,8 +686,10 @@ class CleanTagSoupCommand(sublime_plugin.TextCommand):
         
         self.view.erase_status('xpath_clean')
         sublime.status_message('Tag soup cleaned successfully.')
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
+    
     def is_visible(self):
         return containsSGML(self.view)
 
@@ -804,6 +822,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         muliple_types_in_result = next(unique_types_in_result, None) is not None
         
         show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
+        
         def show_preview(item):
             if isinstance(item, etree._Element):
                 return show_element_preview(item)
@@ -839,6 +858,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
+    
     def is_visible(self):
         return containsSGML(self.view)
 

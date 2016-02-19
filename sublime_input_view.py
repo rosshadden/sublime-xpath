@@ -1,4 +1,3 @@
-import sublime
 import sublime_plugin
 from .sublime_input import RequestInputCommand
 
@@ -69,6 +68,7 @@ class InputViewListener(sublime_plugin.EventListener):
         global on_activation_callbacks
         for callback in on_activation_callbacks.values():
             callback(view)
+    
     def on_pre_close(self, view):
         global on_activation_callbacks
         callback = on_activation_callbacks.pop(view.id(), None) # remove callback if present

@@ -98,6 +98,7 @@ class QuickPanelInputViewListener(sublime_plugin.EventListener):
         global on_modified_callbacks
         for callback in on_modified_callbacks.values():
             callback(view)
+    
     def on_pre_close(self, view):
         global on_modified_callbacks
         on_modified_callbacks.pop(view.id(), None) # remove callback if present

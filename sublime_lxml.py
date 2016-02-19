@@ -245,6 +245,7 @@ def parse_xpath_query_for_completions(view, completion_position):
     
     # split the rest of the tree into subqueries that should be executed on the results of the previous one
     subqueries = {0: ''}
+    
     def split(node, level):
         children = node['children']
         relevant = []
