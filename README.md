@@ -4,19 +4,20 @@ Sublime Text - XPath Plugin
 ## Features:
 
 - Updates status bar text to XPath of first selection.
-- Copy XPath at cursor(s) to clipboard.
+- [Copy XPath at cursor(s) to clipboard.](#copy_xpath_demo)
 - Jump selection to relative tag - previous or next sibling, parent, open or close tag. It is also possible to select the entire tag contents, optionally including the tag itself.  This works for multiple selections as well, of course.
 - Query XML and (X)HTML documents by XPath 1.0 expression.
   - with syntax highlighting and [intelligent auto-completion](#autocomplete_demo).
   - with a custom `print` function that can be used as a debugging aid by logging nodesets etc. to the console.
   - display results in real-time (i.e. as you type the query, fitting in perfectly with Sublime's other actions). (With an option to customize this, if desired.)
-  - reference multiple context nodes (at cursor positions) by using the `$contexts` variable.
-  - Re-run the previous query and select the corresponding nodes in the document. (Note that it doesn't preserve the context nodes at the moment.)
+  - [move the cursor to the highlighted result.](#cursor_to_highlighted_result_demo)
+  - [reference multiple context nodes](#multiple_contexts_demo) (at cursor positions) by using the `$contexts` variable.
+  - [Re-run the previous query and select all the corresponding nodes in the document.](#select_all_results_demo) (Note that it doesn't preserve the context nodes at the moment.)
   - with history, optionally globally or per document.
   - optionally normalize whitespace when displaying text results (via a setting).
   - define custom variables in the settings file.
 - Show XML well-formedness parse errors, and move the cursor to the location where the error occurred.
-- Tidy HTML or "tag soup" into valid XML.
+- [Tidy HTML or "tag soup" into valid XML.](#clean_tag_soup_demo)
 
 ## Settings:
 
@@ -36,10 +37,26 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `normalize_whitespace_in_preview` - whether or not to normalize whitespace for text results in the preview.  Defaults to `false`, because there are situations when it is important to see exact results.
 - `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
 
+<a name="demos"></a>
+## Demonstrations
 <a name="autocomplete_demo"></a>
-## Demonstration
-Autocompletion in action
+- Autocompletion in action
 ![Autocompletion in action](https://cloud.githubusercontent.com/assets/11882719/12841929/245cdbd4-cbf8-11e5-8da0-26119e5213ab.gif "A demonstration of the Sublime XPath plugin, with it's intelligent auto completion")
+<a name="cursor_to_highlighted_result_demo"></a>
+- Move cursor to a single highlighted result
+![Move cursor to result](https://cloud.githubusercontent.com/assets/11882719/13141364/9d22053e-d63f-11e5-853a-3d2089e81664.gif "A demonstration of the Sublime XPath plugin, moving the cursor to the highlighted result")
+<a name="select_all_results_demo"></a>
+- Example usage of selecting all the results of the previous XPath query
+![Move cursor](https://cloud.githubusercontent.com/assets/11882719/13170898/4c3f511c-d6f8-11e5-98bd-9eeac5f71b13.gif "A demonstration of the Sublime XPath plugin, with it's cursor movement/selection helpers")
+<a name="copy_xpath_demo"></a>
+- Copying the XPath(s) of the node(s) under the cursor(s) to the clipboard
+![Copy XPath to clipboard](https://cloud.githubusercontent.com/assets/11882719/13170773/2dee3008-d6f7-11e5-9b93-b1c5da70cd5b.gif "A demonstration of the Sublime XPath plugin, copying the XPaths at the cursors to the clipboard")
+<a name="multiple_contexts_demo"></a>
+- Working with multiple context nodes
+![Multiple context nodes](https://cloud.githubusercontent.com/assets/11882719/13171045/3053e99e-d6f9-11e5-8f58-2a8cb2d7e131.gif "A demonstration of the Sublime XPath plugin, working with multiple context nodes")
+<a name="clean_tag_soup_demo"></a>
+- Clean badly formed HTML / tag soup
+![Clean tag soup](https://cloud.githubusercontent.com/assets/11882719/13172607/a4e74172-d701-11e5-9ff2-0aa7b9f56799.gif "A demonstration of the Sublime XPath plugin, cleaning bad HTML tag soup so that it can be queried")
 
 ## Potential future improvements:
 
