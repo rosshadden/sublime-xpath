@@ -97,7 +97,10 @@ def ensureTreeCacheIsCurrent(view):
         
         xml_roots[view.id()] = []
         for tree, namespaces in buildTreesForView(view):
-            xml_roots[view.id()].append(tree.getroot())
+            root = None
+            if tree is not None:
+                root = tree.getroot()
+            xml_roots[view.id()].append(root)
         
         view.erase_status('xpath')
         global previous_first_selection
@@ -685,22 +688,25 @@ def get_context_nodes_from_cursors(view):
         regions_cursors.setdefault(result[1], []).append(result[2])
     
     if len(invalid_trees) > 0:
-        invalid_trees = [region_scope for region_scope in invalid_trees if view.match_selector(region_scope.begin(), 'text.html') and not view.match_selector(region_scope.begin(), 'text.html.markdown')]
+        invalid_trees = [region_scope for region_scope in invalid_trees if view.match_selector(region_scope.begin(), 'text.html - text.html.markdown')]
         if len(invalid_trees) > 0:
             print('XPath: Asking about cleaning HTML for view', 'id', view.id(), 'file_name', view.file_name(), 'regions', invalid_trees)
             if sublime.ok_cancel_dialog('XPath: The HTML is not well formed, and cannot be parsed by the XML parser. Would you like it to be cleaned?', 'Yes'):
                 view.run_command('clean_tag_soup', { 'regions': [(region.begin(), region.end()) for region in invalid_trees] })
-                trees = ensureTreeCacheIsCurrent(view)
+                roots = ensureTreeCacheIsCurrent(view)
                 updateStatusToCurrentXPathIfSGML(view)
-    
-    # TODO: show error if any of the XML regions containing the cursor is invalid?
+                invalid_trees = []
     
     contexts = {}
-    for region_index in regions_cursors.keys():
-        root = roots[region_index]
-        if root is not None:
-            contexts[root.getroottree()] = [item[0] for item in getNodesAtPositions(view, [root], regions_cursors[region_index])]
     
+    if len(invalid_trees) > 0: # show error if any of the XML regions containing the cursor is invalid
+        sublime.error_message('The XML cannot be parsed, therefore it is not currently possible to execute XPath queries on the document.  Please see the status bar for parsing errors.')
+    else:
+        for region_index in regions_cursors.keys():
+            root = roots[region_index]
+            if root is not None:
+                contexts[root.getroottree()] = [item[0] for item in getNodesAtPositions(view, [root], regions_cursors[region_index])]
+        
     return contexts
 
 class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'prefill_query': '//prefix:LocalName', 'live_mode': True })
@@ -717,6 +723,8 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def run(self, edit, **args):
         self.cache_context_nodes()
+        if len(self.contexts[1].keys()) == 0: # if there are no context nodes, don't proceed to show the xpath input panel
+            return
         super().run(edit, **args)
     
     def parse_args(self):
