@@ -216,9 +216,6 @@ def getXPathOfNodes(nodes, args):
     def getNodePath(node, namespaces, root):
         return '/'.join(reversed(list(getNodePathSegments(node, namespaces, root))))
     
-    
-    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-    
     roots = {}
     for node in nodes:
         tree = node.getroottree()

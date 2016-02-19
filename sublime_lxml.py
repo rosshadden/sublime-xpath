@@ -61,7 +61,7 @@ def getNodesAtPositions(view, roots, positions):
         return (matches, start_index, max_index)
     
     def getMatches(node, next_match_index, max_index, final_matches):
-        """Check the node and it's children for all matches within the specified range.""" 
+        """Check the node and it's children for all matches within the specified range."""
         spans = getNodePositions(view, node)
         
         found_match_at_last_expected_position_in_node = False
