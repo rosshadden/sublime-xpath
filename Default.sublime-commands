@@ -1,19 +1,19 @@
 [
 	{
 		"caption": "XPath: Copy exact path to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": false }
 	}, {
 		"caption": "XPath: Copy hierarchy without attributes to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": true, "show_attributes_in_hierarchy": false }
 	}, {
 		"caption": "XPath: Copy hierarchy with attributes to clipboard",
-		"command": "xpath",
+		"command": "copy_xpath",
 		"args":	{ "show_hierarchy_only": true, "show_attributes_in_hierarchy": true }
 	}, {
 		"caption": "XPath: Goto previous sibling",
-		"command": "goto_relative", "args": { "direction": "prev" }
+		"command": "goto_relative", "args": { "direction": "previous" }
 	}, {
 		"caption": "XPath: Goto next sibling",
 		"command": "goto_relative", "args": { "direction": "next" }
@@ -26,5 +26,29 @@
 	}, {
 		"caption": "XPath: Goto close tag",
 		"command": "goto_relative", "args": { "direction": "close" }
+	}, {
+		"caption": "XPath: Goto open and close tag",
+		"command": "goto_relative", "args": { "direction": "names" }
+	}, {
+		"caption": "XPath: Goto content",
+		"command": "goto_relative", "args": { "direction": "content" }
+	}, {
+		"caption": "XPath: Select entire element",
+		"command": "goto_relative", "args": { "direction": "entire" }
+	}, {
+		"caption": "XPath: Query document",
+		"command": "query_xpath"
+	}, {
+		"caption": "XPath: Goto XML parse error",
+		"command": "goto_xml_parse_error"
+	}, {
+		"caption": "XPath: Show query history",
+		"command": "show_xpath_query_history"
+	}, {
+		"caption": "XPath: Re-run last query and select all results",
+		"command": "rerun_last_xpath_query_and_select_results"
+	}, {
+		"caption": "XPath: Clean tag soup",
+		"command": "clean_tag_soup"
 	}
 ]

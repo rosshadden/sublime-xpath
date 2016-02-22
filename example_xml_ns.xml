@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<test>
+	<hello xmlns="hello_ns">
+		<!-- from an element name standpoint, you could expect this element to be reachable by the path "/test/hello".
+		However, XPath 1.0 does not have the concept of a default namespace. If the XML document being queried defines a default namespace, the XPath expression should map the namespace to a prefix for easier access.
+		This is what this plugin does for you. Because this is the first prefix-less namespace declared in document order, it will become "default", assuming "default" is set as the default namespace prefix to use.
+		But, because there is at least one other prefix-less namespace in the document - which resolves to a different uri - it will become "default1" instead. -->
+		
+		<!-- The scope of a default namespace declaration extends from the beginning of the start-tag in which it appears to the end of the corresponding end-tag, excluding the scope of any inner default namespace declarations. -->
+		<world xmlns="world_ns"><!-- second prefix-less namespace in doc order, becomes "default2" -->
+			<example /><!-- path here is "/test/default1:hello/default2:world/default2:example" -->
+		</world>
+	</hello>
+	<more xmlns="more_ns" xmlns:an="another_ns"><!-- third prefix-less namespace in doc order, becomes "default3".  First "an" prefix declared in doc-order.  Because there is more than one unique namespace uri declared with this prefix, it will become "an1" for query purposes. -->
+		<an:another></an:another><!-- path here is "/test/default3:more[1]/an1:another" -->
+	</more>
+	<more xmlns="more_ns" xmlns:an="yet_another_ns" xmlns:unique="single"><!-- this prefixless namespace has the same uri as one already used, "default3", so this is also "default3". Because the an prefix is being declared again to a different uri than the previous one, it becomes "an2". As the "unique" prefix is unique, it remains as "unique", with no numeric suffix. -->
+		<an:yet_another></an:yet_another><!-- path here is "/test/default3:more[2]/an2:yet_another" -->
+		<unique:example></unique:example><!-- path here is "/test/default3:more[2]/unique:example" -->
+	</more>
+	<foo xmlns="world_ns" /><!-- same uri as default2 used, path is therefore "/test/default2:foo" -->
+	<numeric xmlns:an="yans"><!-- this one becomes "an4", because "an" has been used twice already and "an3" is explicitly defined later in the document -->
+		<an:test /><!-- /test/numeric/an4:test -->
+	</numeric>
+	<numeric xmlns:an3="numbered_ns"><!-- specific namespace prefix with a numeric suffix declared -->
+		<an3:okay></an3:okay>
+	</numeric>
+	<text>sample text<more /> lorem ipsum etc.</text>
+</test>

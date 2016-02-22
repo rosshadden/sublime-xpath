@@ -8,12 +8,30 @@
 	],
 	// ignore the above and include all the attributes in the xpath
 	"show_all_attributes": false,
-	// whether tags and attributes should be treated as case sensitive for index purposes
+	// whether tags and attributes should be treated as case sensitive for path index purposes - doesn't affect xpath queries
 	"case_sensitive": true,
 	// show only the hierarchy (without indexes) in the status bar
 	"show_hierarchy_only": false,
 	// when in hierarchy mode, whether to include attributes or not
 	"show_attributes_in_hierarchy": false,
 	// only copy unique xpaths when there are multiple selections
-	"copy_unique_path_only": true
+	"copy_unique_path_only": true,
+	// query xpath in live mode
+	"live_mode": true,
+	// default namespace prefix for xpath query when elements have xmlns attribute set
+	"default_namespace_prefix": "default",
+	// whether or not to show the namespace prefix that the xpath query will expect
+	"show_namespace_prefixes_from_query": false,
+	// whether or not to only show the current xpath in the status bar if the view is not dirty. Useful to save CPU cycles when editing a document
+	"only_show_xpath_if_saved": false,
+	// only show the first x number of results from the xpath query, to speed up result display. Set to <= 0 for no limit
+	"max_results_to_show": 1000,
+	// if you never want to it to remember the most recent query used (you can still get to it by explicitly using the history list), but want it to prefill the path with the path of the node under the first cursor, set this to true
+	"prefill_path_at_cursor": false,
+	// whether or not you want the plugin to show query history for all files, as opposed to only the current file.  Note that query history for documents with no filename will not be preserved after Sublime restart if this setting is false
+	"global_query_history": true,
+	// the maximum number of (non-unique) xpath queries to retain in history.  Note that the history can be manually manipulated at any time in the xpath_query_history.sublime-settings file
+	"max_query_history": 100,
+	// whether or not to normalize whitespace when showing the text results of an xpath query
+	"normalize_whitespace_in_preview": false
 }
