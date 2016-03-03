@@ -567,11 +567,14 @@ def change_key_for_xpath_query_history(oldkey, newkey):
     """For all items in the history with the given oldkey, change the key to the specified newkey."""
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
     history = history_settings.get('history', [])
+    items_changed = 0
     for item in history:
         if item[1] == oldkey:
             item[1] = newkey
-    history_settings.set('history', history)
-    sublime.save_settings('xpath_query_history.sublime-settings')
+            items_changed += 1
+    if items_changed > 0:
+        history_settings.set('history', history)
+        sublime.save_settings('xpath_query_history.sublime-settings')
 
 def get_history_key_for_view(view):
     """Return the key used to store history items that relate to the specified view."""
