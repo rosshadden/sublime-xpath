@@ -55,6 +55,18 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - <a name="clean_tag_soup_demo"></a>Clean badly formed HTML / tag soup
   ![Clean tag soup](https://cloud.githubusercontent.com/assets/11882719/13172607/a4e74172-d701-11e5-9ff2-0aa7b9f56799.gif "A demonstration of the Sublime XPath plugin, cleaning bad HTML tag soup so that it can be queried")
 
+## Installation
+
+The recommended way to install the Sublime Text XPath plugin is via [Package Control](https://packagecontrol.io/packages/xpath). Package Control will install the plugin on your system and keep it up to date.
+
+1. [Ensure Package Control is installed.](https://packagecontrol.io/installation)
+1. In Sublime Text, open the `Preferences` menu, and select `Package Control`.
+1. Select `Package Control: Install Package`.
+1. Start typing `xpath`. When you see it, select it.
+1. Wait for it to install.
+1. Restart Sublime Text to be sure everything is loaded properly.
+1. Enjoy!
+
 ## Potential future improvements:
 
 Feature requests, bug reports/fixes and usability suggestions are always welcome.
