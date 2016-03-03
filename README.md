@@ -36,6 +36,8 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `max_results_to_show` - the maximum number of results to show from the xpath query.  Set to <= 0 for no limit.  Useful to speed up display of results when there are lots.
 - `normalize_whitespace_in_preview` - whether or not to normalize whitespace for text results in the preview.  Defaults to `false`, because there are situations when it is important to see exact results.
 - `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
+- `auto_completion_triggers` - characters that, when typed while entering an XPath expression, will automatically show autocompletions. If empty, autocompletion can still be triggered manually.
+- `intelligent_auto_complete` - whether or not to include intelligent autocompletion suggestions from the document.
 
 <a name="demos"></a>
 ## Demonstrations
@@ -64,7 +66,6 @@ In no particular order, here are some ideas of how this plugin could be made eve
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
 - Allow defining custom XPath functions in the sublime-settings file.
 - Allow defining variables as XPath expressions that would get evaluated into a nodeset.
-- Option to disable auto completion completely, or just the intelligent part of auto completion.
 
 ## Contributors
 
