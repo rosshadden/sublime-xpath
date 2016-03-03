@@ -74,10 +74,10 @@ Feature requests, bug reports/fixes and usability suggestions are always welcome
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
 
 - Improve syntax highlighting (and therefore also auto completion) accuracy.
-- Optimize modifications to the XML, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every change.
+- Optimize the way that modifications to the underlying XML document are handled, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
 - Allow defining custom XPath functions in the sublime-settings file.
-- Allow defining variables as XPath expressions that would get evaluated into a nodeset.
+- Allow defining variables as (absolute) XPath expressions that would get evaluated into a nodeset.
 
 ## Contributors
 
