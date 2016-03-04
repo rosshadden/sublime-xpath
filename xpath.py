@@ -567,11 +567,14 @@ def change_key_for_xpath_query_history(oldkey, newkey):
     """For all items in the history with the given oldkey, change the key to the specified newkey."""
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
     history = history_settings.get('history', [])
+    items_changed = 0
     for item in history:
         if item[1] == oldkey:
             item[1] = newkey
-    history_settings.set('history', history)
-    sublime.save_settings('xpath_query_history.sublime-settings')
+            items_changed += 1
+    if items_changed > 0:
+        history_settings.set('history', history)
+        sublime.save_settings('xpath_query_history.sublime-settings')
 
 def get_history_key_for_view(view):
     """Return the key used to store history items that relate to the specified view."""
@@ -770,6 +773,11 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         self.arguments['async'] = getBoolValueFromArgsOrSettings('live_query_async', self.arguments, True)
         self.arguments['delay'] = int(settings.get('live_query_delay', 0))
         self.arguments['live_mode'] = getBoolValueFromArgsOrSettings('live_mode', self.arguments, True)
+        
+        self.arguments['normalize_whitespace_in_preview'] = getBoolValueFromArgsOrSettings('normalize_whitespace_in_preview', self.arguments, False)
+        self.arguments['auto_completion_triggers'] = settings.get('auto_completion_triggers', '/')
+        self.arguments['intelligent_auto_complete'] = getBoolValueFromArgsOrSettings('intelligent_auto_complete', self.arguments, True)
+        
         super().parse_args()
     
     def get_query_results(self, query):
@@ -809,7 +817,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         maxlen = 70
         
         show_text_preview = None
-        if getBoolValueFromArgsOrSettings('normalize_whitespace_in_preview', None, False):
+        if self.arguments['normalize_whitespace_in_preview']:
             show_text_preview = lambda result: collapseWhitespace(str(result), maxlen)
         else:
             show_text_preview = lambda result: str(result)[0:maxlen]
@@ -848,10 +856,14 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def show_input_panel(self, initial_value):
         super().show_input_panel(initial_value)
-        self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': '/[$@:( '} ])
+        if len(self.arguments['auto_completion_triggers'] or '') > 0:
+            self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': self.arguments['auto_completion_triggers']} ])
     
     def on_query_completions(self, prefix, locations): # moved from .sublime-completions file here - https://github.com/SublimeTextIssues/Core/issues/819
-        return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2], settings.get('variables', {})), sublime.INHIBIT_WORD_COMPLETIONS)
+        flags = sublime.INHIBIT_WORD_COMPLETIONS
+        if self.arguments['intelligent_auto_complete']:
+            flags = 0
+        return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2], settings.get('variables', {}), self.arguments['intelligent_auto_complete']), flags)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
@@ -859,7 +871,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     def is_visible(self):
         return containsSGML(self.view)
 
-def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, variables):
+def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, variables, intelligent):
     def completions_axis_specifiers():
         completions = ['ancestor', 'ancestor-or-self', 'attribute', 'child', 'descendant', 'descendant-or-self', 'following', 'following-sibling', 'namespace', 'parent', 'preceding', 'preceding-sibling', 'self']
         return [(completion + '\taxis', completion + '::') for completion in completions]
@@ -915,7 +927,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
     if include_generics or include_xpath:
         subqueries = parse_xpath_query_for_completions(view, positions[0])
         
-        if include_xpath:
+        if include_xpath and intelligent:
             # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
             # execute previous complete query parts, so that we have the right context nodes for the current sub-expression
             

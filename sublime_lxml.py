@@ -1,5 +1,6 @@
 import sublime
 from .lxml_parser import *
+from .sublime_helper import get_scopes
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getNodeTagRegion(view, node, position_type):
@@ -147,22 +148,6 @@ def getElementXMLPreview(view, node, maxlen):
     open_pos, close_pos = getNodePosition(view, node)
     preview = view.substr(sublime.Region(open_pos.begin(), close_pos.end()))
     return collapseWhitespace(preview, maxlen)
-
-def get_scopes(view, start_at_position, stop_at_position):
-    scopes = []
-    current_scope = None
-    for pos in range(start_at_position, stop_at_position):
-        scope = view.scope_name(pos)
-        if current_scope is None:
-            current_scope = (scope, pos, pos)
-        elif current_scope[0] == scope: # if the current scope is exactly the same, extend it
-            current_scope = (current_scope[0], current_scope[1], pos)
-        else: # store the previous scope and register new one
-            scopes.append(current_scope)
-            current_scope = (scope, pos, pos)
-    if current_scope is not None:
-        scopes.append(current_scope)
-    return scopes
 
 def parse_xpath_query_for_completions(view, completion_position):
     """Given a view with XPath syntax and a position where completions are desired, parse the xpath query and return the relevant sub queries."""

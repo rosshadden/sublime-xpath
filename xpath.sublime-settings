@@ -33,5 +33,9 @@
 	// the maximum number of (non-unique) xpath queries to retain in history.  Note that the history can be manually manipulated at any time in the xpath_query_history.sublime-settings file
 	"max_query_history": 100,
 	// whether or not to normalize whitespace when showing the text results of an xpath query
-	"normalize_whitespace_in_preview": false
+	"normalize_whitespace_in_preview": false,
+	// characters that, when typed in the xpath expression input panel, will automatically trigger autocompletions. If empty, autocompletion can still be triggered manually
+	"auto_completion_triggers": "'/[$@:( '",
+	// whether or not to include intelligent autocompletion suggestions from the document
+	"intelligent_auto_complete": true
 }

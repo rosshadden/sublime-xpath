@@ -36,38 +36,48 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `max_results_to_show` - the maximum number of results to show from the xpath query.  Set to <= 0 for no limit.  Useful to speed up display of results when there are lots.
 - `normalize_whitespace_in_preview` - whether or not to normalize whitespace for text results in the preview.  Defaults to `false`, because there are situations when it is important to see exact results.
 - `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
+- `auto_completion_triggers` - characters that, when typed while entering an XPath expression, will automatically show autocompletions. If empty, autocompletion can still be triggered manually.
+- `intelligent_auto_complete` - whether or not to include intelligent autocompletion suggestions from the document.
 
 <a name="demos"></a>
 ## Demonstrations
-<a name="autocomplete_demo"></a>
-- Autocompletion in action
-![Autocompletion in action](https://cloud.githubusercontent.com/assets/11882719/12841929/245cdbd4-cbf8-11e5-8da0-26119e5213ab.gif "A demonstration of the Sublime XPath plugin, with it's intelligent auto completion")
-<a name="cursor_to_highlighted_result_demo"></a>
-- Move cursor to a single highlighted result
-![Move cursor to result](https://cloud.githubusercontent.com/assets/11882719/13141364/9d22053e-d63f-11e5-853a-3d2089e81664.gif "A demonstration of the Sublime XPath plugin, moving the cursor to the highlighted result")
-<a name="select_all_results_demo"></a>
-- Example usage of selecting all the results of the previous XPath query
-![Move cursor](https://cloud.githubusercontent.com/assets/11882719/13170898/4c3f511c-d6f8-11e5-98bd-9eeac5f71b13.gif "A demonstration of the Sublime XPath plugin, with it's cursor movement/selection helpers")
-<a name="copy_xpath_demo"></a>
-- Copying the XPath(s) of the node(s) under the cursor(s) to the clipboard
-![Copy XPath to clipboard](https://cloud.githubusercontent.com/assets/11882719/13170773/2dee3008-d6f7-11e5-9b93-b1c5da70cd5b.gif "A demonstration of the Sublime XPath plugin, copying the XPaths at the cursors to the clipboard")
-<a name="multiple_contexts_demo"></a>
-- Working with multiple context nodes
-![Multiple context nodes](https://cloud.githubusercontent.com/assets/11882719/13171045/3053e99e-d6f9-11e5-8f58-2a8cb2d7e131.gif "A demonstration of the Sublime XPath plugin, working with multiple context nodes")
-<a name="clean_tag_soup_demo"></a>
-- Clean badly formed HTML / tag soup
-![Clean tag soup](https://cloud.githubusercontent.com/assets/11882719/13172607/a4e74172-d701-11e5-9ff2-0aa7b9f56799.gif "A demonstration of the Sublime XPath plugin, cleaning bad HTML tag soup so that it can be queried")
+
+- <a name="autocomplete_demo"></a>Autocompletion in action
+  ![Autocompletion in action](https://cloud.githubusercontent.com/assets/11882719/12841929/245cdbd4-cbf8-11e5-8da0-26119e5213ab.gif "A demonstration of the Sublime XPath plugin, with it's intelligent auto completion")
+- <a name="cursor_to_highlighted_result_demo"></a>Move cursor to a single highlighted result
+  ![Move cursor to result](https://cloud.githubusercontent.com/assets/11882719/13141364/9d22053e-d63f-11e5-853a-3d2089e81664.gif "A demonstration of the Sublime XPath plugin, moving the cursor to the highlighted result")
+- <a name="select_all_results_demo"></a>Example usage of selecting all the results of the previous XPath query
+  ![Move cursor](https://cloud.githubusercontent.com/assets/11882719/13170898/4c3f511c-d6f8-11e5-98bd-9eeac5f71b13.gif "A demonstration of the Sublime XPath plugin, with it's cursor movement/selection helpers")
+- <a name="copy_xpath_demo"></a>Copying the XPath(s) of the node(s) under the cursor(s) to the clipboard
+  ![Copy XPath to clipboard](https://cloud.githubusercontent.com/assets/11882719/13170773/2dee3008-d6f7-11e5-9b93-b1c5da70cd5b.gif "A demonstration of the Sublime XPath plugin, copying the XPaths at the cursors to the clipboard")
+- <a name="multiple_contexts_demo"></a>Working with multiple context nodes
+  ![Multiple context nodes](https://cloud.githubusercontent.com/assets/11882719/13171045/3053e99e-d6f9-11e5-8f58-2a8cb2d7e131.gif "A demonstration of the Sublime XPath plugin, working with multiple context nodes")
+- <a name="clean_tag_soup_demo"></a>Clean badly formed HTML / tag soup
+  ![Clean tag soup](https://cloud.githubusercontent.com/assets/11882719/13172607/a4e74172-d701-11e5-9ff2-0aa7b9f56799.gif "A demonstration of the Sublime XPath plugin, cleaning bad HTML tag soup so that it can be queried")
+
+## Installation
+
+The recommended way to install the Sublime Text XPath plugin is via [Package Control](https://packagecontrol.io/packages/xpath). Package Control will install the plugin on your system and keep it up to date.
+
+1. [Ensure Package Control is installed.](https://packagecontrol.io/installation)
+1. In Sublime Text, open the `Preferences` menu, and select `Package Control`.
+1. Select `Package Control: Install Package`.
+1. Start typing `xpath`. When you see it, select it.
+1. Wait for it to install.
+1. Restart Sublime Text to be sure everything is loaded properly.
+1. Enjoy!
 
 ## Potential future improvements:
 
 Feature requests, bug reports/fixes and usability suggestions are always welcome.
 
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
+
 - Improve syntax highlighting (and therefore also auto completion) accuracy.
-- Optimize writes, especially non-structure-altering changes.
+- Optimize for when modifications to the underlying XML document are made by the user, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
 - Allow defining custom XPath functions in the sublime-settings file.
-- Option to disable auto completion completely, or just the intelligent part of auto completion.
+- Allow defining variables as (absolute) XPath expressions that would get evaluated into a nodeset.
 
 ## Contributors
 
