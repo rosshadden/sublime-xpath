@@ -642,6 +642,7 @@ class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example 
             sublime.status_message(str(total_results) + ' nodes selected')
         else:
             sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
+        add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), kwargs['xpath'])
 
 class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })
     def run(self, edit, **args):
