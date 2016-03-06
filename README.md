@@ -12,7 +12,7 @@ Sublime Text - XPath Plugin
   - display results in real-time (i.e. as you type the query, fitting in perfectly with Sublime's other actions). (With an option to customize this, if desired.)
   - [move the cursor to the highlighted result.](#cursor_to_highlighted_result_demo)
   - [reference multiple context nodes](#multiple_contexts_demo) (at cursor positions) by using the `$contexts` variable.
-  - [Re-run the previous query and select all the corresponding nodes in the document.](#select_all_results_demo) (Note that it doesn't preserve the context nodes at the moment.)
+  - [Execute a query and select all the corresponding nodes in the document.](#select_all_results_demo) (There is an entry in the command palette to re-run the previous query and select all results, but please note that it doesn't preserve the context nodes at the moment.)
   - with history, optionally globally or per document.
   - optionally normalize whitespace when displaying text results (via a setting).
   - define custom variables in the settings file.
