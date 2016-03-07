@@ -12,7 +12,7 @@ Sublime Text - XPath Plugin
   - display results in real-time (i.e. as you type the query, fitting in perfectly with Sublime's other actions). (With an option to customize this, if desired.)
   - [move the cursor to the highlighted result.](#cursor_to_highlighted_result_demo)
   - [reference multiple context nodes](#multiple_contexts_demo) (at cursor positions) by using the `$contexts` variable.
-  - [Re-run the previous query and select all the corresponding nodes in the document.](#select_all_results_demo) (Note that it doesn't preserve the context nodes at the moment.)
+  - [Execute a query and select all the corresponding nodes in the document.](#select_all_results_demo) (There is an entry in the command palette to re-run the previous query and select all results, but please note that it doesn't preserve the context nodes at the moment.)
   - with history, optionally globally or per document.
   - optionally normalize whitespace when displaying text results (via a setting).
   - define custom variables in the settings file.
@@ -73,6 +73,8 @@ Feature requests, bug reports/fixes and usability suggestions are always welcome
 
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
 
+- Option to select attribute values (or the entire attribute definition) when attribute nodes are returned from an XPath query. (It currently only selects the element they belong to)
+- Option to change what is selected when the cursor is moved to an element. (So that it can select both the open and the close tag for example).
 - Improve syntax highlighting (and therefore also auto completion) accuracy.
 - Optimize for when modifications to the underlying XML document are made by the user, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.

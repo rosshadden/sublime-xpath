@@ -633,6 +633,17 @@ def namespace_map_for_tree(tree):
     namespaces = unique_namespace_prefixes(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
     return namespaces
 
+class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('select_results_from_xpath_query', { 'xpath': '//*' })
+    def run(self, edit, **kwargs):
+        contexts = get_context_nodes_from_cursors(self.view)
+        nodes = get_results_for_xpath_query_multiple_trees(kwargs['xpath'], contexts, namespace_map_from_contexts(contexts))
+        total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
+        if total_results == total_selections:
+            sublime.status_message(str(total_results) + ' nodes selected')
+        else:
+            sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
+        add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), kwargs['xpath'])
+
 class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })
     def run(self, edit, **args):
         global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
@@ -646,13 +657,7 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
         else:
-            contexts = get_context_nodes_from_cursors(self.view)
-            nodes = get_results_for_xpath_query_multiple_trees(history[-1], contexts, namespace_map_from_contexts(contexts))
-            total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
-            if total_results == total_selections:
-                sublime.status_message(str(total_results) + ' nodes selected')
-            else:
-                sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
+            self.view.run_command('select_results_from_xpath_query', { 'xpath': history[-1] })
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
