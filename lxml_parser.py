@@ -261,6 +261,9 @@ def get_results_for_xpath_query(query, tree, context = None, namespaces = None, 
     if namespaces is not None:
         for prefix in namespaces.keys():
             nsmap[prefix] = namespaces[prefix][0]
+    
+    global ns_loc
+    query += '[namespace-uri() != "' + ns_loc + '"]'
     xpath = etree.XPath(query, namespaces = nsmap)
     
     results = execute_xpath_query(tree, xpath, context, **variables)

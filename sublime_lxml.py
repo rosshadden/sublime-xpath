@@ -168,6 +168,9 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             # position type 'content' <element attr1="|test|"></element> "Goto attribute value in open tag"
             # position type 'entire' <element |attr1="test"|></element> "Goto attribute declaration in open tag"
             
+            if attrname.startswith('{'):
+                attrname = '\w+:' + attrname.split('}')[1] # NOTE: will currently get the wrong attribute in some (rare?) situations with two attributes with the same local name belonging to the same element, for example if there is something like <element abc:foo="hello" bar:foo="world" /> because it doesn't check the prefix or the namespace uri
+            
             tag = getTagName(node)[2]
             chars_before = len('<') + len(tag)
             attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))

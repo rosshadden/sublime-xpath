@@ -919,6 +919,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
             for completion in funcs[key]:
                 yield (completion + '\t' + key + ' functions', completion + '($1)')
     
+    global ns_loc
     completions = []
     
     variables['contexts'] = None
@@ -961,6 +962,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 exec_query = subqueries[-1] + '*'
                 if prefix != '':
                     exec_query += '[starts-with(name(), $_prefix)]'
+                exec_query += '[namespace-uri() != $ns_loc]'
                 
                 # determine if any queries can be skipped, due to using an absolute path
                 relevant_queries = 0
@@ -982,6 +984,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 xpath_variables['contexts'] = contexts[tree]
                 xpath_variables['expression_contexts'] = None
                 xpath_variables['_prefix'] = prefix
+                xpath_variables['ns_loc'] = ns_loc
                 
                 for query in subqueries[0:-1] + [exec_query]:
                     if query != '':
@@ -1006,9 +1009,14 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             completions.append((fullname + '\tElement', fullname))
                         elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
                             if prev_char == '@' or result.is_attribute:
-                                global ns_loc
-                                if not result.attrname.startswith('{' + ns_loc + '}'):
-                                    completions.append((result.attrname + '\tAttribute', result.attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
+                                attrname = result.attrname
+                                if attrname.startswith('{'):
+                                    #if attrname.startswith('{' + ns_loc + '}'):
+                                    #    continue
+                                    root = result.getparent().getroottree().getroot()
+                                    ns, localname = attrname[len('{'):].split('}')
+                                    attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == ns)) + ':' + localname # find the first prefix in the map that relates to this uri
+                                completions.append((attrname + '\tAttribute', attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
                         else: # debug, are we missing something we could suggest?
                             #completions.append((str(result) + '\t' + str(type(result)), str(result)))
                             pass
