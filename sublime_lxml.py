@@ -101,10 +101,12 @@ def getNodesAtPositions(view, roots, positions):
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
     for node in nodes:
         attrname = None
+        attrvalue = None
         is_text = None
         is_tail = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             attrname = node.attrname
+            attrvalue = str(node)
             is_text = node.is_text
             is_tail = node.is_tail
             node = node.getparent() # get the parent
@@ -168,26 +170,27 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             # position type 'content' <element attr1="|test|"></element> "Goto attribute value in open tag"
             # position type 'entire' <element |attr1="test"|></element> "Goto attribute declaration in open tag"
             
-            if attrname.startswith('{'):
-                attrname = '\w+:' + attrname.split('}')[1] # NOTE: will currently get the wrong attribute in some (rare?) situations with two attributes with the same local name belonging to the same element, for example if there is something like <element abc:foo="hello" bar:foo="world" /> because it doesn't check the prefix or the namespace uri
-            
             tag = getTagName(node)[2]
-            chars_before = len('<') + len(tag)
-            attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))
-            chars_before -= len(' ')
-            match = None
-            for quote in ('"', "'"):
-                match = re.search('\s+((' + attrname + ')\s*=\s*' + quote + '([^' + quote + ']*)' + quote + ')', attrs)
+            for uri, local_name, prefix, full_name in get_namespace_details_for_qualified_name(node, attrname):
+                chars_before = len('<') + len(tag)
+                attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))
+                chars_before -= len(' ')
+                match = None
+                for quote in ('"', "'"):
+                    match = re.search('\s+((' + full_name + ')\s*=\s*' + quote + '([^' + quote + ']*)' + quote + ')', attrs)
+                    if match:
+                        break
+                
                 if match:
+                    #print('"' + view.substr(sublime.Region(open_pos.begin() + chars_before + match.start(3), open_pos.begin() + chars_before + match.end(3))) + '"', '"' + attrvalue + '"')
+                    group = 1
+                    if attribute_position_type in ('name'):
+                        group = 2
+                    elif attribute_position_type in ('value', 'content'):
+                        group = 3
+                    
+                    yield sublime.Region(open_pos.begin() + chars_before + match.start(group), open_pos.begin() + chars_before + match.end(group))
                     break
-            
-            group = 1
-            if attribute_position_type in ('name'):
-                group = 2
-            elif attribute_position_type in ('value', 'content'):
-                group = 3
-            
-            yield sublime.Region(open_pos.begin() + chars_before + match.start(group), open_pos.begin() + chars_before + match.end(group))
 
 def move_cursors_to_nodes(view, nodes, element_position_type, attribute_position_type):
     nodes = list(nodes)

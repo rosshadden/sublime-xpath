@@ -93,6 +93,13 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             current = self._element_stack[-1]
             self._recordPosition(current, 'open_tag_start_pos')
             
+            current.set('{' + ns_loc + '}namespace_count', str(len(nsmap)))
+            ns_index = 0
+            for ns in nsmap:
+                current.set('{' + ns_loc + '}namespace_prefix_' + str(ns_index), ns[1] or '')
+                current.set('{' + ns_loc + '}namespace_uri_' + str(ns_index), ns[2])
+                ns_index += 1
+            
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
             if prefix is None:
@@ -278,3 +285,21 @@ def execute_xpath_query(tree, xpath, context_node = None, **variables):
         return result
     else:
         return [result]
+
+def get_namespace_details_for_qualified_name(element, lxml_name):
+    """Given an element and a lxml name in the form {uri}local_name or local_name, return the uri, local_name and matching prefixes."""
+    if not lxml_name.startswith('{') or not element.attrib.get('{lxml}namespace_count'):
+        yield (None, lxml_name, '', lxml_name)
+    else:
+        uri, local_name = lxml_name[len('{'):].split('}')
+        while element is not None:
+            namespace_count = int(element.get('{lxml}namespace_count'))
+            for index in range(0, namespace_count):
+                if element.get('{lxml}namespace_uri_' + str(index)) == uri:
+                    prefix = element.get('{lxml}namespace_prefix_' + str(index))
+                    full_name = local_name
+                    if prefix != '':
+                        full_name = prefix + ':' + local_name
+                    yield (uri, local_name, prefix, full_name)
+            
+            element = element.getparent()
