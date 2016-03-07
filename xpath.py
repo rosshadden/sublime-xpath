@@ -357,7 +357,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                 position_type = 'open'
                 if args['direction'] in non_open_positions:
                     position_type = args['direction']
-                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
+                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type, None)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
@@ -633,11 +633,25 @@ def namespace_map_for_tree(tree):
     namespaces = unique_namespace_prefixes(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
     return namespaces
 
-class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('select_results_from_xpath_query', { 'xpath': '//*' })
+class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('select_results_from_xpath_query', { 'xpath': '//*', 'goto_element': 'names' })
     def run(self, edit, **kwargs):
         contexts = get_context_nodes_from_cursors(self.view)
         nodes = get_results_for_xpath_query_multiple_trees(kwargs['xpath'], contexts, namespace_map_from_contexts(contexts))
-        total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
+        
+        global settings
+        goto_element = settings.get('goto_element', 'open')
+        goto_attribute = settings.get('goto_attribute', 'value')
+        if goto_element == 'none':
+            goto_element = 'open'
+        if goto_attribute == 'none':
+            goto_attribute = 'value'
+        
+        if 'goto_element' in kwargs:
+            goto_element = kwargs['goto_element']
+        if 'goto_attribute' in kwargs:
+            goto_attribute = kwargs['goto_attribute']
+        
+        total_selections, total_results = move_cursors_to_nodes(self.view, nodes, goto_element, goto_attribute)
         if total_results == total_selections:
             sublime.status_message(str(total_results) + ' nodes selected')
         else:
@@ -652,7 +666,7 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
         if global_history:
             keys = None
         
-        # TODO: somehow preserve original $contexts variable?
+        # TODO: preserve original $contexts variable (xpaths of all context nodes) with history, and restore here?
         history = get_xpath_query_history_for_keys(keys)
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
@@ -783,6 +797,12 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         self.arguments['auto_completion_triggers'] = settings.get('auto_completion_triggers', '/')
         self.arguments['intelligent_auto_complete'] = getBoolValueFromArgsOrSettings('intelligent_auto_complete', self.arguments, True)
         
+        
+        if 'goto_element' not in self.arguments:
+            self.arguments['goto_element'] = settings.get('goto_element', 'open')
+        if 'goto_attribute' not in self.arguments:
+            self.arguments['goto_attribute'] = settings.get('goto_attribute', 'value')
+        
         super().parse_args()
     
     def get_query_results(self, query):
@@ -846,7 +866,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         
     def quickpanel_selection_changed(self, selected_index):
         if selected_index > -1: # quick panel wasn't cancelled
-            move_cursors_to_nodes(self.view, [self.items[selected_index]], 'open')
+            move_cursors_to_nodes(self.view, [self.items[selected_index]], self.arguments['goto_element'], self.arguments['goto_attribute'])
             #self.view.window().focus_view(self.view) # focus the view to try getting the cursor positions to update while the quick panel is open
             #if self.input_panel is not None:
             #    self.input_panel.window().focus_view(self.input_panel)

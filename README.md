@@ -38,6 +38,20 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
 - `variables` - a dictionary of custom variables, which can be used when writing an XPath query expression.
 - `auto_completion_triggers` - characters that, when typed while entering an XPath expression, will automatically show autocompletions. If empty, autocompletion can still be triggered manually.
 - `intelligent_auto_complete` - whether or not to include intelligent autocompletion suggestions from the document.
+- `goto_element` - when an element is selected via an XPath query, which aspect of it the cursor should move to. Possible values are:
+  - `open` - Select the name of the element in the open tag.
+  - `close` - Select the name of the element in the close tag.
+  - `names` - Select the name of the element in both the open and the close tag.
+  - `open_attributes` - Select all the attributes in the open tag.
+  - `content` - Select the content of the element.
+  - `entire` - Select the entire element i.e. it's open tag, contents and close tag.
+  - `none` - Do not move the cursor.
+- `goto_attribute` - when an attribute is selected via an XPath query, which aspect of it the cursor should move to. Possible values are:
+  - `name` - Select the name of the attribute.
+  - `value` - Select the value (inside the quotes) of the attribute.
+  - `entire` - Select the name and the value of the attribute.
+  - `element` - Select the element that the attribute belongs to, using the `goto_element` rules.
+  - `none` - Do not move the cursor.
 
 <a name="demos"></a>
 ## Demonstrations
@@ -73,8 +87,6 @@ Feature requests, bug reports/fixes and usability suggestions are always welcome
 
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
 
-- Option to select attribute values (or the entire attribute definition) when attribute nodes are returned from an XPath query. (It currently only selects the element they belong to)
-- Option to change what is selected when the cursor is moved to an element. (So that it can select both the open and the close tag for example).
 - Improve syntax highlighting (and therefore also auto completion) accuracy.
 - Optimize for when modifications to the underlying XML document are made by the user, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
