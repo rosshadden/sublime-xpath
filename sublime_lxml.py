@@ -111,7 +111,6 @@ def get_nodes_from_document(nodes):
             continue # unsupported type
         
         key = next((key for key in element.attrib.keys() if key.startswith('{' + ns_loc + '}')), None)
-        print(key)
         # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
         if key is not None:
             yield node
