@@ -90,6 +90,26 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
     
     def on_query_completions(self, prefix, locations): # http://docs.sublimetext.info/en/latest/reference/api.html#sublime_plugin.EventListener.on_query_completions
         pass
+    
+    def refresh_selection_bug_work_around(self):
+        # https://github.com/SublimeTextIssues/Core/issues/485
+        # refresh_selection_bug_work_around() provides a workaround for the Sublime
+        # Text bug whereby selections do not always get displayed correctly
+        # immediately after being altered by a plugin.
+        
+        # Adding and then removing an empty list of regions in the view
+        # ensures that all selections are refreshed and displayed correctly.
+        # Using an actual list of regions say, self.view.sel(), also works.
+        
+        empty_list = []
+        
+        bug_reg_key = 'selection_bug_demo_workaround_regions_key'
+        
+        self.view.add_regions(bug_reg_key, empty_list, 'no_scope', '', sublime.HIDDEN)
+        
+        self.view.erase_regions(bug_reg_key)
+        
+    # End of def refreshSelectionBugWorkAround()
 
 class InputCompletionsListener(sublime_plugin.EventListener):
     def on_query_completions(self, view, prefix, locations):

@@ -867,6 +867,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     def quickpanel_selection_changed(self, selected_index):
         if selected_index > -1: # quick panel wasn't cancelled
             move_cursors_to_nodes(self.view, [self.items[selected_index]], self.arguments['goto_element'], self.arguments['goto_attribute'])
+            self.refresh_selection_bug_work_around()
             #self.view.window().focus_view(self.view) # focus the view to try getting the cursor positions to update while the quick panel is open
             #if self.input_panel is not None:
             #    self.input_panel.window().focus_view(self.input_panel)
