@@ -759,8 +759,12 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
         
         # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
-        self.highlighted_result = context_nodes[next(iter(context_nodes.keys()))][0]
-        self.highlighted_index = 0
+        try:
+            self.highlighted_result = context_nodes[next(iter(context_nodes.keys()))][0]
+            self.highlighted_index = 0
+        except:
+            self.highlighted_result = None
+            self.highlighted_index = -1
         
     def run(self, edit, **args):
         self.cache_context_nodes()
