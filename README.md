@@ -91,6 +91,7 @@ Feature requests, bug reports/fixes and usability suggestions are always welcome
 
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
 
+- Research using a custom Element class and keeping the proxies alive instead of storing metadata in attributes - see http://lxml.de/element_classes.html#element-initialization.
 - Improve syntax highlighting (and therefore also auto completion) accuracy.
 - Optimize for when modifications to the underlying XML document are made by the user, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
