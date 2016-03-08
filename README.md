@@ -81,12 +81,17 @@ The recommended way to install the Sublime Text XPath plugin is via [Package Con
 1. Restart Sublime Text to be sure everything is loaded properly.
 1. Enjoy!
 
+## Known Quirks
+
+Unfortunately, Python isn't very good at processing xml. The lxml library doesn't surface column positions of the nodes etc. and attribute prefixes are lost, with just namespace uri retained. To make matters worse, it isn't possible to store custom metadata on a node. To overcome these limitations, this plugin stores the necessary information in element attribute nodes with a separate namespace. This works well, but it has the side effect of impacting the XPath query results. Where possible, they have been filtered out before the plugin returns the data to the user. But there are some quirks. For example, the count of attributes will always be wrong using `count(@*)`. To work around this, you can exclude attributes in the `lxml` namespace like this: `count(@*[namespace-uri() != 'lxml'])`
+
 ## Potential future improvements:
 
 Feature requests, bug reports/fixes and usability suggestions are always welcome.
 
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
 
+- Research using a custom Element class and keeping the proxies alive instead of storing metadata in attributes - see http://lxml.de/element_classes.html#element-initialization.
 - Improve syntax highlighting (and therefore also auto completion) accuracy.
 - Optimize for when modifications to the underlying XML document are made by the user, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
