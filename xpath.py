@@ -865,6 +865,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         return [show_preview(item) for item in results]
         
     def quickpanel_selection_changed(self, selected_index):
+        super().quickpanel_selection_changed(selected_index)
         if selected_index > -1: # quick panel wasn't cancelled
             move_cursors_to_nodes(self.view, [self.items[selected_index]], self.arguments['goto_element'], self.arguments['goto_attribute'])
             self.refresh_selection_bug_work_around()

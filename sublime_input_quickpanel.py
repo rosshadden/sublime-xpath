@@ -7,6 +7,8 @@ on_modified_callbacks = {}
 class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should be overidden and not used directly
     items = None
     ignore_view_activations = False
+    highlighted_index = -1
+    highlighted_result = None
     
     def run(self, edit, **args):
         self.items = None
@@ -39,7 +41,17 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
             flags = 0
             if self.live_mode:
                 flags = sublime.KEEP_OPEN_ON_FOCUS_LOST
-            self.view.window().show_quick_panel(self.get_items_to_show_in_quickpanel(), self.quickpanel_selection_done, flags, -1, self.quickpanel_selection_changed) # TODO: consider restoring the selected index when the input panel was hidden and is now re-shown?
+            
+            index = -1
+            if self.highlighted_result is not None:
+                if self.highlighted_index < len(items) and items[self.highlighted_index] == self.highlighted_result: # if the value at the previously highlighted index matches the previously highlighted item, highlight it
+                    index = self.highlighted_index
+                else: # otherwise try to find the previously highlighted item
+                    try:
+                        index = items.index(self.highlighted_result)
+                    except ValueError:
+                        pass
+            self.view.window().show_quick_panel(self.get_items_to_show_in_quickpanel(), self.quickpanel_selection_done, flags, index, self.quickpanel_selection_changed)
             if self.live_mode and self.input_panel is not None:
                 self.input_panel.window().focus_view(self.input_panel)
     
@@ -61,7 +73,9 @@ class QuickPanelFromInputCommand(RequestViewInputCommand): # this command should
         return self.items
     
     def quickpanel_selection_changed(self, selected_index):
-        pass
+        self.highlighted_index = selected_index
+        if selected_index > -1:
+            self.highlighted_result = self.items[selected_index]
     
     def quickpanel_selection_done(self, selected_index):
         if selected_index > -1: # if it wasn't cancelled
