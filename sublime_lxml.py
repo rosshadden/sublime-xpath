@@ -104,8 +104,6 @@ def filter_out_internal_nodes(nodes):
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             if node.attrname is not None and node.attrname.startswith('{' + ns_loc + '}'): # skip our internally created attributes
                 continue
-        elif not isinstance(node, etree._Element):
-            continue # unsupported type
         
         yield node
 
