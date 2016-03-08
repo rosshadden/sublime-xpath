@@ -652,7 +652,7 @@ class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example 
             goto_attribute = kwargs['goto_attribute']
         
         total_selections, total_results = move_cursors_to_nodes(self.view, nodes, goto_element, goto_attribute)
-        if total_results == total_selections:
+        if total_selections == total_results: # NOTE: the number reported in the status bar (below) is wrong when there are multiple selections per node
             sublime.status_message(str(total_results) + ' nodes selected')
         else:
             sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
