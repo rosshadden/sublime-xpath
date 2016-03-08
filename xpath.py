@@ -755,16 +755,23 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         """Cache context nodes to allow live mode to work with them."""
         context_nodes = get_context_nodes_from_cursors(self.view)
         self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
+        
+        tree_count = 0
         for root in context_nodes:
+            tree_count += 1
+            
             print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
         
-        # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
-        try:
-            self.highlighted_result = context_nodes[next(iter(context_nodes.keys()))][0]
+        self.highlighted_result = None
+        self.highlighted_index = -1
+        
+        if tree_count == 1: # if there is exactly one xml tree
+            tree = next(iter(context_nodes.keys())) # get the tree
+            if len(context_nodes[tree]) == 0: # if there are no context nodes
+                context_nodes[tree].append(tree.getroot()) # use the root element as the context node
+            # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
+            self.highlighted_result = context_nodes[tree][0]
             self.highlighted_index = 0
-        except:
-            self.highlighted_result = None
-            self.highlighted_index = -1
         
     def run(self, edit, **args):
         self.cache_context_nodes()

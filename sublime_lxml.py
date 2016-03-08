@@ -88,11 +88,11 @@ def getNodesAtPositions(view, roots, positions):
     for root in roots:
         if root is not None:
             last_match_index = len(positions) - 1
-            get_matches_in_tree = True
-            if len(roots) > 1: # if there is only one tree, we can skip the optimization check, because we know for sure the matches will be in the tree
-                open_pos, close_pos = getNodePosition(view, root)
-                root_matches, start_match_index, last_match_index = matchSpan(open_pos.cover(close_pos), start_match_index, last_match_index, True)
-                get_matches_in_tree = len(root_matches) > 0 # determine if it is worth checking this tree
+            
+            open_pos, close_pos = getNodePosition(view, root)
+            root_matches, start_match_index, last_match_index = matchSpan(open_pos.cover(close_pos), start_match_index, last_match_index, True)
+            get_matches_in_tree = len(root_matches) > 0 # determine if it is worth checking this tree
+                
             if get_matches_in_tree: # skip the tree if it doesn't participate in the match (saves iterating through all children of root element unnecessarily)
                 start_match_index = getMatches(root, start_match_index, last_match_index, matches)
     
