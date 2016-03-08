@@ -28,16 +28,16 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         def setDocumentLocator(self, locator):
             self._locator = locator
         
-        def _splitPrefixAndGetNamespaceURI(self, fullName):
+        def _splitPrefixAndGetNamespaceURI(self, full_name):
             prefix = None
             local_name = None
             
-            split_pos = fullName.find(':')
+            split_pos = full_name.find(':')
             if split_pos > -1:
-                prefix = fullName[0:split_pos]
-                local_name = fullName[split_pos + 1:]
+                prefix = full_name[0:split_pos]
+                local_name = full_name[split_pos + 1:]
             else:
-                local_name = fullName
+                local_name = full_name
             
             return (prefix, local_name, self._getNamespaceURI(prefix))
         
@@ -58,7 +58,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             locator = self._locator or parser
             return str(locator.getLineNumber() - 1 + line_number_offset) + '/' + str(locator.getColumnNumber())
         
-        def startElementNS(self, name, tagName, attrs):
+        def startElementNS(self, name, tag_name, attrs):
             self._recordEndPosition()
             
             self._last_action = 'open'
@@ -84,11 +84,11 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
                 attrs.pop(attr[0]) # remove the attribute
                 attrs[(attr[1][2], attr[1][1])] = attr[2] # re-add the attribute with the correct qualified name
             
-            tag = self._splitPrefixAndGetNamespaceURI(tagName)
+            tag = self._splitPrefixAndGetNamespaceURI(tag_name)
             name = (tag[2], tag[1])
             
             self._new_mappings = self._getNamespaceMap()
-            super().startElementNS(name, tagName, attrs)
+            super().startElementNS(name, tag_name, attrs)
             
             current = self._element_stack[-1]
             self._recordPosition(current, 'open_tag_start_pos')
@@ -113,7 +113,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             if prefix is None:
                 self._default_ns = self._getNamespaceURI(None)
         
-        def endElementNS(self, name, tagName):
+        def endElementNS(self, name, tag_name):
             self._recordEndPosition()
             
             self._last_action = 'close'
@@ -121,9 +121,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             current = self._element_stack[-1]
             self._recordPosition(current, 'close_tag_start_pos')
             
-            tag = self._splitPrefixAndGetNamespaceURI(tagName)
+            tag = self._splitPrefixAndGetNamespaceURI(tag_name)
             name = (tag[2], tag[1])
-            super().endElementNS(name, tagName)
+            super().endElementNS(name, tag_name)
             if None in self._prefix_hierarchy[-1]: # re-map default namespace if applicable
                 self.endPrefixMapping(None)
             self._prefix_hierarchy.pop()

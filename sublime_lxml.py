@@ -100,13 +100,11 @@ def getNodesAtPositions(view, roots, positions):
 
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
     for node in nodes:
-        attrname = None
-        attrvalue = None
+        attr_name = None
         is_text = None
         is_tail = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
-            attrname = node.attrname
-            attrvalue = str(node)
+            attr_name = node.attrname
             is_text = node.is_text
             is_tail = node.is_tail
             node = node.getparent() # get the parent
@@ -138,7 +136,7 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             if next_node is not None:
                 text_end_pos = getNodeTagRegion(view, next_node, 'open').begin()
             yield sublime.Region(text_begin_pos, text_end_pos)
-        elif attrname is None or attribute_position_type is None or attribute_position_type in ('element', 'parent'):
+        elif attr_name is None or attribute_position_type is None or attribute_position_type in ('element', 'parent'):
             # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
             # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
             # position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
@@ -171,24 +169,29 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             # position type 'entire' <element |attr1="test"|></element> "Goto attribute declaration in open tag"
             
             tag = getTagName(node)[2]
-            for uri, local_name, prefix, full_name in get_namespace_details_for_qualified_name(node, attrname):
-                chars_before = len('<') + len(tag)
-                attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))
-                chars_before -= len(' ')
-                match = None
-                for quote in ('"', "'"):
-                    match = re.search('\s+((' + full_name + ')\s*=\s*' + quote + '([^' + quote + ']*)' + quote + ')', attrs)
-                    if match:
-                        break
+            
+            attr = get_namespace_details_for_qualified_name(node, attr_name)
+            attr_check = next(attr)
+            
+            chars_before = len('<' + tag)
+            attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))
+            chars_before -= len(' ')
+            
+            for match in re.finditer('\s+((\w+(?::\w+)?)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'))', attrs):
+                is_this_one = False
+                if attr_check[2] == '': # if there is no prefix
+                    is_this_one = match.group(2) == attr_check[1] # do a simple comparison
+                elif match.group(2) == attr_check[3]: # if the full name matches
+                    is_this_one = True
                 
-                if match:
-                    #print('"' + view.substr(sublime.Region(open_pos.begin() + chars_before + match.start(3), open_pos.begin() + chars_before + match.end(3))) + '"', '"' + attrvalue + '"')
-                    group = 1
+                if is_this_one:
+                    group = (1)
                     if attribute_position_type in ('name'):
-                        group = 2
+                        group = (2)
                     elif attribute_position_type in ('value', 'content'):
-                        group = 3
+                        group = (3, 4)
                     
+                    group = next(g for g in group if match.group(g) is not None) # find first value match group (i.e. if double quotes, group 3, if single quotes, group 4)
                     yield sublime.Region(open_pos.begin() + chars_before + match.start(group), open_pos.begin() + chars_before + match.end(group))
                     break
 
