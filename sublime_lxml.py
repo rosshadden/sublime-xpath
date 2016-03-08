@@ -98,6 +98,24 @@ def getNodesAtPositions(view, roots, positions):
     
     return matches
 
+def get_nodes_from_document(nodes):
+    """Given a list of nodes that are the result of an XPath query, return those that belong to the original document."""
+    global ns_loc
+    for node in nodes:
+        element = None
+        if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
+            element = node.getparent() # get the parent
+        elif isinstance(node, etree._Element):
+            element = node
+        else:
+            continue # unsupported type
+        
+        key = next((key for key in element.attrib.keys() if key.startswith('{' + ns_loc + '}')), None)
+        print(key)
+        # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
+        if key is not None:
+            yield node
+
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
     for node in nodes:
         attr_name = None
@@ -197,6 +215,10 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
 
 def move_cursors_to_nodes(view, nodes, element_position_type, attribute_position_type):
     nodes = list(nodes)
+    
+    total_results = len(nodes)
+    
+    nodes = list(get_nodes_from_document(nodes))
     cursors = list(get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type))
     if len(cursors) > 0:
         view.sel().clear()
@@ -204,7 +226,7 @@ def move_cursors_to_nodes(view, nodes, element_position_type, attribute_position
         
         view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
         
-    return (len(cursors), len(nodes))
+    return (len(nodes), total_results)
 
 def getElementXMLPreview(view, node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""
