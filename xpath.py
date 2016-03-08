@@ -757,7 +757,11 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
         for root in context_nodes:
             print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
-    
+        
+        # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
+        self.highlighted_result = context_nodes[next(iter(context_nodes.keys()))][0]
+        self.highlighted_index = 0
+        
     def run(self, edit, **args):
         self.cache_context_nodes()
         if len(self.contexts[1].keys()) == 0: # if there are no context nodes, don't proceed to show the xpath input panel
