@@ -98,10 +98,21 @@ def getNodesAtPositions(view, roots, positions):
     
     return matches
 
+def filter_out_internal_nodes(nodes):
+    global ns_loc
+    for node in nodes:
+        if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
+            if node.attrname is not None and node.attrname.startswith('{' + ns_loc + '}'): # skip our internally created attributes
+                continue
+        elif not isinstance(node, etree._Element):
+            continue # unsupported type
+        
+        yield node
+
 def get_nodes_from_document(nodes):
     """Given a list of nodes that are the result of an XPath query, return those that belong to the original document."""
     global ns_loc
-    for node in nodes:
+    for node in filter_out_internal_nodes(nodes):
         element = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             element = node.getparent() # get the parent
@@ -125,16 +136,9 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             is_text = node.is_text
             is_tail = node.is_tail
             node = node.getparent() # get the parent
-        elif not isinstance(node, etree._Element):
-            continue # unsupported type
         
-        open_pos = None
-        close_pos = None
-        try:
-            open_pos = getNodeTagRegion(view, node, 'open')
-            close_pos = getNodeTagRegion(view, node, 'close')
-        except: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
-            continue
+        open_pos = getNodeTagRegion(view, node, 'open')
+        close_pos = getNodeTagRegion(view, node, 'close')
         
         if is_text or is_tail:
             text_begin_pos = None

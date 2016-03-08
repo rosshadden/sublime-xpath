@@ -830,7 +830,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])
+                results = list(filter_out_internal_nodes(get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))
             except Exception as e:
                 status_text = str(e)
             
@@ -979,7 +979,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 exec_query = subqueries[-1] + '*'
                 if prefix != '':
                     exec_query += '[starts-with(name(), $_prefix)]'
-                exec_query += '[namespace-uri() != $ns_loc]'
+                #exec_query += '[namespace-uri() != $ns_loc]'
                 
                 # determine if any queries can be skipped, due to using an absolute path
                 relevant_queries = 0
@@ -1009,11 +1009,11 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             query = '$expression_contexts/' + query
                         xpath_variables['expression_contexts'] = completion_contexts
                         try:
-                            completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
+                            completion_contexts = filter_out_internal_nodes(get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables))
                             # TODO: if result is not a node, break out as we can't offer any useful suggestions (currently we just get an exception: Non-Element values not supported at this point - got 'example string') when it tries $expression_contexts/*
                         except Exception as e: # xpath query invalid, just show static contexts
                             completion_contexts = None
-                            print('XPath completions error', 'query', query, 'exception', e)
+                            print('XPath completions error.', 'query:', query, 'exception:', e)
                             break
                 
                 if completion_contexts is not None:
@@ -1028,8 +1028,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             if prev_char == '@' or result.is_attribute:
                                 attrname = result.attrname
                                 if attrname.startswith('{'):
-                                    #if attrname.startswith('{' + ns_loc + '}'):
-                                    #    continue
                                     root = result.getparent().getroottree().getroot()
                                     ns, localname = attrname[len('{'):].split('}')
                                     attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == ns)) + ':' + localname # find the first prefix in the map that relates to this uri
