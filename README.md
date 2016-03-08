@@ -81,6 +81,10 @@ The recommended way to install the Sublime Text XPath plugin is via [Package Con
 1. Restart Sublime Text to be sure everything is loaded properly.
 1. Enjoy!
 
+## Known Quirks
+
+Unfortunately, Python isn't very good at processing xml. The lxml library doesn't surface column positions of the nodes etc. and attribute prefixes are lost, with just namespace uri retained. To make matters worse, it isn't possible to store custom metadata on a node. To overcome these limitations, this plugin stores the necessary information in element attribute nodes with a separate namespace. This works well, but it has the side effect of impacting the XPath query results. Where possible, they have been filtered out before the plugin returns the data to the user. But there are some quirks. For example, the count of attributes will always be wrong using `count(@*)`. To work around this, you can exclude attributes in the `lxml` namespace like this: `count(@*[namespace-uri() != 'lxml'])`
+
 ## Potential future improvements:
 
 Feature requests, bug reports/fixes and usability suggestions are always welcome.
