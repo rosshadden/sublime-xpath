@@ -28,16 +28,16 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         def setDocumentLocator(self, locator):
             self._locator = locator
         
-        def _splitPrefixAndGetNamespaceURI(self, fullName):
+        def _splitPrefixAndGetNamespaceURI(self, full_name):
             prefix = None
             local_name = None
             
-            split_pos = fullName.find(':')
+            split_pos = full_name.find(':')
             if split_pos > -1:
-                prefix = fullName[0:split_pos]
-                local_name = fullName[split_pos + 1:]
+                prefix = full_name[0:split_pos]
+                local_name = full_name[split_pos + 1:]
             else:
-                local_name = fullName
+                local_name = full_name
             
             return (prefix, local_name, self._getNamespaceURI(prefix))
         
@@ -58,7 +58,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             locator = self._locator or parser
             return str(locator.getLineNumber() - 1 + line_number_offset) + '/' + str(locator.getColumnNumber())
         
-        def startElementNS(self, name, tagName, attrs):
+        def startElementNS(self, name, tag_name, attrs):
             self._recordEndPosition()
             
             self._last_action = 'open'
@@ -84,14 +84,21 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
                 attrs.pop(attr[0]) # remove the attribute
                 attrs[(attr[1][2], attr[1][1])] = attr[2] # re-add the attribute with the correct qualified name
             
-            tag = self._splitPrefixAndGetNamespaceURI(tagName)
+            tag = self._splitPrefixAndGetNamespaceURI(tag_name)
             name = (tag[2], tag[1])
             
             self._new_mappings = self._getNamespaceMap()
-            super().startElementNS(name, tagName, attrs)
+            super().startElementNS(name, tag_name, attrs)
             
             current = self._element_stack[-1]
             self._recordPosition(current, 'open_tag_start_pos')
+            
+            current.set('{' + ns_loc + '}namespace_count', str(len(nsmap)))
+            ns_index = 0
+            for ns in nsmap:
+                current.set('{' + ns_loc + '}namespace_prefix_' + str(ns_index), ns[1] or '')
+                current.set('{' + ns_loc + '}namespace_uri_' + str(ns_index), ns[2])
+                ns_index += 1
             
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
@@ -106,7 +113,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             if prefix is None:
                 self._default_ns = self._getNamespaceURI(None)
         
-        def endElementNS(self, name, tagName):
+        def endElementNS(self, name, tag_name):
             self._recordEndPosition()
             
             self._last_action = 'close'
@@ -114,9 +121,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             current = self._element_stack[-1]
             self._recordPosition(current, 'close_tag_start_pos')
             
-            tag = self._splitPrefixAndGetNamespaceURI(tagName)
+            tag = self._splitPrefixAndGetNamespaceURI(tag_name)
             name = (tag[2], tag[1])
-            super().endElementNS(name, tagName)
+            super().endElementNS(name, tag_name)
             if None in self._prefix_hierarchy[-1]: # re-map default namespace if applicable
                 self.endPrefixMapping(None)
             self._prefix_hierarchy.pop()
@@ -261,6 +268,9 @@ def get_results_for_xpath_query(query, tree, context = None, namespaces = None, 
     if namespaces is not None:
         for prefix in namespaces.keys():
             nsmap[prefix] = namespaces[prefix][0]
+    
+    global ns_loc
+    query += '[namespace-uri() != "' + ns_loc + '"]'
     xpath = etree.XPath(query, namespaces = nsmap)
     
     results = execute_xpath_query(tree, xpath, context, **variables)
@@ -275,3 +285,21 @@ def execute_xpath_query(tree, xpath, context_node = None, **variables):
         return result
     else:
         return [result]
+
+def get_namespace_details_for_qualified_name(element, lxml_name):
+    """Given an element and a lxml name in the form {uri}local_name or local_name, return the uri, local_name and matching prefixes."""
+    if not lxml_name.startswith('{') or not element.attrib.get('{lxml}namespace_count'):
+        yield (None, lxml_name, '', lxml_name)
+    else:
+        uri, local_name = lxml_name[len('{'):].split('}')
+        while element is not None:
+            namespace_count = int(element.get('{lxml}namespace_count'))
+            for index in range(0, namespace_count):
+                if element.get('{lxml}namespace_uri_' + str(index)) == uri:
+                    prefix = element.get('{lxml}namespace_prefix_' + str(index))
+                    full_name = local_name
+                    if prefix != '':
+                        full_name = prefix + ':' + local_name
+                    yield (uri, local_name, prefix, full_name)
+            
+            element = element.getparent()

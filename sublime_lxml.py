@@ -1,6 +1,7 @@
 import sublime
 from .lxml_parser import *
 from .sublime_helper import get_scopes
+import re
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getNodeTagRegion(view, node, position_type):
@@ -87,19 +88,42 @@ def getNodesAtPositions(view, roots, positions):
     for root in roots:
         if root is not None:
             last_match_index = len(positions) - 1
-            get_matches_in_tree = True
-            if len(roots) > 1: # if there is only one tree, we can skip the optimization check, because we know for sure the matches will be in the tree
-                open_pos, close_pos = getNodePosition(view, root)
-                root_matches, start_match_index, last_match_index = matchSpan(open_pos.cover(close_pos), start_match_index, last_match_index, True)
-                get_matches_in_tree = len(root_matches) > 0 # determine if it is worth checking this tree
+            
+            open_pos, close_pos = getNodePosition(view, root)
+            root_matches, start_match_index, last_match_index = matchSpan(open_pos.cover(close_pos), start_match_index, last_match_index, True)
+            get_matches_in_tree = len(root_matches) > 0 # determine if it is worth checking this tree
+                
             if get_matches_in_tree: # skip the tree if it doesn't participate in the match (saves iterating through all children of root element unnecessarily)
                 start_match_index = getMatches(root, start_match_index, last_match_index, matches)
     
     return matches
 
-def get_regions_of_nodes(view, nodes, position_type):
+def get_nodes_from_document(nodes):
+    """Given a list of nodes that are the result of an XPath query, return those that belong to the original document."""
+    global ns_loc
     for node in nodes:
+        element = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
+            element = node.getparent() # get the parent
+        elif isinstance(node, etree._Element):
+            element = node
+        else:
+            continue # unsupported type
+        
+        key = next((key for key in element.attrib.keys() if key.startswith('{' + ns_loc + '}')), None)
+        # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
+        if key is not None:
+            yield node
+
+def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
+    for node in nodes:
+        attr_name = None
+        is_text = None
+        is_tail = None
+        if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
+            attr_name = node.attrname
+            is_text = node.is_text
+            is_tail = node.is_tail
             node = node.getparent() # get the parent
         elif not isinstance(node, etree._Element):
             continue # unsupported type
@@ -112,36 +136,96 @@ def get_regions_of_nodes(view, nodes, position_type):
         except: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
             continue
         
-        # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
-        # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
-        # position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
-        # position type 'content' <name>|content<subcontent />|</name> "Goto content"
-        # position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
-        
-        if position_type in ('open', 'close', 'names'):
+        if is_text or is_tail:
+            text_begin_pos = None
+            text_end_pos = None
+            next_node = None
+            if is_text:
+                text_begin_pos = open_pos.end()
+                text_end_pos = close_pos.begin()
+                next_node = node.iterchildren()
+            elif is_tail:
+                text_begin_pos = close_pos.end()
+                text_end_pos = getNodeTagRegion(view, node.getparent(), 'close').begin()
+                next_node = node.itersiblings()
+            
+            next_node = next(next_node, None)
+            if next_node is not None:
+                text_end_pos = getNodeTagRegion(view, next_node, 'open').begin()
+            yield sublime.Region(text_begin_pos, text_end_pos)
+        elif attr_name is None or attribute_position_type is None or attribute_position_type in ('element', 'parent'):
+            # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
+            # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
+            # position type 'names' <|name| attr1="test"></|name|> "Goto name in open and close tags"
+            # position type 'content' <name>|content<subcontent />|</name> "Goto content"
+            # position type 'entire' |<name>content<subcontent /></name>| "Select entire element" # the idea being, that you can even paste it into a single-selection app, and it will have only the selected elements - useful for filtering out only useful/relevant parts of a document after a xpath query etc.
+            # position type 'open_attributes' <name| attr1="test" attr2="hello" |/>
+            
+            if element_position_type in ('open', 'close', 'names', 'open_attributes'):
+                tag = getTagName(node)[2]
+                # select only the tag name with the prefix
+                chars_before_tag = len('<')
+                if element_position_type == 'open_attributes':
+                    chars_before = '>'
+                    if isTagSelfClosing(node):
+                        chars_before += '/'
+                    yield sublime.Region(open_pos.begin() + chars_before_tag + len(tag), open_pos.end() - len(chars_before))
+                else:
+                    if element_position_type in ('open', 'names') or isTagSelfClosing(node):
+                        yield sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag))
+                    if element_position_type in ('close', 'names') and not isTagSelfClosing(node):
+                        chars_before_tag += len('/')
+                        yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag))
+            elif element_position_type == 'content':
+                yield sublime.Region(open_pos.end(), close_pos.begin())
+            elif element_position_type == 'entire':
+                yield sublime.Region(open_pos.begin(), close_pos.end())
+        elif attribute_position_type != 'none':
+            # position type 'name' <element |attr1|="test"></element> "Goto attribute name in open tag"
+            # position type 'content' <element attr1="|test|"></element> "Goto attribute value in open tag"
+            # position type 'entire' <element |attr1="test"|></element> "Goto attribute declaration in open tag"
+            
             tag = getTagName(node)[2]
-            # select only the tag name with the prefix
-            chars_before_tag = len('<')
-            if position_type in ('open', 'names') or isTagSelfClosing(node):
-                yield sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag))
-            if position_type in ('close', 'names') and not isTagSelfClosing(node):
-                chars_before_tag += len('/')
-                yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag))
-        elif position_type == 'content':
-            yield sublime.Region(open_pos.end(), close_pos.begin())
-        elif position_type == 'entire':
-            yield sublime.Region(open_pos.begin(), close_pos.end())
+            
+            attr = get_namespace_details_for_qualified_name(node, attr_name)
+            attr_check = next(attr)
+            
+            chars_before = len('<' + tag)
+            attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))
+            chars_before -= len(' ')
+            
+            for match in re.finditer('\s+((\w+(?::\w+)?)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'))', attrs):
+                is_this_one = False
+                if attr_check[2] == '': # if there is no prefix
+                    is_this_one = match.group(2) == attr_check[1] # do a simple comparison
+                elif match.group(2) == attr_check[3]: # if the full name matches
+                    is_this_one = True
+                
+                if is_this_one:
+                    group = (1)
+                    if attribute_position_type in ('name'):
+                        group = (2)
+                    elif attribute_position_type in ('value', 'content'):
+                        group = (3, 4)
+                    
+                    group = next(g for g in group if match.group(g) is not None) # find first value match group (i.e. if double quotes, group 3, if single quotes, group 4)
+                    yield sublime.Region(open_pos.begin() + chars_before + match.start(group), open_pos.begin() + chars_before + match.end(group))
+                    break
 
-def move_cursors_to_nodes(view, nodes, position_type):
+def move_cursors_to_nodes(view, nodes, element_position_type, attribute_position_type):
     nodes = list(nodes)
-    cursors = list(get_regions_of_nodes(view, nodes, position_type))
+    
+    total_results = len(nodes)
+    
+    nodes = list(get_nodes_from_document(nodes))
+    cursors = list(get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type))
     if len(cursors) > 0:
         view.sel().clear()
         view.sel().add_all(cursors)
         
         view.show(cursors[0]) # scroll to show the first selection, if it is not already visible
         
-    return (len(cursors), len(nodes))
+    return (len(nodes), total_results)
 
 def getElementXMLPreview(view, node, maxlen):
     """Generate the xml string for the given node, up to the specified number of characters."""

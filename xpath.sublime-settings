@@ -37,5 +37,9 @@
 	// characters that, when typed in the xpath expression input panel, will automatically trigger autocompletions. If empty, autocompletion can still be triggered manually
 	"auto_completion_triggers": "'/[$@:( '",
 	// whether or not to include intelligent autocompletion suggestions from the document
-	"intelligent_auto_complete": true
+	"intelligent_auto_complete": true,
+	// when an element is selected via an XPath query, what aspect of it should the cursor move to? possible values: open, close, names, open_attributes, content, entire
+	"goto_element": "open",
+	// when an attribute is selected via an XPath query, what aspect of it should the cursor move to? possible values: name, value, entire
+	"goto_attribute": "value"
 }

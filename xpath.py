@@ -357,7 +357,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                 position_type = 'open'
                 if args['direction'] in non_open_positions:
                     position_type = args['direction']
-                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type)
+                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type, None)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
@@ -633,15 +633,29 @@ def namespace_map_for_tree(tree):
     namespaces = unique_namespace_prefixes(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
     return namespaces
 
-class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('select_results_from_xpath_query', { 'xpath': '//*' })
+class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('select_results_from_xpath_query', { 'xpath': '//*', 'goto_element': 'names' })
     def run(self, edit, **kwargs):
         contexts = get_context_nodes_from_cursors(self.view)
         nodes = get_results_for_xpath_query_multiple_trees(kwargs['xpath'], contexts, namespace_map_from_contexts(contexts))
-        total_selections, total_results = move_cursors_to_nodes(self.view, nodes, 'open')
-        if total_results == total_selections:
+        
+        global settings
+        goto_element = settings.get('goto_element', 'open')
+        goto_attribute = settings.get('goto_attribute', 'value')
+        if goto_element == 'none':
+            goto_element = 'open'
+        if goto_attribute == 'none':
+            goto_attribute = 'value'
+        
+        if 'goto_element' in kwargs:
+            goto_element = kwargs['goto_element']
+        if 'goto_attribute' in kwargs:
+            goto_attribute = kwargs['goto_attribute']
+        
+        total_selectable_results, total_results = move_cursors_to_nodes(self.view, nodes, goto_element, goto_attribute)
+        if total_selectable_results == total_results:
             sublime.status_message(str(total_results) + ' nodes selected')
         else:
-            sublime.status_message(str(total_selections) + ' nodes selected out of ' + str(total_results))
+            sublime.status_message(str(total_selectable_results) + ' nodes selected out of ' + str(total_results))
         add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), kwargs['xpath'])
 
 class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })
@@ -652,7 +666,7 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
         if global_history:
             keys = None
         
-        # TODO: somehow preserve original $contexts variable?
+        # TODO: preserve original $contexts variable (xpaths of all context nodes) with history, and restore here?
         history = get_xpath_query_history_for_keys(keys)
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
@@ -741,9 +755,24 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         """Cache context nodes to allow live mode to work with them."""
         context_nodes = get_context_nodes_from_cursors(self.view)
         self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
+        
+        tree_count = 0
         for root in context_nodes:
+            tree_count += 1
+            
             print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
-    
+        
+        self.highlighted_result = None
+        self.highlighted_index = -1
+        
+        if tree_count == 1: # if there is exactly one xml tree
+            tree = next(iter(context_nodes.keys())) # get the tree
+            if len(context_nodes[tree]) == 0: # if there are no context nodes
+                context_nodes[tree].append(tree.getroot()) # use the root element as the context node
+            # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
+            self.highlighted_result = context_nodes[tree][0]
+            self.highlighted_index = 0
+        
     def run(self, edit, **args):
         self.cache_context_nodes()
         if len(self.contexts[1].keys()) == 0: # if there are no context nodes, don't proceed to show the xpath input panel
@@ -782,6 +811,12 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         self.arguments['normalize_whitespace_in_preview'] = getBoolValueFromArgsOrSettings('normalize_whitespace_in_preview', self.arguments, False)
         self.arguments['auto_completion_triggers'] = settings.get('auto_completion_triggers', '/')
         self.arguments['intelligent_auto_complete'] = getBoolValueFromArgsOrSettings('intelligent_auto_complete', self.arguments, True)
+        
+        
+        if 'goto_element' not in self.arguments:
+            self.arguments['goto_element'] = settings.get('goto_element', 'open')
+        if 'goto_attribute' not in self.arguments:
+            self.arguments['goto_attribute'] = settings.get('goto_attribute', 'value')
         
         super().parse_args()
     
@@ -845,8 +880,10 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         return [show_preview(item) for item in results]
         
     def quickpanel_selection_changed(self, selected_index):
+        super().quickpanel_selection_changed(selected_index)
         if selected_index > -1: # quick panel wasn't cancelled
-            move_cursors_to_nodes(self.view, [self.items[selected_index]], 'open')
+            move_cursors_to_nodes(self.view, [self.items[selected_index]], self.arguments['goto_element'], self.arguments['goto_attribute'])
+            self.refresh_selection_bug_work_around()
             #self.view.window().focus_view(self.view) # focus the view to try getting the cursor positions to update while the quick panel is open
             #if self.input_panel is not None:
             #    self.input_panel.window().focus_view(self.input_panel)
@@ -899,6 +936,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
             for completion in funcs[key]:
                 yield (completion + '\t' + key + ' functions', completion + '($1)')
     
+    global ns_loc
     completions = []
     
     variables['contexts'] = None
@@ -941,6 +979,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 exec_query = subqueries[-1] + '*'
                 if prefix != '':
                     exec_query += '[starts-with(name(), $_prefix)]'
+                exec_query += '[namespace-uri() != $ns_loc]'
                 
                 # determine if any queries can be skipped, due to using an absolute path
                 relevant_queries = 0
@@ -962,6 +1001,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 xpath_variables['contexts'] = contexts[tree]
                 xpath_variables['expression_contexts'] = None
                 xpath_variables['_prefix'] = prefix
+                xpath_variables['ns_loc'] = ns_loc
                 
                 for query in subqueries[0:-1] + [exec_query]:
                     if query != '':
@@ -986,9 +1026,14 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             completions.append((fullname + '\tElement', fullname))
                         elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
                             if prev_char == '@' or result.is_attribute:
-                                global ns_loc
-                                if not result.attrname.startswith('{' + ns_loc + '}'):
-                                    completions.append((result.attrname + '\tAttribute', result.attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
+                                attrname = result.attrname
+                                if attrname.startswith('{'):
+                                    #if attrname.startswith('{' + ns_loc + '}'):
+                                    #    continue
+                                    root = result.getparent().getroottree().getroot()
+                                    ns, localname = attrname[len('{'):].split('}')
+                                    attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == ns)) + ':' + localname # find the first prefix in the map that relates to this uri
+                                completions.append((attrname + '\tAttribute', attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
                         else: # debug, are we missing something we could suggest?
                             #completions.append((str(result) + '\t' + str(type(result)), str(result)))
                             pass
