@@ -114,6 +114,8 @@ def get_nodes_from_document(nodes):
         element = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             element = node.getparent() # get the parent
+            if element is None:
+                continue
         elif isinstance(node, etree._Element):
             element = node
         else:
