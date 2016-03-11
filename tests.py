@@ -1,6 +1,7 @@
 import sublime
 import sublime_plugin
 import traceback
+import re
 
 from .lxml_parser import *
 from .sublime_lxml import parse_xpath_query_for_completions
@@ -110,8 +111,31 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 # - name
                 # - value
                 # - entire
+                # check what happens to the status bar text when going to the results of a function
+                 
+                def goto_xpath_element(xpath, element_type, attribute_type):
+                    view.run_command('select_results_from_xpath_query', { 'xpath': xpath, 'goto_element': element_type, 'goto_attribute': attribute_type })
+                    #print(view.get_status('xpath'))
+                    # TODO: currently status is reported as blank, maybe needs time to update? perhaps execute another command to test the status or set a timeout?
+                    #status_text = re.match('XPath[^:]*: (.*)', view.get_status('xpath')).group(1)
+                    
+                    #assert status_text == xpath
                 
-                # check status bar text?
+                goto_xpath_element('/test/default1:hello', 'names', None)
+                goto_xpath_element('/test/default1:hello', 'open', None)
+                goto_xpath_element('/test/default1:hello', 'entire', None)
+                goto_xpath_element('/test/default1:hello/default2:world', 'close', None)
+                goto_xpath_element('/test/default1:hello/default2:world', 'content', None)
+                goto_xpath_element('/test/default1:hello/default2:world', 'open_attributes', None)
+                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'content', None)
+                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'open_attributes', None)
+                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'names', None)
+                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'close', None)
+                
+                # TODO: attributes and text nodes and functions
+                #       - add attributes to test xml
+                #goto_xpath('//text()[contains(., ''text'')]')
+                #goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')')
                 
                 # close the view we opened for testing
                 view.window().run_command('close')
