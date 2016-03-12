@@ -118,8 +118,9 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                     #print(view.get_status('xpath'))
                     # TODO: currently status is reported as blank, maybe needs time to update? perhaps execute another command to test the status or set a timeout?
                     #status_text = re.match('XPath[^:]*: (.*)', view.get_status('xpath')).group(1)
-                    
                     #assert status_text == xpath
+                    # TODO: or could check cursor positions
+                    #print(view.sel()[0])
                 
                 goto_xpath_element('/test/default1:hello', 'names', None)
                 goto_xpath_element('/test/default1:hello', 'open', None)
@@ -135,8 +136,11 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 # TODO: attributes and text nodes and functions
                 #       - add attributes to test xml
                 #goto_xpath('//text()[contains(., ''text'')]')
-                #goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')')
-                
+                #goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')') #  check that selection didn't move 
+                #goto_xpath('(//*)[position() < 3]', 'open') # multiple elements
+                # relative nodes from context node
+                # multiple contexts
+
                 # close the view we opened for testing
                 view.window().run_command('close')
                 
