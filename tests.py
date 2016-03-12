@@ -14,10 +14,11 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
             
             def lxml_parser_tests():
                 def TestLocation(element, positions):
-                    assert getSpecificNodePosition(element, 'open_tag_start_pos') == positions[0]
-                    assert getSpecificNodePosition(element, 'open_tag_end_pos') == positions[1]
-                    assert getSpecificNodePosition(element, 'close_tag_start_pos') == positions[2]
-                    assert getSpecificNodePosition(element, 'close_tag_end_pos') == positions[3]
+                    position_map = ['open_tag_start_pos', 'open_tag_end_pos', 'close_tag_start_pos', 'close_tag_end_pos']
+                    
+                    for index, position_type in enumerate(position_map):
+                        actual_pos = getSpecificNodePosition(element, position_type)
+                        assert actual_pos == positions[index], position_type + ' expected: ' + repr(positions[index]) + ' actual: ' + repr(actual_pos)
                     
                     assert getNodeTagRange(element, 'open') == (positions[0], positions[1])
                     assert getNodeTagRange(element, 'close') == (positions[2], positions[3])
@@ -29,10 +30,10 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 TestLocation(element, [(3, 1), (3, 25), (13, 1), (13, 9)])
                 
                 element = next(tree.getroot().iter(tag = 'text')) # "text" element, contains text
-                TestLocation(element, [(28, 1), (28, 7), (28, 43), (28, 50)])
+                TestLocation(element, [(28, 1), (28, 35), (28, 91), (28, 98)])
                 element = element[0] # "more" element, self-closing
                 assert isTagSelfClosing(element) is True
-                TestLocation(element, [(28, 18), (28, 26), (28, 18), (28, 26)])
+                TestLocation(element, [(28, 46), (28, 74), (28, 46), (28, 74)])
                 
                 ns = [ns for ns in tree.xpath('//namespace::*') if ns[1] not in ('lxml') and ns[0] not in (None, 'xml')][0]
                 element = tree.xpath('//a:*[1]', namespaces = { 'a': ns[1] })[0]
