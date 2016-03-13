@@ -152,8 +152,9 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 random_pos = random.randint(0, view.size())
                 view.sel().clear()
                 view.sel().add(sublime.Region(random_pos))
-                goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) #  check that selection didn't move 
-                goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) #  check that selection didn't move 
+                goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) #  check that selection didn't move
+                goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) #  check that selection didn't move
+                goto_xpath('/test/text/@attr1', None, 'none', [(random_pos, random_pos)]) #  check that selection didn't move
                 
                 # close the view we opened for testing
                 view.window().run_command('close')
