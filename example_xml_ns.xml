@@ -25,7 +25,7 @@
 	<numeric xmlns:an3="numbered_ns"><!-- specific namespace prefix with a numeric suffix declared -->
 		<an3:okay></an3:okay>
 	</numeric>
-	<text attr1="hello" attr2='world'>sample text<more some_value
+	<text attr1="hello" attr2='world' xmlns:abc="abc">sample text<more some_value
 		=
-		"foobar" another_value = "super" xmlns:abc="abc" abc:another_value="value" /> lorem ipsum etc.</text>
+		"foobar" another_value = "super" abc:another_value="value" /> lorem ipsum etc.</text>
 </test>
