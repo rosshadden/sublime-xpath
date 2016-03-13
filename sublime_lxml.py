@@ -206,9 +206,9 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
                     is_this_one = True
                 
                 if is_this_one:
-                    group = (1)
+                    group = (1, None)
                     if attribute_position_type in ('name'):
-                        group = (2)
+                        group = (2, None)
                     elif attribute_position_type in ('value', 'content'):
                         group = (3, 4)
                     

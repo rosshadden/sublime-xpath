@@ -1,7 +1,7 @@
 import sublime
 import sublime_plugin
 import traceback
-import re
+import random
 
 from .lxml_parser import *
 from .sublime_lxml import parse_xpath_query_for_completions
@@ -30,10 +30,10 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 TestLocation(element, [(3, 1), (3, 25), (13, 1), (13, 9)])
                 
                 element = next(tree.getroot().iter(tag = 'text')) # "text" element, contains text
-                TestLocation(element, [(28, 1), (28, 35), (28, 91), (28, 98)])
+                TestLocation(element, [(28, 1), (28, 35), (30, 96), (30, 103)])
                 element = element[0] # "more" element, self-closing
                 assert isTagSelfClosing(element) is True
-                TestLocation(element, [(28, 46), (28, 74), (28, 46), (28, 74)])
+                TestLocation(element, [(28, 46), (30, 79), (28, 46), (30, 79)])
                 
                 ns = [ns for ns in tree.xpath('//namespace::*') if ns[1] not in ('lxml') and ns[0] not in (None, 'xml')][0]
                 element = tree.xpath('//a:*[1]', namespaces = { 'a': ns[1] })[0]
@@ -108,40 +108,53 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 # - content
                 # - entire
                 # - open_attributes
+                # - none
                 # check that going to an attribute node works
                 # - name
                 # - value
                 # - entire
-                # check what happens to the status bar text when going to the results of a function
+                # - none
                  
-                def goto_xpath_element(xpath, element_type, attribute_type):
+                def goto_xpath(xpath, element_type, attribute_type, expected_cursors):
                     view.run_command('select_results_from_xpath_query', { 'xpath': xpath, 'goto_element': element_type, 'goto_attribute': attribute_type })
-                    #print(view.get_status('xpath'))
-                    # TODO: currently status is reported as blank, maybe needs time to update? perhaps execute another command to test the status or set a timeout?
-                    #status_text = re.match('XPath[^:]*: (.*)', view.get_status('xpath')).group(1)
-                    #assert status_text == xpath
-                    # TODO: or could check cursor positions
-                    #print(view.sel()[0])
+                    for index, actual_cursor in enumerate(view.sel()):
+                        assert len(expected_cursors) > index, 'xpath: ' + xpath + '\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\nunexpected cursor: ' + repr(actual_cursor)
+                        assert expected_cursors[index] == (actual_cursor.begin(), actual_cursor.end()), 'xpath: ' + xpath + '\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\nexpected: ' + repr(expected_cursors[index]) + '\nactual: ' + repr(actual_cursor)
+                    assert len(expected_cursors) == len(view.sel()), 'xpath: ' + xpath + '\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\nexpected cursors missing: ' + repr(expected_cursors[len(view.sel()):])
                 
-                goto_xpath_element('/test/default1:hello', 'names', None)
-                goto_xpath_element('/test/default1:hello', 'open', None)
-                goto_xpath_element('/test/default1:hello', 'entire', None)
-                goto_xpath_element('/test/default1:hello/default2:world', 'close', None)
-                goto_xpath_element('/test/default1:hello/default2:world', 'content', None)
-                goto_xpath_element('/test/default1:hello/default2:world', 'open_attributes', None)
-                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'content', None)
-                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'open_attributes', None)
-                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'names', None)
-                goto_xpath_element('/test/default1:hello/default2:world/default2:example', 'close', None)
+                goto_xpath('/test/default1:hello', 'open', None, [(33, 38)])
+                goto_xpath('/test/default1:hello', 'names', None, [(33, 38), (1189, 1194)])
+                goto_xpath('/test/default1:hello', 'entire', None, [(32, 1195)])
+                goto_xpath('/test/default1:hello/default2:world', 'close', None, [(1178, 1183)])
+                goto_xpath('/test/default1:hello/default2:world', 'content', None, [(1080, 1176)])
+                goto_xpath('/test/default1:hello/default2:world', 'open_attributes', None, [(992, 1079)])
+                goto_xpath('/test/default1:hello/default2:world/default2:example', 'content', None, [(1096, 1096)])
+                goto_xpath('/test/default1:hello/default2:world/default2:example', 'open_attributes', None, [(1093, 1095)])
+                goto_xpath('/test/default1:hello/default2:world/default2:example', 'names', None, [(1086, 1093), (1098, 1105)])
+                goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1098, 1105)])
                 
-                # TODO: attributes and text nodes and functions
-                #       - add attributes to test xml
-                #goto_xpath('//text()[contains(., ''text'')]')
-                #goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')') #  check that selection didn't move 
-                #goto_xpath('(//*)[position() < 3]', 'open') # multiple elements
+                goto_xpath('(//text())[1]', None, None, [(29, 32)])
+                goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
+                goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
+                goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2784, 2788)]) # multiple elements
+                goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
                 # relative nodes from context node
+                goto_xpath('../preceding-sibling::default3:more/descendant-or-self::*', 'open', None, [(1199, 1203), (1480, 1490)])
                 # multiple contexts
-
+                goto_xpath('$contexts/..', 'open', None, [(24, 28), (1199, 1203)])
+                
+                # attributes
+                goto_xpath('/test/text/@attr1', None, 'value', [(2622, 2627)])
+                goto_xpath('/test/text/@*', None, 'name', [(2615, 2620), (2629, 2634)])
+                goto_xpath('/test/text/@*', None, 'entire', [(2615, 2628), (2629, 2642)])
+                # TODO: attribute with namespace prefix
+                
+                random_pos = random.randint(0, view.size())
+                view.sel().clear()
+                view.sel().add(sublime.Region(random_pos))
+                goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) #  check that selection didn't move 
+                goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) #  check that selection didn't move 
+                
                 # close the view we opened for testing
                 view.window().run_command('close')
                 
