@@ -30,10 +30,10 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 TestLocation(element, [(3, 1), (3, 25), (13, 1), (13, 9)])
                 
                 element = next(tree.getroot().iter(tag = 'text')) # "text" element, contains text
-                TestLocation(element, [(28, 1), (28, 51), (30, 80), (30, 87)])
+                TestLocation(element, [(28, 1), (28, 35), (30, 96), (30, 103)])
                 element = element[0] # "more" element, self-closing
                 assert isTagSelfClosing(element) is True
-                TestLocation(element, [(28, 62), (30, 63), (28, 62), (30, 63)])
+                TestLocation(element, [(28, 46), (30, 79), (28, 46), (30, 79)])
                 
                 ns = [ns for ns in tree.xpath('//namespace::*') if ns[1] not in ('lxml') and ns[0] not in (None, 'xml')][0]
                 element = tree.xpath('//a:*[1]', namespaces = { 'a': ns[1] })[0]
@@ -134,7 +134,7 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1098, 1105)])
                 
                 goto_xpath('(//text())[1]', None, None, [(29, 32)])
-                goto_xpath("//text()[contains(., 'text')]", None, None, [(2659, 2670)])
+                goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
                 goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
                 goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2784, 2788)]) # multiple elements
                 goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])

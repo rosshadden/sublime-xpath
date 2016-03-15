@@ -70,15 +70,18 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             for attr_name, attr_value in attrs.items():
                 if attr_name[0] is None: # if there is no namespace URI associated with the attribute already
                     if attr_name[1].startswith('xmlns:'): # map the prefix to the namespace URI
-                        nsmap.append((attr_name, attr_name[1][len('xmlns:'):], attr_value))
+                        ns = (attr_name, attr_name[1][len('xmlns:'):], attr_value)
+                        nsmap.append(ns)
+                        self.startPrefixMapping(ns[1], ns[2]) # map the prefix to the URI
                     elif attr_name[1] == 'xmlns': # map the default namespace URI
-                        nsmap.append((attr_name, None, attr_value))
+                        ns = (attr_name, None, attr_value)
+                        nsmap.append(ns)
+                        self.startPrefixMapping(ns[1], ns[2]) # map the prefix to the URI
                     elif ':' in attr_name[1]: # separate the prefix from the local name
                         attrmap.append((attr_name, self._splitPrefixAndGetNamespaceURI(attr_name[1]), attr_value))
             
             for ns in nsmap:
                 attrs.pop(ns[0]) # remove the xmlns attribute
-                self.startPrefixMapping(ns[1], ns[2]) # map the prefix to the URI
             
             for attr in attrmap:
                 attrs.pop(attr[0]) # remove the attribute
