@@ -107,11 +107,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             self._recordPosition(current, 'open_tag_start_pos')
             
             current.set('{' + ns_loc + '}namespace_count', str(len(nsmap)))
-            ns_index = 0
-            for ns in nsmap:
+            for ns_index, ns in enumerate(nsmap):
                 current.set('{' + ns_loc + '}namespace_prefix_' + str(ns_index), ns[1] or '')
                 current.set('{' + ns_loc + '}namespace_uri_' + str(ns_index), ns[2])
-                ns_index += 1
             
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
