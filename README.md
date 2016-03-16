@@ -81,6 +81,9 @@ The recommended way to install the Sublime Text XPath plugin is via [Package Con
 1. Restart Sublime Text to be sure everything is loaded properly.
 1. Enjoy!
 
+## Known issues
+
+Comment nodes are ignored by Python's built in sax xml parser, so are not processed as part of the document tree, and therefore cannot be referenced from within an XPath expression. (The built in sax parser is used to retrieve location information (line and column numbers) while parsing the document. There is no other way of doing it, as Python's xml support is quite poor and implementations don't otherwise expose this information.)
 
 ## Potential future improvements:
 
