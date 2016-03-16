@@ -12,6 +12,9 @@ def clean_html(html_soup):
     root = fromhtmlstring(html_soup)
     return etree.tostring(root, encoding='unicode')
 
+class LocationAwareElement(etree.ElementBase):
+    pass
+
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, should_stop = None):
     """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the should_stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
@@ -19,11 +22,18 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
     parser.setFeature(feature_external_ges, False)
     global ns_loc
     
+    parser_lookup = etree.ElementDefaultClassLookup(element=LocationAwareElement)
+    lxml_parser = etree.XMLParser()
+    lxml_parser.set_element_class_lookup(parser_lookup)
+    
     class ETreeContent(ElementTreeContentHandler):
         _locator = None
         _prefix_hierarchy = []
         _last_action = None
         _prefixes_doc_order = []
+        
+        def __init__(self):
+            super().__init__(makeelement=lxml_parser.makeelement)
         
         def setDocumentLocator(self, locator):
             self._locator = locator
