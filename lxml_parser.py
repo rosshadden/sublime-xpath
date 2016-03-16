@@ -33,7 +33,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         _prefix_hierarchy = []
         _last_action = None
         _prefixes_doc_order = []
-        _all_elements = [] # necessary to keep the "proxy" alive, so it will keep our custom class attributes - otherwise, when the class instance is recreated, it no longer has the position information
+        _all_elements = [] # necessary to keep the "proxy" alive, so it will keep our custom class attributes - otherwise, when the class instance is recreated, it no longer has the position information - see http://lxml.de/element_classes.html#element-initialization
         
         def __init__(self):
             super().__init__(makeelement=lxml_parser.makeelement)
