@@ -10,14 +10,14 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
     def run(self, edit):
         try:
             xml = sublime.load_resource(sublime.find_resources('example_xml_ns.xml')[0])
-            tree, namespaces = lxml_etree_parse_xml_string_with_location(xml, 1)
+            tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml, 1)
             
             def lxml_parser_tests():
                 def TestLocation(element, positions):
                     position_map = ['open_tag_start_pos', 'open_tag_end_pos', 'close_tag_start_pos', 'close_tag_end_pos']
                     
                     for index, position_type in enumerate(position_map):
-                        actual_pos = getSpecificNodePosition(element, position_type)
+                        actual_pos = getattr(element, position_type)
                         assert actual_pos == positions[index], position_type + ' expected: ' + repr(positions[index]) + ' actual: ' + repr(actual_pos)
                     
                     assert getNodeTagRange(element, 'open') == (positions[0], positions[1])
