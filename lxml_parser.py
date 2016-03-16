@@ -66,7 +66,9 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             self._prefix_hierarchy.append({})
             
             nsmap = []
-            attrmap = []
+            attrs_to_map = []
+            attrmap = {}
+            
             for attr_name, attr_value in attrs.items():
                 if attr_name[0] is None: # if there is no namespace URI associated with the attribute already
                     if attr_name[1].startswith('xmlns:'): # map the prefix to the namespace URI
@@ -78,20 +80,21 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
                         nsmap.append(ns)
                         self.startPrefixMapping(ns[1], ns[2]) # map the prefix to the URI
                     elif ':' in attr_name[1]: # separate the prefix from the local name
-                        attrmap.append((attr_name, self._splitPrefixAndGetNamespaceURI(attr_name[1]), attr_value))
+                        attrs_to_map.append((attr_name, attr_value))
+                    else:
+                        attrmap[attr_name] = attr_value
+                else:
+                    attrmap[attr_name] = attr_value
             
-            for ns in nsmap:
-                attrs.pop(ns[0]) # remove the xmlns attribute
-            
-            for attr in attrmap:
-                attrs.pop(attr[0]) # remove the attribute
-                attrs[(attr[1][2], attr[1][1])] = attr[2] # re-add the attribute with the correct qualified name
+            for attr_name, attr_value in attrs_to_map:
+                split = self._splitPrefixAndGetNamespaceURI(attr_name[1])
+                attrmap[(split[2], split[1])] = attr_value
             
             tag = self._splitPrefixAndGetNamespaceURI(tag_name)
             name = (tag[2], tag[1])
             
             self._new_mappings = self._getNamespaceMap()
-            super().startElementNS(name, tag_name, attrs)
+            super().startElementNS(name, tag_name, attrmap)
             
             current = self._element_stack[-1]
             self._recordPosition(current, 'open_tag_start_pos')
