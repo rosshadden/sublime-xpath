@@ -105,16 +105,16 @@ def get_nodes_from_document(nodes):
         element = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             element = node.getparent() # get the parent
-            if element is None:
+            if element is None: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
                 continue
-        elif isinstance(node, etree._Element):
+        elif isinstance(node, etree.CommentBase):
+            continue
+        elif isinstance(node, etree.ElementBase):
             element = node
         else:
             continue # unsupported type
         
-        # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
-        if isinstance(element, LocationAwareElement) or isinstance(element, LocationAwareComment):
-            yield node
+        yield node
 
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
     for node in nodes:
