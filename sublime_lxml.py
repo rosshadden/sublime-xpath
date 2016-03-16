@@ -27,10 +27,11 @@ def getNodePositions(view, node):
     pos = open_pos.begin()
     
     for child in node.iterchildren():
-        child_open_pos, child_close_pos = getNodePosition(view, child)
-        yield (node, pos, child_open_pos.begin(), True)
-        pos = child_close_pos.end()
-        yield (child, child_open_pos.begin(), pos, len(child) == 0)
+        if isinstance(child, LocationAwareElement): # skip comments
+            child_open_pos, child_close_pos = getNodePosition(view, child)
+            yield (node, pos, child_open_pos.begin(), True)
+            pos = child_close_pos.end()
+            yield (child, child_open_pos.begin(), pos, len(child) == 0)
     
     yield (node, pos, close_pos.end(), True)
 
@@ -112,7 +113,7 @@ def get_nodes_from_document(nodes):
             continue # unsupported type
         
         # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
-        if isinstance(element, LocationAwareElement):
+        if isinstance(element, LocationAwareElement) or isinstance(element, LocationAwareComment):
             yield node
 
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):

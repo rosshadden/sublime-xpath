@@ -169,6 +169,8 @@ def getXPathOfNodes(nodes, args):
             index = 1
             
             def compare(sibling):
+                if not isinstance(sibling, LocationAwareElement): # skip comments
+                    return False
                 sibling_tag = getTagNameWithMappedPrefix(sibling, namespaces)
                 return sibling_tag == tag # namespace uri, prefix and tag name must all match
             

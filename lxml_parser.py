@@ -17,6 +17,12 @@ class LocationAwareElement(etree.ElementBase):
     
     new_namespaces = []
 
+class LocationAwareComment(etree.CommentBase):
+    open_tag_start_pos = None
+    open_tag_end_pos = None
+    close_tag_start_pos = None
+    close_tag_end_pos = None
+
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, should_stop = None):
     """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the should_stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
@@ -33,6 +39,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         _last_action = None
         _prefixes_doc_order = []
         _all_elements = [] # necessary to keep the "proxy" alive, so it will keep our custom class attributes - otherwise, when the class instance is recreated, it no longer has the position information - see http://lxml.de/element_classes.html#element-initialization
+        _previous_chars = None
         
         def __init__(self):
             super().__init__(makeelement=lxml_parser.makeelement)
@@ -72,8 +79,10 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         
         def startElementNS(self, name, tag_name, attrs):
             self._recordEndPosition()
-            
+            if len(self._element_stack) > 0:
+                self.characters('')
             self._last_action = 'open'
+            self._previous_chars = None
             # correct missing element and attribute namespaceURIs, using known prefixes and new prefixes declared with this element
             self._prefix_hierarchy.append({})
             
@@ -129,7 +138,8 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         
         def endElementNS(self, name, tag_name):
             self._recordEndPosition()
-            
+            self.characters('')
+            self._previous_chars = None
             self._last_action = 'close'
             
             current = self._element_stack[-1]
@@ -149,7 +159,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         def _recordEndPosition(self):
             if len(self._element_stack) > 0:
                 current = self._element_stack[-1]
-                if len(current) == 0: # current element has no children
+                if len(current) == 0: # current element has no children at this moment in time
                     if current.text is None:
                         self._recordPosition(current, 'open_tag_end_pos')
                 else: # current element has children
@@ -160,9 +170,34 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
                             if self._last_action == 'close' and last_child.close_tag_end_pos == last_child.open_tag_end_pos: # self-closing tag, update the start position of the "close tag" to the start position of the open tag
                                 self._recordPosition(last_child, 'close_tag_start_pos', last_child.open_tag_start_pos)
         
+        def _position_after_characters(self, position_before_chars, data):
+            if data == '\n':
+                return (position_before_chars[0] + 1, 0)
+            else:
+                return (position_before_chars[0], position_before_chars[1] + len(data))
+        
         def characters(self, data):
-            self._recordEndPosition()
-            super().characters(data)
+            position = self._getParsePosition()
+            if self._previous_chars is None:
+                self._recordEndPosition()
+            if self._previous_chars is not None:
+                expected_position = self._position_after_characters(self._previous_chars[0], self._previous_chars[1])
+                if position != expected_position:
+                    # create new text/CDATA node starting from position
+                    # NOTE: this isn't possible with ElementTree, because all it stores are an elements text and tail, so there is no capability to have text + CDATA + text or tail + CDATA + tail
+                    #       therefore we cheat and separate it using a comment node
+                    comment = LocationAwareComment('')
+                    comment.open_tag_start_pos = comment.close_tag_start_pos = expected_position
+                    comment.open_tag_end_pos = comment.close_tag_end_pos = position
+                    self._last_action = 'close'
+                    
+                    self._all_elements.append(comment)
+                    self._element_stack[-1].append(comment)
+            
+            if data != '':
+                super().characters(data)
+            
+            self._previous_chars = (position, data)
         
         def processingInstruction(self, target, data):
             pass # ignore processing instructions
