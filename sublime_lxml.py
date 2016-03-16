@@ -98,19 +98,9 @@ def getNodesAtPositions(view, roots, positions):
     
     return matches
 
-def filter_out_internal_nodes(nodes):
-    global ns_loc
-    for node in nodes:
-        if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
-            if node.attrname is not None and node.attrname.startswith('{' + ns_loc + '}'): # skip our internally created attributes
-                continue
-        
-        yield node
-
 def get_nodes_from_document(nodes):
     """Given a list of nodes that are the result of an XPath query, return those that belong to the original document."""
-    global ns_loc
-    for node in filter_out_internal_nodes(nodes):
+    for node in nodes:
         element = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             element = node.getparent() # get the parent
@@ -121,9 +111,8 @@ def get_nodes_from_document(nodes):
         else:
             continue # unsupported type
         
-        key = next((key for key in element.attrib.keys() if key.startswith('{' + ns_loc + '}')), None)
         # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
-        if key is not None:
+        if isinstance(element, LocationAwareElement):
             yield node
 
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):

@@ -5,8 +5,6 @@ from lxml.html import fromstring as fromhtmlstring
 from xml.sax.handler import feature_external_pes, feature_external_ges
 import collections
 
-ns_loc = 'lxml'
-
 def clean_html(html_soup):
     """Convert the given html tag soup string into a valid xml string."""
     root = fromhtmlstring(html_soup)
@@ -17,13 +15,14 @@ class LocationAwareElement(etree.ElementBase):
     open_tag_end_pos = None
     close_tag_start_pos = None
     close_tag_end_pos = None
+    
+    new_namespaces = []
 
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, should_stop = None):
     """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the should_stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
     parser.setFeature(feature_external_pes, False)
     parser.setFeature(feature_external_ges, False)
-    global ns_loc
     
     parser_lookup = etree.ElementDefaultClassLookup(element=LocationAwareElement)
     lxml_parser = etree.XMLParser()
@@ -114,10 +113,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             self._all_elements.append(current)
             self._recordPosition(current, 'open_tag_start_pos')
             
-            current.set('{' + ns_loc + '}namespace_count', str(len(nsmap)))
-            for ns_index, ns in enumerate(nsmap):
-                current.set('{' + ns_loc + '}namespace_prefix_' + str(ns_index), ns[1] or '')
-                current.set('{' + ns_loc + '}namespace_uri_' + str(ns_index), ns[2])
+            current.new_namespaces = nsmap
             
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
@@ -192,18 +188,11 @@ def chunks(entire, chunk_size): # http://stackoverflow.com/a/18854817/4473405
     """Return a generator that will split the input into chunks of the specified size."""
     return (entire[i : chunk_size + i] for i in range(0, len(entire), chunk_size))
 
-# TODO: consider subclassing etree.ElementBase and adding as methods to that
-def getSpecificNodePosition(node, position_name):
-    """Given a node and a position name, return the row and column that relates to the node's position."""
-    #global ns_loc
-    #row, col = node.get('{' + ns_loc + '}' + position_name).split('/')
-    #return (int(row), int(col))
-    return getattr(node, position_name)
-
+# TODO: consider moving to LocationAwareElement class
 def getNodeTagRange(node, position_type):
     """Given a node and position type (open or close), return the rows and columns that relate to the node's position."""
-    begin = getSpecificNodePosition(node, position_type + '_tag_start_pos')
-    end = getSpecificNodePosition(node, position_type + '_tag_end_pos')
+    begin = getattr(node, position_type + '_tag_start_pos')
+    end = getattr(node, position_type + '_tag_end_pos')
     return (begin, end)
 
 def getRelativeNode(relative_to, direction):
@@ -305,15 +294,14 @@ def execute_xpath_query(tree, xpath, context_node = None, **variables):
 
 def get_namespace_details_for_qualified_name(element, lxml_name):
     """Given an element and a lxml name in the form {uri}local_name or local_name, return the uri, local_name and matching prefixes."""
-    if not lxml_name.startswith('{') or not element.attrib.get('{lxml}namespace_count'):
+    if not lxml_name.startswith('{') or not isinstance(element, LocationAwareElement):
         yield (None, lxml_name, '', lxml_name)
     else:
         uri, local_name = lxml_name[len('{'):].split('}')
         while element is not None:
-            namespace_count = int(element.get('{lxml}namespace_count'))
-            for index in range(0, namespace_count):
-                if element.get('{lxml}namespace_uri_' + str(index)) == uri:
-                    prefix = element.get('{lxml}namespace_prefix_' + str(index))
+            for ns in element.new_namespaces:
+                if ns[2] == uri:
+                    prefix = ns[1] or ''
                     full_name = local_name
                     if prefix != '':
                         full_name = prefix + ':' + local_name

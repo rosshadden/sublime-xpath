@@ -134,8 +134,6 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         return containsSGML(self.view)
 
 def getXPathOfNodes(nodes, args):
-    global ns_loc
-    
     include_indexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
@@ -193,19 +191,18 @@ def getXPathOfNodes(nodes, args):
             attributes_to_show = []
             for attr_name in node.attrib:
                 include_attribue = False
-                if not attr_name.startswith('{' + ns_loc + '}'):
-                    if all_attributes:
-                        include_attribute = True
-                    else:
-                        if not case_sensitive:
-                            attr_name = attr_name.lower()
-                        attr = attr_name.split(':')
-                        include_attribute = attr_name in wanted_attributes
-                        if not include_attribue and len(attr) == 2:
-                            include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
-                    
-                    if include_attribute:
-                        attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
+                if all_attributes:
+                    include_attribute = True
+                else:
+                    if not case_sensitive:
+                        attr_name = attr_name.lower()
+                    attr = attr_name.split(':')
+                    include_attribute = attr_name in wanted_attributes
+                    if not include_attribue and len(attr) == 2:
+                        include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
+                
+                if include_attribute:
+                    attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
             
             if len(attributes_to_show) > 0:
                 output += '[' + ' and '.join(attributes_to_show) + ']'
@@ -510,9 +507,8 @@ def get_all_namespaces_in_tree(tree):
     # find all namespaces in the document, so that the same prefixes can be used for the xpath
     # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
     # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-    global ns_loc
     getNamespaces = etree.XPath('//namespace::*')
-    return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
+    return getUniqueItems(getNamespaces(tree))
 
 def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namespaces, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
@@ -838,7 +834,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = list(filter_out_internal_nodes(get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))
+                results = list(get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2]))
             except Exception as e:
                 status_text = str(e)
             
@@ -944,7 +940,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
             for completion in funcs[key]:
                 yield (completion + '\t' + key + ' functions', completion + '($1)')
     
-    global ns_loc
     completions = []
     
     variables['contexts'] = None
@@ -987,7 +982,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 exec_query = subqueries[-1] + '*'
                 if prefix != '':
                     exec_query += '[starts-with(name(), $_prefix)]'
-                #exec_query += '[namespace-uri() != $ns_loc]'
                 
                 # determine if any queries can be skipped, due to using an absolute path
                 relevant_queries = 0
@@ -1009,7 +1003,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 xpath_variables['contexts'] = contexts[tree]
                 xpath_variables['expression_contexts'] = None
                 xpath_variables['_prefix'] = prefix
-                xpath_variables['ns_loc'] = ns_loc
                 
                 for query in subqueries[0:-1] + [exec_query]:
                     if query != '':
@@ -1017,7 +1010,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             query = '$expression_contexts/' + query
                         xpath_variables['expression_contexts'] = completion_contexts
                         try:
-                            completion_contexts = filter_out_internal_nodes(get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables))
+                            completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
                             # TODO: if result is not a node, break out as we can't offer any useful suggestions (currently we just get an exception: Non-Element values not supported at this point - got 'example string') when it tries $expression_contexts/*
                         except Exception as e: # xpath query invalid, just show static contexts
                             completion_contexts = None
