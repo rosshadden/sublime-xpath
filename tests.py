@@ -135,8 +135,9 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 
                 goto_xpath('(//text())[1]', None, None, [(29, 32)])
                 goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
+                goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2783), (2792, 2795), (2798, 2801), (2815, 2818), (2836, 2839), (2842, 2844)]) # CDATA etc.
                 goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
-                goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2784, 2788)]) # multiple elements
+                goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2846, 2850)]) # multiple elements
                 goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
                 # relative nodes from context node
                 goto_xpath('../preceding-sibling::default3:more/descendant-or-self::*', 'open', None, [(1199, 1203), (1480, 1490)])
