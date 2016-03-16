@@ -175,11 +175,13 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
     
     parser.setContentHandler(createETree)
     
-    for chunk in chunks(xml_string, 1024 * 8): # read in 8 KiB chunks
-        if should_stop is not None:
+    if should_stop is None or not callable(should_stop):
+        parser.feed(xml_string)
+    else:
+        for chunk in chunks(xml_string, 1024 * 8): # read in 8 KiB chunks
             if should_stop():
                 break
-        parser.feed(chunk)
+            parser.feed(chunk)
     
     parser.close()
     return (createETree.etree, createETree._prefixes_doc_order, createETree._all_elements)
