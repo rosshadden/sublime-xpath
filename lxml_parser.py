@@ -1,8 +1,7 @@
 from lxml.sax import ElementTreeContentHandler
 from lxml import etree
-from xml.sax import make_parser
+from xml.sax import make_parser, handler
 from lxml.html import fromstring as fromhtmlstring
-from xml.sax.handler import feature_external_pes, feature_external_ges
 import collections
 
 def clean_html(html_soup):
@@ -21,8 +20,8 @@ class LocationAwareElement(etree.ElementBase):
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, should_stop = None):
     """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the should_stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
-    parser.setFeature(feature_external_pes, False)
-    parser.setFeature(feature_external_ges, False)
+    parser.setFeature(handler.feature_external_pes, False)
+    parser.setFeature(handler.feature_external_ges, False)
     
     parser_lookup = etree.ElementDefaultClassLookup(element=LocationAwareElement)
     lxml_parser = etree.XMLParser()
