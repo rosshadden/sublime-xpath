@@ -837,7 +837,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = list(get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2]))
+                results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2]) if not isinstance(result, etree.CommentBase)))
             except Exception as e:
                 status_text = str(e)
             
