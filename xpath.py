@@ -10,6 +10,7 @@ from .sublime_input_quickpanel import QuickPanelFromInputCommand
 
 change_counters = {}
 xml_roots = {}
+xml_elements = {}
 previous_first_selection = {}
 settings = None
 parse_error = 'XPath - error parsing XML at '
@@ -19,9 +20,11 @@ def settingsChanged():
     """Clear change counters and cached xpath regions for all views, and reparse xml regions for the current view."""
     global change_counters
     global xml_roots
+    global xml_elements
     global previous_first_selection
     change_counters.clear()
     xml_roots.clear()
+    xml_elements.clear()
     previous_first_selection.clear()
     updateStatusToCurrentXPathIfSGML(sublime.active_window().active_view())
 
@@ -75,13 +78,13 @@ def buildTreeForViewRegion(view, region_scope):
     if view.is_read_only():
         stop = None # no need to check for modifications if the view is read only
     try:
-        tree, namespaces = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
+        tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
     except SAXParseException as e:
         global parse_error
         text = 'line ' + str(e.getLineNumber() + line_number_offset) + ', column ' + str(e.getColumnNumber() + 1) + ' - ' + e.getMessage()
         view.set_status('xpath_error', parse_error + text)
     
-    return (tree, namespaces)
+    return (tree, namespaces, all_elements)
 
 def ensureTreeCacheIsCurrent(view):
     """If the document has been modified since the xml was parsed, parse it again to recreate the trees."""
@@ -90,17 +93,20 @@ def ensureTreeCacheIsCurrent(view):
     old_count = change_counters.get(view.id(), None)
     
     global xml_roots
+    global xml_elements
     if old_count is None or new_count > old_count:
         change_counters[view.id()] = new_count
         view.set_status('xpath', 'XML being parsed...')
         view.erase_status('xpath_error')
         
         xml_roots[view.id()] = []
-        for tree, namespaces in buildTreesForView(view):
+        xml_elements[view.id()] = []
+        for tree, namespaces, all_elements in buildTreesForView(view):
             root = None
             if tree is not None:
                 root = tree.getroot()
             xml_roots[view.id()].append(root)
+            xml_elements[view.id()].append(all_elements)
         
         view.erase_status('xpath')
         global previous_first_selection
@@ -407,9 +413,11 @@ class XpathListener(sublime_plugin.EventListener):
     def on_pre_close(self, view):
         global change_counters
         global xml_roots
+        global xml_elements
         global previous_first_selection
         change_counters.pop(view.id(), None)
         xml_roots.pop(view.id(), None)
+        xml_elements.pop(view.id(), None)
         previous_first_selection.pop(view.id(), None)
         
         if view.file_name() is None: # if the file has no filename associated with it
