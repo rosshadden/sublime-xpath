@@ -72,6 +72,7 @@ def buildTreeForViewRegion(view, region_scope):
     xml_string = view.substr(region_scope)
     tree = None
     namespaces = None
+    all_elements = None
     line_number_offset = view.rowcol(region_scope.begin())[0]
     change_count = view.change_count()
     stop = lambda: change_count < view.change_count() # stop parsing if the document is modified
