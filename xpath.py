@@ -761,7 +761,10 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
         context_nodes = get_context_nodes_from_cursors(self.view)
-        self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
+        change_count = self.view.change_count()
+        
+        different_tree = self.contexts is None or self.contexts[0] != change_count # if the document has changed since the context nodes were cached
+        self.contexts = (change_count, context_nodes, namespace_map_from_contexts(context_nodes))
         
         tree_count = 0
         for root in context_nodes:
@@ -769,20 +772,17 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             
             print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
         
-        self.highlighted_result = None
-        self.highlighted_index = -1
-        
         if tree_count == 1: # if there is exactly one xml tree
             tree = next(iter(context_nodes.keys())) # get the tree
             if len(context_nodes[tree]) == 0: # if there are no context nodes
                 context_nodes[tree].append(tree.getroot()) # use the root element as the context node
             # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
-            self.highlighted_result = context_nodes[tree][0]
-            self.highlighted_index = 0
+            if different_tree and isinstance(self.highlighted_result, LocationAwareElement):
+                self.highlighted_result = context_nodes[tree][0]
+                self.highlighted_index = 0
         
     def run(self, edit, **args):
-        if self.contexts is None or self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
-            self.cache_context_nodes()
+        self.cache_context_nodes()
         if len(self.contexts[1].keys()) == 0: # if there are no context nodes, don't proceed to show the xpath input panel
             return
         super().run(edit, **args)
