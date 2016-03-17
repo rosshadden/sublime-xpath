@@ -776,7 +776,9 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             tree = next(iter(context_nodes.keys())) # get the tree
             if len(context_nodes[tree]) == 0: # if there are no context nodes
                 context_nodes[tree].append(tree.getroot()) # use the root element as the context node
-            # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
+            # if the document has changed, attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far). If the document hasn't changed, keep the previously selected result.
+            # TODO: make a setting to define a preference for whether to try to show the previously selected node, or the context node. If the document has changed, the previously selected node can possibly be retained by it's exact XPath
+            #       - also attempt to fallback to the other when the specified one can't be found in the results
             if different_tree and isinstance(self.highlighted_result, LocationAwareElement):
                 self.highlighted_result = context_nodes[tree][0]
                 self.highlighted_index = 0
