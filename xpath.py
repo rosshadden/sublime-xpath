@@ -781,7 +781,8 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             self.highlighted_index = 0
         
     def run(self, edit, **args):
-        self.cache_context_nodes()
+        if self.contexts is None or self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
+            self.cache_context_nodes()
         if len(self.contexts[1].keys()) == 0: # if there are no context nodes, don't proceed to show the xpath input panel
             return
         super().run(edit, **args)
