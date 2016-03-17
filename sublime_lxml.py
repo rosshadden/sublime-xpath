@@ -27,10 +27,11 @@ def getNodePositions(view, node):
     pos = open_pos.begin()
     
     for child in node.iterchildren():
-        child_open_pos, child_close_pos = getNodePosition(view, child)
-        yield (node, pos, child_open_pos.begin(), True)
-        pos = child_close_pos.end()
-        yield (child, child_open_pos.begin(), pos, len(child) == 0)
+        if isinstance(child, LocationAwareElement): # skip comments
+            child_open_pos, child_close_pos = getNodePosition(view, child)
+            yield (node, pos, child_open_pos.begin(), True)
+            pos = child_close_pos.end()
+            yield (child, child_open_pos.begin(), pos, len(child) == 0)
     
     yield (node, pos, close_pos.end(), True)
 
@@ -98,31 +99,22 @@ def getNodesAtPositions(view, roots, positions):
     
     return matches
 
-def filter_out_internal_nodes(nodes):
-    global ns_loc
-    for node in nodes:
-        if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
-            if node.attrname is not None and node.attrname.startswith('{' + ns_loc + '}'): # skip our internally created attributes
-                continue
-        
-        yield node
-
 def get_nodes_from_document(nodes):
     """Given a list of nodes that are the result of an XPath query, return those that belong to the original document."""
-    global ns_loc
-    for node in filter_out_internal_nodes(nodes):
+    for node in nodes:
         element = None
         if isinstance(node, etree._ElementUnicodeResult): # if the node is an attribute or text node etc.
             element = node.getparent() # get the parent
-        elif isinstance(node, etree._Element):
+            if element is None: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
+                continue
+        elif isinstance(node, etree.CommentBase):
+            continue
+        elif isinstance(node, etree.ElementBase):
             element = node
         else:
             continue # unsupported type
         
-        key = next((key for key in element.attrib.keys() if key.startswith('{' + ns_loc + '}')), None)
-        # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
-        if key is not None:
-            yield node
+        yield node
 
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
     for node in nodes:
@@ -204,9 +196,9 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
                     is_this_one = True
                 
                 if is_this_one:
-                    group = (1)
+                    group = (1, None)
                     if attribute_position_type in ('name'):
-                        group = (2)
+                        group = (2, None)
                     elif attribute_position_type in ('value', 'content'):
                         group = (3, 4)
                     
