@@ -10,6 +10,7 @@ from .sublime_input_quickpanel import QuickPanelFromInputCommand
 
 change_counters = {}
 xml_roots = {}
+xml_elements = {}
 previous_first_selection = {}
 settings = None
 parse_error = 'XPath - error parsing XML at '
@@ -19,9 +20,11 @@ def settingsChanged():
     """Clear change counters and cached xpath regions for all views, and reparse xml regions for the current view."""
     global change_counters
     global xml_roots
+    global xml_elements
     global previous_first_selection
     change_counters.clear()
     xml_roots.clear()
+    xml_elements.clear()
     previous_first_selection.clear()
     updateStatusToCurrentXPathIfSGML(sublime.active_window().active_view())
 
@@ -69,19 +72,20 @@ def buildTreeForViewRegion(view, region_scope):
     xml_string = view.substr(region_scope)
     tree = None
     namespaces = None
+    all_elements = None
     line_number_offset = view.rowcol(region_scope.begin())[0]
     change_count = view.change_count()
     stop = lambda: change_count < view.change_count() # stop parsing if the document is modified
     if view.is_read_only():
         stop = None # no need to check for modifications if the view is read only
     try:
-        tree, namespaces = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
+        tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
     except SAXParseException as e:
         global parse_error
         text = 'line ' + str(e.getLineNumber() + line_number_offset) + ', column ' + str(e.getColumnNumber() + 1) + ' - ' + e.getMessage()
         view.set_status('xpath_error', parse_error + text)
     
-    return (tree, namespaces)
+    return (tree, namespaces, all_elements)
 
 def ensureTreeCacheIsCurrent(view):
     """If the document has been modified since the xml was parsed, parse it again to recreate the trees."""
@@ -90,17 +94,20 @@ def ensureTreeCacheIsCurrent(view):
     old_count = change_counters.get(view.id(), None)
     
     global xml_roots
+    global xml_elements
     if old_count is None or new_count > old_count:
         change_counters[view.id()] = new_count
         view.set_status('xpath', 'XML being parsed...')
         view.erase_status('xpath_error')
         
         xml_roots[view.id()] = []
-        for tree, namespaces in buildTreesForView(view):
+        xml_elements[view.id()] = []
+        for tree, namespaces, all_elements in buildTreesForView(view):
             root = None
             if tree is not None:
                 root = tree.getroot()
             xml_roots[view.id()].append(root)
+            xml_elements[view.id()].append(all_elements)
         
         view.erase_status('xpath')
         global previous_first_selection
@@ -128,8 +135,6 @@ class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
         return containsSGML(self.view)
 
 def getXPathOfNodes(nodes, args):
-    global ns_loc
-    
     include_indexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
@@ -164,6 +169,8 @@ def getXPathOfNodes(nodes, args):
             index = 1
             
             def compare(sibling):
+                if not isinstance(sibling, LocationAwareElement): # skip comments
+                    return False
                 sibling_tag = getTagNameWithMappedPrefix(sibling, namespaces)
                 return sibling_tag == tag # namespace uri, prefix and tag name must all match
             
@@ -187,19 +194,18 @@ def getXPathOfNodes(nodes, args):
             attributes_to_show = []
             for attr_name in node.attrib:
                 include_attribue = False
-                if not attr_name.startswith('{' + ns_loc + '}'):
-                    if all_attributes:
-                        include_attribute = True
-                    else:
-                        if not case_sensitive:
-                            attr_name = attr_name.lower()
-                        attr = attr_name.split(':')
-                        include_attribute = attr_name in wanted_attributes
-                        if not include_attribue and len(attr) == 2:
-                            include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
-                    
-                    if include_attribute:
-                        attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
+                if all_attributes:
+                    include_attribute = True
+                else:
+                    if not case_sensitive:
+                        attr_name = attr_name.lower()
+                    attr = attr_name.split(':')
+                    include_attribute = attr_name in wanted_attributes
+                    if not include_attribue and len(attr) == 2:
+                        include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
+                
+                if include_attribute:
+                    attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
             
             if len(attributes_to_show) > 0:
                 output += '[' + ' and '.join(attributes_to_show) + ']'
@@ -407,9 +413,11 @@ class XpathListener(sublime_plugin.EventListener):
     def on_pre_close(self, view):
         global change_counters
         global xml_roots
+        global xml_elements
         global previous_first_selection
         change_counters.pop(view.id(), None)
         xml_roots.pop(view.id(), None)
+        xml_elements.pop(view.id(), None)
         previous_first_selection.pop(view.id(), None)
         
         if view.file_name() is None: # if the file has no filename associated with it
@@ -502,9 +510,8 @@ def get_all_namespaces_in_tree(tree):
     # find all namespaces in the document, so that the same prefixes can be used for the xpath
     # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
     # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-    global ns_loc
     getNamespaces = etree.XPath('//namespace::*')
-    return getUniqueItems([ns for ns in getNamespaces(tree) if ns[1] != ns_loc])
+    return getUniqueItems(getNamespaces(tree))
 
 def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namespaces, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
@@ -754,7 +761,10 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
         context_nodes = get_context_nodes_from_cursors(self.view)
-        self.contexts = (self.view.change_count(), context_nodes, namespace_map_from_contexts(context_nodes))
+        change_count = self.view.change_count()
+        
+        different_tree = self.contexts is None or self.contexts[0] != change_count # if the document has changed since the context nodes were cached
+        self.contexts = (change_count, context_nodes, namespace_map_from_contexts(context_nodes))
         
         tree_count = 0
         for root in context_nodes:
@@ -762,16 +772,16 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             
             print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
         
-        self.highlighted_result = None
-        self.highlighted_index = -1
-        
         if tree_count == 1: # if there is exactly one xml tree
             tree = next(iter(context_nodes.keys())) # get the tree
             if len(context_nodes[tree]) == 0: # if there are no context nodes
                 context_nodes[tree].append(tree.getroot()) # use the root element as the context node
-            # attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far)
-            self.highlighted_result = context_nodes[tree][0]
-            self.highlighted_index = 0
+            # if the document has changed, attempt to highlight the context node in the quick panel by default so that the cursor doesn't move (far). If the document hasn't changed, keep the previously selected result.
+            # TODO: make a setting to define a preference for whether to try to show the previously selected node, or the context node. If the document has changed, the previously selected node can possibly be retained by it's exact XPath
+            #       - also attempt to fallback to the other when the specified one can't be found in the results
+            if different_tree and isinstance(self.highlighted_result, LocationAwareElement):
+                self.highlighted_result = context_nodes[tree][0]
+                self.highlighted_index = 0
         
     def run(self, edit, **args):
         self.cache_context_nodes()
@@ -830,7 +840,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = list(filter_out_internal_nodes(get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))
+                results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2]) if not isinstance(result, etree.CommentBase)))
             except Exception as e:
                 status_text = str(e)
             
@@ -936,7 +946,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
             for completion in funcs[key]:
                 yield (completion + '\t' + key + ' functions', completion + '($1)')
     
-    global ns_loc
     completions = []
     
     variables['contexts'] = None
@@ -979,7 +988,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 exec_query = subqueries[-1] + '*'
                 if prefix != '':
                     exec_query += '[starts-with(name(), $_prefix)]'
-                #exec_query += '[namespace-uri() != $ns_loc]'
                 
                 # determine if any queries can be skipped, due to using an absolute path
                 relevant_queries = 0
@@ -1001,7 +1009,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 xpath_variables['contexts'] = contexts[tree]
                 xpath_variables['expression_contexts'] = None
                 xpath_variables['_prefix'] = prefix
-                xpath_variables['ns_loc'] = ns_loc
                 
                 for query in subqueries[0:-1] + [exec_query]:
                     if query != '':
@@ -1009,7 +1016,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             query = '$expression_contexts/' + query
                         xpath_variables['expression_contexts'] = completion_contexts
                         try:
-                            completion_contexts = filter_out_internal_nodes(get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables))
+                            completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
                             # TODO: if result is not a node, break out as we can't offer any useful suggestions (currently we just get an exception: Non-Element values not supported at this point - got 'example string') when it tries $expression_contexts/*
                         except Exception as e: # xpath query invalid, just show static contexts
                             completion_contexts = None

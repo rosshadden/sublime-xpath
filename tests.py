@@ -10,14 +10,14 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
     def run(self, edit):
         try:
             xml = sublime.load_resource(sublime.find_resources('example_xml_ns.xml')[0])
-            tree, namespaces = lxml_etree_parse_xml_string_with_location(xml, 1)
+            tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml, 1)
             
             def lxml_parser_tests():
                 def TestLocation(element, positions):
                     position_map = ['open_tag_start_pos', 'open_tag_end_pos', 'close_tag_start_pos', 'close_tag_end_pos']
                     
                     for index, position_type in enumerate(position_map):
-                        actual_pos = getSpecificNodePosition(element, position_type)
+                        actual_pos = getattr(element, position_type)
                         assert actual_pos == positions[index], position_type + ' expected: ' + repr(positions[index]) + ' actual: ' + repr(actual_pos)
                     
                     assert getNodeTagRange(element, 'open') == (positions[0], positions[1])
@@ -135,8 +135,9 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 
                 goto_xpath('(//text())[1]', None, None, [(29, 32)])
                 goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
+                goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2783), (2792, 2795), (2798, 2801), (2815, 2818), (2836, 2839), (2842, 2844)]) # CDATA etc.
                 goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
-                goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2784, 2788)]) # multiple elements
+                goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2846, 2850)]) # multiple elements
                 goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
                 # relative nodes from context node
                 goto_xpath('../preceding-sibling::default3:more/descendant-or-self::*', 'open', None, [(1199, 1203), (1480, 1490)])

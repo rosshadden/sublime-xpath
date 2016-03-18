@@ -1,29 +1,48 @@
 from lxml.sax import ElementTreeContentHandler
 from lxml import etree
-from xml.sax import make_parser
+from xml.sax import make_parser, handler
 from lxml.html import fromstring as fromhtmlstring
-from xml.sax.handler import feature_external_pes, feature_external_ges
 import collections
-
-ns_loc = 'lxml'
 
 def clean_html(html_soup):
     """Convert the given html tag soup string into a valid xml string."""
     root = fromhtmlstring(html_soup)
     return etree.tostring(root, encoding='unicode')
 
+class LocationAwareElement(etree.ElementBase):
+    open_tag_start_pos = None
+    open_tag_end_pos = None
+    close_tag_start_pos = None
+    close_tag_end_pos = None
+    
+    new_namespaces = []
+
+class LocationAwareComment(etree.CommentBase):
+    open_tag_start_pos = None
+    open_tag_end_pos = None
+    close_tag_start_pos = None
+    close_tag_end_pos = None
+
 def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, should_stop = None):
     """Parse the specified xml_string in chunks, adding location attributes to the tree it returns. If the should_stop method is provided, stop/interrupt parsing if it returns True."""
     parser = make_parser()
-    parser.setFeature(feature_external_pes, False)
-    parser.setFeature(feature_external_ges, False)
-    global ns_loc
+    parser.setFeature(handler.feature_external_pes, False)
+    parser.setFeature(handler.feature_external_ges, False)
+    
+    parser_lookup = etree.ElementDefaultClassLookup(element=LocationAwareElement)
+    lxml_parser = etree.XMLParser()
+    lxml_parser.set_element_class_lookup(parser_lookup)
     
     class ETreeContent(ElementTreeContentHandler):
         _locator = None
         _prefix_hierarchy = []
         _last_action = None
         _prefixes_doc_order = []
+        _all_elements = [] # necessary to keep the "proxy" alive, so it will keep our custom class attributes - otherwise, when the class instance is recreated, it no longer has the position information - see http://lxml.de/element_classes.html#element-initialization
+        _previous_chars = None
+        
+        def __init__(self):
+            super().__init__(makeelement=lxml_parser.makeelement)
         
         def setDocumentLocator(self, locator):
             self._locator = locator
@@ -56,12 +75,14 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         
         def _getParsePosition(self):
             locator = self._locator or parser
-            return str(locator.getLineNumber() - 1 + line_number_offset) + '/' + str(locator.getColumnNumber())
+            return (locator.getLineNumber() - 1 + line_number_offset, locator.getColumnNumber())
         
         def startElementNS(self, name, tag_name, attrs):
             self._recordEndPosition()
-            
+            if len(self._element_stack) > 0:
+                self.characters('')
             self._last_action = 'open'
+            self._previous_chars = None
             # correct missing element and attribute namespaceURIs, using known prefixes and new prefixes declared with this element
             self._prefix_hierarchy.append({})
             
@@ -97,14 +118,10 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             super().startElementNS(name, tag_name, attrmap)
             
             current = self._element_stack[-1]
+            self._all_elements.append(current)
             self._recordPosition(current, 'open_tag_start_pos')
             
-            current.set('{' + ns_loc + '}namespace_count', str(len(nsmap)))
-            ns_index = 0
-            for ns in nsmap:
-                current.set('{' + ns_loc + '}namespace_prefix_' + str(ns_index), ns[1] or '')
-                current.set('{' + ns_loc + '}namespace_uri_' + str(ns_index), ns[2])
-                ns_index += 1
+            current.new_namespaces = nsmap
             
         def startPrefixMapping(self, prefix, uri):
             self._prefix_hierarchy[-1][prefix] = uri
@@ -121,7 +138,8 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
         
         def endElementNS(self, name, tag_name):
             self._recordEndPosition()
-            
+            self.characters('')
+            self._previous_chars = None
             self._last_action = 'close'
             
             current = self._element_stack[-1]
@@ -135,14 +153,13 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             self._prefix_hierarchy.pop()
         
         def _recordPosition(self, node, position_name, position = None):
-            position_name = '{' + ns_loc + '}' + position_name
-            if position is not None or position_name not in node.attrib.keys():
-                node.set(position_name, position or self._getParsePosition())
+            if position is not None or getattr(node, position_name) is None:
+                setattr(node, position_name, position or self._getParsePosition())
         
         def _recordEndPosition(self):
             if len(self._element_stack) > 0:
                 current = self._element_stack[-1]
-                if len(current) == 0: # current element has no children
+                if len(current) == 0: # current element has no children at this moment in time
                     if current.text is None:
                         self._recordPosition(current, 'open_tag_end_pos')
                 else: # current element has children
@@ -150,12 +167,37 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
                         last_child = current[-1] # get the last child
                         if last_child.tail is None and self._last_action is not None:
                             self._recordPosition(last_child, self._last_action + '_tag_end_pos')
-                            if self._last_action == 'close' and last_child.get('{' + ns_loc + '}close_tag_end_pos') == last_child.get('{' + ns_loc + '}open_tag_end_pos'): # self-closing tag, update the start position of the "close tag" to the start position of the open tag
-                                self._recordPosition(last_child, 'close_tag_start_pos', last_child.get('{' + ns_loc + '}open_tag_start_pos'))
+                            if self._last_action == 'close' and last_child.close_tag_end_pos == last_child.open_tag_end_pos: # self-closing tag, update the start position of the "close tag" to the start position of the open tag
+                                self._recordPosition(last_child, 'close_tag_start_pos', last_child.open_tag_start_pos)
+        
+        def _position_after_characters(self, position_before_chars, data):
+            if data == '\n':
+                return (position_before_chars[0] + 1, 0)
+            else:
+                return (position_before_chars[0], position_before_chars[1] + len(data))
         
         def characters(self, data):
-            self._recordEndPosition()
-            super().characters(data)
+            position = self._getParsePosition()
+            if self._previous_chars is None:
+                self._recordEndPosition()
+            if self._previous_chars is not None:
+                expected_position = self._position_after_characters(self._previous_chars[0], self._previous_chars[1])
+                if position != expected_position:
+                    # create new text/CDATA node starting from position
+                    # NOTE: this isn't possible with ElementTree, because all it stores are an elements text and tail, so there is no capability to have text + CDATA + text or tail + CDATA + tail
+                    #       therefore we cheat and separate it using a comment node
+                    comment = LocationAwareComment('')
+                    comment.open_tag_start_pos = comment.close_tag_start_pos = expected_position
+                    comment.open_tag_end_pos = comment.close_tag_end_pos = position
+                    self._last_action = 'close'
+                    
+                    self._all_elements.append(comment)
+                    self._element_stack[-1].append(comment)
+            
+            if data != '':
+                super().characters(data)
+            
+            self._previous_chars = (position, data)
         
         def processingInstruction(self, target, data):
             pass # ignore processing instructions
@@ -167,30 +209,26 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
     
     parser.setContentHandler(createETree)
     
-    for chunk in chunks(xml_string, 1024 * 8): # read in 8 KiB chunks
-        if should_stop is not None:
+    if should_stop is None or not callable(should_stop):
+        parser.feed(xml_string)
+    else:
+        for chunk in chunks(xml_string, 1024 * 8): # read in 8 KiB chunks
             if should_stop():
                 break
-        parser.feed(chunk)
+            parser.feed(chunk)
     
     parser.close()
-    return (createETree.etree, createETree._prefixes_doc_order)
+    return (createETree.etree, createETree._prefixes_doc_order, createETree._all_elements)
 
 def chunks(entire, chunk_size): # http://stackoverflow.com/a/18854817/4473405
     """Return a generator that will split the input into chunks of the specified size."""
     return (entire[i : chunk_size + i] for i in range(0, len(entire), chunk_size))
 
-# TODO: consider subclassing etree.ElementBase and adding as methods to that
-def getSpecificNodePosition(node, position_name):
-    """Given a node and a position name, return the row and column that relates to the node's position."""
-    global ns_loc
-    row, col = node.get('{' + ns_loc + '}' + position_name).split('/')
-    return (int(row), int(col))
-
+# TODO: consider moving to LocationAwareElement class
 def getNodeTagRange(node, position_type):
     """Given a node and position type (open or close), return the rows and columns that relate to the node's position."""
-    begin = getSpecificNodePosition(node, position_type + '_tag_start_pos')
-    end = getSpecificNodePosition(node, position_type + '_tag_end_pos')
+    begin = getattr(node, position_type + '_tag_start_pos')
+    end = getattr(node, position_type + '_tag_end_pos')
     return (begin, end)
 
 def getRelativeNode(relative_to, direction):
@@ -292,15 +330,14 @@ def execute_xpath_query(tree, xpath, context_node = None, **variables):
 
 def get_namespace_details_for_qualified_name(element, lxml_name):
     """Given an element and a lxml name in the form {uri}local_name or local_name, return the uri, local_name and matching prefixes."""
-    if not lxml_name.startswith('{') or not element.attrib.get('{lxml}namespace_count'):
+    if not lxml_name.startswith('{') or not isinstance(element, LocationAwareElement):
         yield (None, lxml_name, '', lxml_name)
     else:
         uri, local_name = lxml_name[len('{'):].split('}')
         while element is not None:
-            namespace_count = int(element.get('{lxml}namespace_count'))
-            for index in range(0, namespace_count):
-                if element.get('{lxml}namespace_uri_' + str(index)) == uri:
-                    prefix = element.get('{lxml}namespace_prefix_' + str(index))
+            for ns in element.new_namespaces:
+                if ns[2] == uri:
+                    prefix = ns[1] or ''
                     full_name = local_name
                     if prefix != '':
                         full_name = prefix + ':' + local_name
