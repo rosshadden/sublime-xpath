@@ -52,11 +52,6 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
     - include: pop_me
     - include: base_without_pop
   location_step:
-    - match: '(/{1,2})\s*(\*)'
-      captures:
-        1: punctuation.separator.xpath.location_step
-        2: variable.parameter.xpath # NameTest
-      set: operator_or_predicate
     - match: '/{1,2}'
       scope: punctuation.separator.xpath.location_step
       set: location_test
@@ -93,12 +88,11 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
     - match: '(comment|text|processing-instruction|node)\s*\(\s*\)'
       scope: storage.type.xpath.node_type # NodeType
       set: operator_or_predicate
-    - match: '((?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::)\s*(?:({{NCName}})?|({{Attribute}})?)'
+    - match: '((?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::)\s*'
       captures:
         1: constant.language.xpath.axis_name # AxisName
         2: variable.parameter.xpath # NameTest
         3: keyword.control.flow.xpath # Attribute
-      set: operator_or_predicate
     - match: '({{Prefix}}{{QName}})\s*(\()'
       captures:
         0: entity.name.function.xpath # NameTest
