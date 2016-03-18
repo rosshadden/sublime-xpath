@@ -44,3 +44,6 @@
 #                                                               ^^^^^^^^^^^^^^^^^ query.xml.xpath xpath.predicate string.quoted.double.xpath
 #                                                                                ^ query.xml.xpath xpath.predicate keyword.operator.xpath
 #                                                                                 ^ query.xml.xpath xpath.predicate variable.parameter.xpath
+
+///5*+2'hello'
+# ^^^^^^^^^^^^ query.xml.xpath xpath.predicate invalid.illegal.unexpected_token.xpath

@@ -15,8 +15,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: invalid.illegal.stray-bracket-end
     - match: ''
       push: base
-  base:
-    - include: pop_me
+  base_without_pop:
     - include: location_step
     - match: '\('
       scope: punctuation.definition.arguments.begin.xpath.subexpression comment
@@ -49,6 +48,9 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: entity.name.variable.xpath support.function.builtin.xpath.variable # VariableReference
       set: operator_or_predicate
     - include: location_test
+  base:
+    - include: pop_me
+    - include: base_without_pop
   location_step:
     - match: '(/{1,2})\s*(\*)'
       captures:
@@ -67,10 +69,11 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
     - match: '(?=[,\]\)])'
       pop: true
   operator:
-    - match: '(?:and|or|mod|div)(?:\b|(?=\d))|\*|\||\+|-|!?=|<=?|>=?'
+    - match: 'and|or|mod|div|\*|\||\+|-|!?=|<=?|>=?'
       scope: keyword.operator.xpath # Operator
-      set: base
+      set: base #_without_pop # TODO: show invalid if an operator is at the end of a predicate for example - currently this looks valid when the closing square bracket shouldn't be: //*[. or]
     - include: pop_me
+    - include: unexpected_token
   operator_or_predicate:
     - include: location_step
     - match: '\['
@@ -114,3 +117,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: variable.parameter.xpath # NameTest
       set: operator_or_predicate
     - include: axis_step
+    - include: unexpected_token
+  unexpected_token:
+    - match: '\S+'
+      scope: invalid.illegal.unexpected_token.xpath
