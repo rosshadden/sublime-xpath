@@ -1,0 +1,46 @@
+# SYNTAX TEST "xpath.sublime-syntax"
+.1 *2**
+# <- constant.numeric.xpath
+#^ constant.numeric.xpath
+#  ^ keyword.operator.xpath
+#   ^ constant.numeric.xpath
+#    ^ keyword.operator.xpath
+#     ^ variable.parameter.xpath
++
+5mod2
+# <- constant.numeric.xpath
+#^^^ keyword.operator.xpath
+#   ^ constant.numeric.xpath
+
+/and/ *
+#^^^ variable.parameter.xpath
+#     ^ variable.parameter.xpath
+
+/ for/../hello.world/ ns :foobar
+# ^^^ variable.parameter.xpath
+#     ^^ query.xml.xpath keyword.control.flow.xpath
+#        ^^^^^^^^^^^ variable.parameter.xpath
+#                     ^^^^^^^^^^ variable.parameter.xpath
+
+//example[1]/*[starts-with(local-name(), "hello") and./text()and"hello[world][1]"+*
+# ^^^^^^^ variable.parameter.xpath
+#        ^ query.xml.xpath xpath.predicate punctuation.definition.arguments.begin.xpath.predicate comment
+#         ^ constant.numeric.xpath
+#          ^ query.xml.xpath xpath.predicate punctuation.definition.arguments.end.xpath.predicate comment
+#            ^ variable.parameter.xpath
+#             ^ query.xml.xpath xpath.predicate punctuation.definition.arguments.begin.xpath.predicate comment
+#              ^^^^^^^^^^^^^^^^^^^^^^^ query.xml.xpath xpath.predicate meta.function-call.xpath entity.name.function.xpath
+#                          ^^^^^^^^^^^ query.xml.xpath xpath.predicate meta.function-call.xpath meta.function-call.xpath entity.name.function.xpath
+#                                    ^ query.xml.xpath xpath.predicate meta.function-call.xpath meta.function-call.xpath entity.name.function.xpath punctuation.definition.arguments.begin.xpath.subexpression comment
+#                                     ^ query.xml.xpath xpath.predicate meta.function-call.xpath meta.function-call.xpath punctuation.definition.arguments.end.xpath.subexpression comment
+#                                      ^ query.xml.xpath xpath.predicate meta.function-call.xpath punctuation.separator.xpath.arguments
+#                                        ^^^^^^^ query.xml.xpath xpath.predicate meta.function-call.xpath string.quoted.double.xpath
+#                                               ^ query.xml.xpath xpath.predicate meta.function-call.xpath punctuation.definition.arguments.end.xpath.subexpression comment
+#                                                 ^^^ query.xml.xpath xpath.predicate keyword.operator.xpath
+#                                                    ^ query.xml.xpath xpath.predicate keyword.control.flow.xpath
+#                                                     ^ query.xml.xpath xpath.predicate punctuation.separator.xpath.location_step
+#                                                      ^^^^^^ query.xml.xpath xpath.predicate storage.type.xpath.node_type
+#                                                            ^^^ query.xml.xpath xpath.predicate keyword.operator.xpath
+#                                                               ^^^^^^^^^^^^^^^^^ query.xml.xpath xpath.predicate string.quoted.double.xpath
+#                                                                                ^ query.xml.xpath xpath.predicate keyword.operator.xpath
+#                                                                                 ^ query.xml.xpath xpath.predicate variable.parameter.xpath
