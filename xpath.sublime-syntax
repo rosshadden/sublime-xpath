@@ -93,6 +93,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
         1: constant.language.xpath.axis_name # AxisName
         2: variable.parameter.xpath # NameTest
         3: keyword.control.flow.xpath # Attribute
+      set: location_test
     - match: '({{Prefix}}{{QName}})\s*(\()'
       captures:
         0: entity.name.function.xpath # NameTest
