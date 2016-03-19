@@ -12,106 +12,112 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
     - match: '#.*$'
       scope: syntax_test.marker # needed to get syntax tests working properly, otherwise it treats the syntax test definition line as an xpath...
     - match: '\]|\)'
-      scope: invalid.illegal.stray-bracket-end
+      scope: invalid.illegal.stray-bracket-end.xpath
     - match: ''
       push: base
   base_without_pop:
     - include: location_step
     - match: '-*\('
       scope: punctuation.definition.arguments.begin.xpath.subexpression comment
-      push:
-        - meta_scope: meta.block.query.xpath
-        - match: '\)'
-          scope: punctuation.definition.arguments.end.xpath.subexpression comment
-          set: operator_or_predicate
-        - match: ''
-          push: base
-    - match: '"'
-      scope: punctuation.definition.string.begin.xpath
-      push:
-        - meta_scope: string.quoted.double.xpath # Literal
-        - match: '"'
-          scope: punctuation.definition.string.end.xpath
-          set: operator
-    - match: "'"
-      scope: punctuation.definition.string.begin.xpath
-      push:
-        - meta_scope: string.quoted.single.xpath # Literal
-        - match: "'"
-          captures:
-            0: punctuation.definition.string.end.xpath
-          set: operator
+      set: [inside_subexpression, base_disallow_pop] # don't allow an opening parenthesis followed immediately by a closing parenthesis
+    - match: '(")([^"]*)(")'
+      captures:
+        0: string.quoted.double.xpath # Literal
+        1: punctuation.definition.string.begin.xpath
+        3: punctuation.definition.string.end.xpath
+      set: operator
+    - match: "(')([^']*)(')"
+      captures:
+        0: string.quoted.single.xpath # Literal
+        1: punctuation.definition.string.begin.xpath
+        3: punctuation.definition.string.end.xpath
+      set: operator
     - match: '-*(?:\d+\.\d*|\.?\d+)' # lxml allows '2', '2.', '.5', '2.5' and '---3' for example - '2.' is treated as '2.0'
       scope: constant.numeric.xpath # Number
       set: operator
     - match: '\$({{QName}})?'
       scope: entity.name.variable.xpath support.function.builtin.xpath.variable # VariableReference
-      set: operator_or_predicate
+      set: operator_or_predicate_or_location_step
     - include: location_test
+  inside_subexpression:
+    - meta_scope: meta.block.query.xpath
+    - match: '\)'
+      scope: punctuation.definition.arguments.end.xpath.subexpression comment
+      set: operator_or_predicate_or_location_step
   base:
     - include: pop_me
     - include: base_without_pop
+    - include: unexpected_token
   location_step:
     - match: '/{1,2}'
       scope: punctuation.separator.xpath.location_step
-      set: location_test
+      set: location_test_or_invalid
   axis_step:
-    - match: '\.?\.'
+    - match: '\.{1,2}'
       scope: keyword.control.flow.xpath # AxisStep
-      set: operator_or_predicate
+      set: operator_or_predicate_or_location_step
+  base_disallow_pop:
+    - include: base_without_pop
+    - match: '[,\]\)]'
+      scope: invalid.illegal.unexpected_token.xpath
   pop_me:
     - match: '(?=[,\]\)])'
       pop: true
   operator:
     - match: 'and|or|mod|div|\*|\||\+|-|!?=|<=?|>=?'
       scope: keyword.operator.xpath # Operator
-      set: base #_without_pop # TODO: show invalid if an operator is at the end of a predicate for example - currently this looks valid when the closing square bracket shouldn't be: //*[. or]
+      set: base_disallow_pop #_without_pop # show invalid end predicate when an operator is at the end of a predicate for example //*[a or ]
     - include: pop_me
     - include: unexpected_token
   operator_or_predicate:
-    - include: location_step
     - match: '\['
       scope: punctuation.definition.arguments.begin.xpath.predicate comment
-      push:
-        - meta_scope: xpath.predicate
-        - match: '\]'
-          scope: punctuation.definition.arguments.end.xpath.predicate comment
-          set: operator_or_predicate
-        - match: ''
-          push: base
+      set: [inside_predicate, base_disallow_pop]
     - include: operator
+  operator_or_predicate_or_location_step:
+    - include: location_step
+    - include: operator_or_predicate
+  inside_predicate:
+    - meta_scope: xpath.predicate
+    - match: '\]'
+      scope: punctuation.definition.arguments.end.xpath.predicate comment
+      set: operator_or_predicate_or_location_step
+    - include: unexpected_token
   location_test:
     - match: '{{Attribute}}'
       scope: keyword.control.flow.xpath # Attribute
-      set: operator_or_predicate
+      set: operator_or_predicate_or_location_step
     - match: '(comment|text|processing-instruction|node)\s*\(\s*\)'
       scope: storage.type.xpath.node_type # NodeType
-      set: operator_or_predicate
+      set: operator_or_predicate_or_location_step
     - match: '((?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::)\s*'
       captures:
         1: constant.language.xpath.axis_name # AxisName
         2: variable.parameter.xpath # NameTest
         3: keyword.control.flow.xpath # Attribute
-      set: location_test
+      set: location_test_or_invalid
     - match: '({{Prefix}}{{QName}})\s*(\()'
       captures:
         0: entity.name.function.xpath # NameTest
         2: punctuation.definition.arguments.begin.xpath.subexpression comment
-      push:
-        - meta_scope: meta.function-call.xpath
-        - match: '\)'
-          scope: punctuation.definition.arguments.end.xpath.subexpression comment
-          set: operator_or_predicate
-        - match: ','
-          scope: punctuation.separator.xpath.arguments
-          push: base
-        - match: ''
-          push: base
+      set: [inside_function, base]
     - match: '{{NCName}}'
       scope: variable.parameter.xpath # NameTest
-      set: operator_or_predicate
+      set: operator_or_predicate_or_location_step
     - include: axis_step
+  location_test_or_invalid:
+    - include: location_test
     - include: unexpected_token
+  inside_function:
+    - meta_scope: meta.function-call.xpath
+    - match: '\)'
+      scope: punctuation.definition.arguments.end.xpath.subexpression comment
+      set: operator_or_predicate_or_location_step
+    - match: ','
+      scope: punctuation.separator.xpath.arguments comment
+      push: base
   unexpected_token:
+    - match: '[)\]]'
+      scope: invalid.illegal.stray-bracket-end.xpath
     - match: '\S+'
       scope: invalid.illegal.unexpected_token.xpath

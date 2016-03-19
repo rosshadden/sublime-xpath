@@ -39,4 +39,4 @@
 #                                                                                                   ^^^^^^ storage.type.xpath.node_type - meta.function-call.xpath
 
  )]
-#^^ invalid.illegal.stray-bracket-end
+#^ invalid.illegal.stray-bracket-end.xpath

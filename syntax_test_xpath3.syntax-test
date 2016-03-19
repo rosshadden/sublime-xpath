@@ -7,7 +7,7 @@
 #    ^ keyword.operator.xpath
 #     ^ variable.parameter.xpath
 +
-5mod2
+5mod2+
 # <- constant.numeric.xpath
 #^^^ keyword.operator.xpath
 #   ^ constant.numeric.xpath
