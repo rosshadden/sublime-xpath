@@ -20,6 +20,10 @@
 #                                ^^^^^^^^^^^^^^^^^^^ constant.language.xpath.axis_name
 #                                                    ^^^^ variable.parameter.xpath
 #                                                         ^^ variable.parameter.xpath
+ -3.div--(-.2)
+# ^^ query.xml.xpath constant.numeric.xpath
+#   ^^^ query.xml.xpath keyword.operator.xpath
+#         ^^^ query.xml.xpath constant.numeric.xpath
 /*[following::(bar)]
 # .^^^^^^^^^^^ constant.language.xpath.axis_name
 #             ^^^^^ query.xml.xpath invalid.illegal.unexpected_token.xpath

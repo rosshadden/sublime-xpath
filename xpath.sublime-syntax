@@ -17,7 +17,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       push: base
   base_without_pop:
     - include: location_step
-    - match: '\('
+    - match: '-*\('
       scope: punctuation.definition.arguments.begin.xpath.subexpression comment
       push:
         - meta_scope: meta.block.query.xpath
@@ -41,7 +41,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
           captures:
             0: punctuation.definition.string.end.xpath
           set: operator
-    - match: '(\d*\.)?\d+'
+    - match: '-*(?:\d+\.\d*|\.?\d+)' # lxml allows '2', '2.', '.5', '2.5' and '---3' for example - '2.' is treated as '2.0'
       scope: constant.numeric.xpath # Number
       set: operator
     - match: '\$({{QName}})?'
@@ -56,9 +56,8 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: punctuation.separator.xpath.location_step
       set: location_test
   axis_step:
-    - match: '(\.?\.)\s*(?!\d)'
-      captures:
-        1: keyword.control.flow.xpath # AxisStep
+    - match: '\.?\.'
+      scope: keyword.control.flow.xpath # AxisStep
       set: operator_or_predicate
   pop_me:
     - match: '(?=[,\]\)])'
