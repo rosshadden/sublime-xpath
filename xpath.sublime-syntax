@@ -83,27 +83,37 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
       scope: punctuation.definition.arguments.end.xpath.predicate comment
       set: operator_or_predicate_or_location_step
     - include: unexpected_token
+  node_type:
+    - match: '(comment|text|processing-instruction|node)\s*\(\s*\)'
+      scope: storage.type.xpath.node_type # NodeType
+      set: operator_or_predicate_or_location_step
+  name_test:
+    - match: '{{NCName}}'
+      scope: variable.parameter.xpath # NameTest
+      set: operator_or_predicate_or_location_step
+  node_test:
+    - include: node_type
+    - include: name_test
+  node_test_or_invalid:
+    - include: node_test
+    - include: unexpected_token
   location_test:
     - match: '{{Attribute}}'
       scope: keyword.control.flow.xpath # Attribute
-      set: operator_or_predicate_or_location_step
-    - match: '(comment|text|processing-instruction|node)\s*\(\s*\)'
-      scope: storage.type.xpath.node_type # NodeType
       set: operator_or_predicate_or_location_step
     - match: '((?:ancestor(?:-or-self)?|attribute|child|descendant(?:-or-self)?|following(?:-sibling)?|namespace|parent|preceding(?:-sibling)?|self)\s*::)\s*'
       captures:
         1: constant.language.xpath.axis_name # AxisName
         2: variable.parameter.xpath # NameTest
         3: keyword.control.flow.xpath # Attribute
-      set: location_test_or_invalid
+      set: node_test_or_invalid
+    - include: node_type
     - match: '({{Prefix}}{{QName}})\s*(\()'
       captures:
         0: entity.name.function.xpath # NameTest
         2: punctuation.definition.arguments.begin.xpath.subexpression comment
       set: [inside_function, base]
-    - match: '{{NCName}}'
-      scope: variable.parameter.xpath # NameTest
-      set: operator_or_predicate_or_location_step
+    - include: name_test
     - include: axis_step
   location_test_or_invalid:
     - include: location_test
