@@ -180,7 +180,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             position = self._getParsePosition()
             if self._previous_chars is None:
                 self._recordEndPosition()
-            if self._previous_chars is not None:
+            else:
                 expected_position = self._position_after_characters(self._previous_chars[0], self._previous_chars[1])
                 if position != expected_position:
                     # create new text/CDATA node starting from position
