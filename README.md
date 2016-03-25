@@ -23,7 +23,7 @@ Sublime Text - XPath Plugin
 
 See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/xpath.sublime-settings) for details and default values.
 
-- `show_hierarchy_only` - Whether to show only hierarchy in status bar, instead of exact xpath.
+- `show_hierarchy_only` - Whether to show only hierarchy in status bar, instead of exact xpath. i.e. `/Root/Node` instead of `/Root/Node[3]`
 - `show_all_attributes` - Whether to show all attributes in the path.  If false, will use a provided whitelist.
 - `case_sensitive` - Whether to ignore case when determining tag index and whether an attribute matches one defined in the whitelist.  Ignored for when querying an xpath.
 - `copy_unique_path_only` - Whether to copy only unique xpaths to the clipboard when there are multiple selections.
@@ -52,6 +52,8 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
   - `entire` - Select the name and the value of the attribute.
   - `element` - Select the element that the attribute belongs to, using the `goto_element` rules.
   - `none` - Do not move the cursor.
+
+No key bindings are set by default, but an example sublime-keymap file is included, to show the available commands and arguments.
 
 <a name="demos"></a>
 ## Demonstrations

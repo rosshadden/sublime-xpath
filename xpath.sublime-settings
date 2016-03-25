@@ -16,7 +16,7 @@
 	"show_attributes_in_hierarchy": false,
 	// only copy unique xpaths when there are multiple selections
 	"copy_unique_path_only": true,
-	// query xpath in live mode
+	// query xpath in live mode - whether or not to show results as you type
 	"live_mode": true,
 	// default namespace prefix for xpath query when elements have xmlns attribute set
 	"default_namespace_prefix": "default",
