@@ -53,6 +53,7 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
   - `element` - Select the element that the attribute belongs to, using the `goto_element` rules.
   - `none` - Do not move the cursor.
 
+No key bindings are set by default, but an example sublime-keymap file is included, to show the available commands and arguments.
 
 <a name="demos"></a>
 ## Demonstrations
