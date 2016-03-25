@@ -139,7 +139,7 @@ def getXPathOfNodes(nodes, args):
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
     show_namespace_prefixes_from_query = getBoolValueFromArgsOrSettings('show_namespace_prefixes_from_query', args, False)
-    case_sensitive = getBoolValueFromArgsOrSettings('case_sensitive', args, False)
+    case_sensitive = getBoolValueFromArgsOrSettings('case_sensitive', args, True)
     all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
     
     global settings
@@ -678,7 +678,10 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
         if len(history) == 0:
             sublime.status_message('no previous query to re-run')
         else:
-            self.view.run_command('select_results_from_xpath_query', { 'xpath': history[-1] })
+            if args is None:
+                args = dict()
+            args['xpath'] = history[-1]
+            self.view.run_command('select_results_from_xpath_query', args)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)

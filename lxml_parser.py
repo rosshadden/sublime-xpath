@@ -240,7 +240,7 @@ def getRelativeNode(relative_to, direction):
         generator = relative_to.itersiblings()
     elif direction in ('prev', 'previous'):
         generator = relative_to.itersiblings(preceding = True)
-    elif direction in ('open', 'close', 'names', 'entire', 'content'):
+    elif direction in ('open', 'close', 'names', 'entire', 'content', 'open_attributes'):
         generator = return_specific(relative_to) # return self
     elif direction == 'parent':
         generator = return_specific(relative_to.getparent())
