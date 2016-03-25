@@ -29,6 +29,11 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 assert isTagSelfClosing(element) is False
                 TestLocation(element, [(3, 1), (3, 25), (13, 1), (13, 9)])
                 
+                element = next(next(element.iterchildren(tag = '{world_ns}world')).iterchildren(tag = '{world_ns}example'))
+                assert getTagName(element) == ('world_ns', 'example', 'example')
+                assert isTagSelfClosing(element) is True
+                TestLocation(element, [(11, 3), (11, 14), (11, 3), (11, 14)])
+                
                 element = next(tree.getroot().iter(tag = 'text')) # "text" element, contains text
                 TestLocation(element, [(28, 1), (28, 35), (30, 96), (30, 103)])
                 element = element[0] # "more" element, self-closing

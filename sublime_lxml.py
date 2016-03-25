@@ -158,23 +158,21 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             if element_position_type in ('open', 'close', 'names', 'open_attributes'):
                 # select only the tag name with the prefix
                 chars_before_tag = len('<')
-                tag_length = 1
-                end_tag_pos = open_pos.begin() + chars_before_tag + tag_length
-                
-                while not view.match_selector(end_tag_pos, 'punctuation.definition.tag.end.xml'):
-                    if view.match_selector(end_tag_pos, 'entity.name.tag'):
-                        tag_length += 1
-                    
-                    end_tag_pos += 1
+                tag = getTagName(node)[2]
                 
                 if element_position_type == 'open_attributes':
-                    yield sublime.Region(open_pos.begin() + chars_before_tag + tag_length, end_tag_pos)
+                    chars_before_end = 0
+                    print(node, isTagSelfClosing(node))
+                    if isTagSelfClosing(node):
+                        chars_before_end += len('/')
+                    end_pos = open_pos.begin() + view.substr(open_pos).index('>') # open_pos.end() could be the end of a comment immediately following the open tag because the sax parser ignores comments
+                    yield sublime.Region(open_pos.begin() + chars_before_tag + len(tag), end_pos - chars_before_end)
                 else:
                     if element_position_type in ('open', 'names') or isTagSelfClosing(node):
-                        yield sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + tag_length)
+                        yield sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag))
                     if element_position_type in ('close', 'names') and not isTagSelfClosing(node):
                         chars_before_tag += len('/')
-                        yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + tag_length)
+                        yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag))
             elif element_position_type == 'content':
                 yield sublime.Region(open_pos.end(), close_pos.begin())
             elif element_position_type == 'entire':

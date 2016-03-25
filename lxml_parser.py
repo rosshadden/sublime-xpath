@@ -14,6 +14,7 @@ class LocationAwareElement(etree.ElementBase):
     open_tag_end_pos = None
     close_tag_start_pos = None
     close_tag_end_pos = None
+    original_prefix = None
     
     new_namespaces = []
 
@@ -118,6 +119,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
             super().startElementNS(name, tag_name, attrmap)
             
             current = self._element_stack[-1]
+            current.original_prefix = tag[0]
             self._all_elements.append(current)
             self._recordPosition(current, 'open_tag_start_pos')
             
@@ -189,7 +191,7 @@ def lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, sh
                     comment = LocationAwareComment('')
                     comment.open_tag_start_pos = comment.close_tag_start_pos = expected_position
                     comment.open_tag_end_pos = comment.close_tag_end_pos = position
-                    self._last_action = 'close'
+                    self._last_action = None
                     
                     self._all_elements.append(comment)
                     self._element_stack[-1].append(comment)
@@ -259,8 +261,8 @@ def getTagName(node):
     full_name = local_name
     if len(items) == 2:
         namespace = items[0][len('{'):]
-        if node.prefix is not None:
-            full_name = node.prefix + ':' + full_name
+        if node.original_prefix is not None:
+            full_name = node.original_prefix + ':' + full_name
     
     return (namespace, local_name, full_name)
 
