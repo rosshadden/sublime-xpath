@@ -1,0 +1,98 @@
+[ // NOTE: because this file is named Example, and doesn't end in: (Windows) or (OSX) or (Linux), it is ignored by ST3.
+    // NOTE: not including an arg will use the value from your user preferences, if present, otherwise the default settings
+    
+    // Move cursor to XML Parse Error
+    {
+        "keys": ["ctrl+alt+super+e"],
+        "command": "goto_xml_parse_error"
+    },
+    
+    // Copy unique XPaths at cursors to the clipboard
+    // - without positions - aka hierarchy only mode i.e. `/Root/Node` instead of `/Root/Node[3]`
+    // - but with whitelisted attributes i.e. `/Root/Node[@id="test"]`
+    // - with the exact path from the document, not taking into account duplicate namespace declarations aka don't use namespace prefixes from query
+    {
+        "keys": ["ctrl+alt+super+c"],
+        "command": "copy_xpath",
+        "args": {
+            "show_hierarchy_only": true,
+            "copy_unique_path_only": true,
+            "show_namespace_prefixes_from_query": false,
+            "show_attributes_in_hierarchy": true,
+            "show_all_attributes": false // if false, include only whitelisted attributes
+        }
+    },
+    
+    // as above, but include indexes ignoring element name casing, and all attributes
+    {
+        "keys": ["ctrl+shift+alt+super+c"],
+        "command": "copy_xpath",
+        "args": {
+            "show_all_attributes": true,
+            "show_hierarchy_only": false,
+            "case_sensitive": false
+        }
+    },
+    
+    // Move cursors to relative nodes (or to open tag, closing tag, both open and closing tag, the attributes in the open tag, the entire node, the contents of the node)
+    {
+        "keys": ["ctrl+alt+super+g"],
+        "command": "goto_relative",
+        "args": {
+            "direction": "previous", // options are: 'next', 'prev'(ious), 'parent', and also 'open' tag, 'close' tag, 'names' (both open and closing tag), 'open_attributes', 'entire', 'content'
+        }
+    },
+    
+    // Show XPath Query History
+    {
+        "keys": ["ctrl+alt+super+h"],
+        "command": "show_xpath_query_history",
+        "args": {
+            "global_query_history": true // whether or not to show the global history, or the history specific to the current view
+        }
+    },
+    
+    // Directly run an XPath query and select the results
+    {
+        "keys": ["ctrl+alt+super+q"],
+        "command": "select_results_from_xpath_query",
+        "args": {
+            "xpath": "//*", // the specific XPath query to execute
+            "goto_element": "names", // same options available as for goto_relative
+            "goto_attribute": "value" // options are name, value, entire
+        }
+    },
+    
+    // Re-run the most recently used XPath query and select the results
+    {
+        "keys": ["ctrl+alt+super+r"],
+        "command": "rerun_last_xpath_query_and_select_results",
+        "args": {
+            "global_query_history": true, // whether or not to use the last query from the global history, or the history specific to the current view
+            "goto_element": "names", // same options available as for goto_relative
+            "goto_attribute": "value" // options are name, value, entire
+        }
+    },
+    
+    // Clean (HTML) "tag soup"
+    {
+        "keys": ["ctrl+alt+super+s"],
+        "command": "clean_tag_soup"
+    },
+    
+    // Show the XPath query input box
+    {
+        "keys": ["ctrl+shift+alt+super+q"],
+        "command": "query_xpath",
+        "args": {
+            "prefill_query": "//text()", // an XPath query to put into the input box by default - can omit and use "prefill_path_at_cursor": true instead to use the path of the node under the first cursor
+            "live_mode": true, // as per settings
+            "normalize_whitespace_in_preview": false, // as per settings
+            "intelligent_auto_complete": true, // as per settings
+            "goto_element": "names", // same options available as for goto_relative
+            "goto_attribute": "value", // options are name, value, entire
+            "max_results_to_show": 1000 // as per settings
+        }
+    },
+    
+]
