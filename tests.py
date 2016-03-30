@@ -10,42 +10,7 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
     def run(self, edit):
         try:
             xml = sublime.load_resource(sublime.find_resources('example_xml_ns.xml')[0])
-            tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml, 1)
-            
-            def lxml_parser_tests():
-                def TestLocation(element, positions):
-                    position_map = ['open_tag_start_pos', 'open_tag_end_pos', 'close_tag_start_pos', 'close_tag_end_pos']
-                    
-                    for index, position_type in enumerate(position_map):
-                        actual_pos = getattr(element, position_type)
-                        assert actual_pos == positions[index], position_type + ' expected: ' + repr(positions[index]) + ' actual: ' + repr(actual_pos)
-                    
-                    assert getNodeTagRange(element, 'open') == (positions[0], positions[1])
-                    assert getNodeTagRange(element, 'close') == (positions[2], positions[3])
-                
-                element = tree.getroot()[0]
-                assert element.tag == '{hello_ns}hello' # ensure it is the element we want
-                assert getTagName(element) == ('hello_ns', 'hello', 'hello')
-                assert isTagSelfClosing(element) is False
-                TestLocation(element, [(3, 1), (3, 25), (13, 1), (13, 9)])
-                
-                element = next(next(element.iterchildren(tag = '{world_ns}world')).iterchildren(tag = '{world_ns}example'))
-                assert getTagName(element) == ('world_ns', 'example', 'example')
-                assert isTagSelfClosing(element) is True
-                TestLocation(element, [(11, 3), (11, 14), (11, 3), (11, 14)])
-                
-                element = next(tree.getroot().iter(tag = 'text')) # "text" element, contains text
-                TestLocation(element, [(28, 1), (28, 35), (30, 96), (30, 103)])
-                element = element[0] # "more" element, self-closing
-                assert isTagSelfClosing(element) is True
-                TestLocation(element, [(28, 46), (30, 79), (28, 46), (30, 79)])
-                
-                ns = [ns for ns in tree.xpath('//namespace::*') if ns[1] not in ('lxml') and ns[0] not in (None, 'xml')][0]
-                element = tree.xpath('//a:*[1]', namespaces = { 'a': ns[1] })[0]
-                assert getTagName(element) == (ns[1], element.xpath('local-name(.)'), ns[0] + ':' + element.xpath('local-name(.)'))
-                assert isTagSelfClosing(element) is False
-                
-                assert getRelativeNode(element, 'parent') == element.getparent()
+            tree, all_elements = lxml_etree_parse_xml_string_with_location(xml)
             
             def sublime_lxml_completion_tests():
                 def test_xpath_completion(xpath, expectation):
@@ -131,17 +96,17 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 goto_xpath('/test/default1:hello', 'names', None, [(33, 38), (1189, 1194)])
                 goto_xpath('/test/default1:hello', 'entire', None, [(32, 1195)])
                 goto_xpath('/test/default1:hello/default2:world', 'close', None, [(1178, 1183)])
-                goto_xpath('/test/default1:hello/default2:world', 'content', None, [(1080, 1176)])
+                goto_xpath('/test/default1:hello/default2:world', 'content', None, [(1010, 1176)])
                 goto_xpath('/test/default1:hello/default2:world', 'open_attributes', None, [(992, 1009)])
                 goto_xpath('/test/default1:hello/default2:world/default2:example', 'content', None, [(1096, 1096)])
                 goto_xpath('/test/default1:hello/default2:world/default2:example', 'open_attributes', None, [(1093, 1094)])
-                goto_xpath('/test/default1:hello/default2:world/default2:example', 'names', None, [(1086, 1093), (1098, 1105)])
-                goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1098, 1105)])
+                goto_xpath('/test/default1:hello/default2:world/default2:example', 'names', None, [(1086, 1093)])
+                goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1086, 1093)])
                 goto_xpath('//hij', 'open_attributes', None, [(2805, 2805)])
                 
                 goto_xpath('(//text())[1]', None, None, [(29, 32)])
                 goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
-                goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2783), (2792, 2795), (2798, 2801), (2815, 2818), (2836, 2839), (2842, 2844)]) # CDATA etc.
+                goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2801), (2806, 2821), (2827, 2844)]) # text nodes including CDATA
                 goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
                 goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2846, 2850)]) # multiple elements
                 goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
@@ -167,7 +132,6 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 view.window().run_command('close')
                 
             
-            lxml_parser_tests()
             sublime_lxml_completion_tests()
             sublime_lxml_goto_node_tests()
             

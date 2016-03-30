@@ -169,7 +169,7 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
                 ensureTagNameEndPosIsSet(node, open_pos)
                 
                 if element_position_type == 'open_attributes':
-                    chars_before_end = 0
+                    chars_before_end = len('>')
                     if node.is_self_closing():
                         chars_before_end += len('/')
                     yield sublime.Region(node.tag_name_end_pos, open_pos.end() - chars_before_end)
@@ -181,7 +181,10 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
                         chars_before_tag += len('/')
                         yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + len('/') + (node.tag_name_end_pos - open_pos.begin()))
             elif element_position_type == 'content':
-                yield sublime.Region(open_pos.end(), close_pos.begin())
+                if node.is_self_closing():
+                    yield sublime.Region(open_pos.end(), open_pos.end())
+                else:
+                    yield sublime.Region(open_pos.end(), close_pos.begin())
             elif element_position_type == 'entire':
                 yield sublime.Region(open_pos.begin(), close_pos.end())
         elif attribute_position_type != 'none':
