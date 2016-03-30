@@ -102,6 +102,10 @@ The XPath `/hello[1]/text()` on the first example will return a single text node
 XPath 1.0 does not have the concept of a default namespace.  Therefore, if a node in the XML document being queried defines a default namespace, that namespace should be mapped to a prefix in the XPath query expression for easier access.
 See the included `example_xml_ns.xml` file for more details.
 
+### Nodes before the root element
+
+Note that due to the way ElementTree (the Python XML module) works, comments, processing instructions or doctypes that come before the root node of the document won't be navigatable by this plugin.
+
 ## Potential future improvements:
 
 Feature requests, bug reports/fixes and usability suggestions are always welcome.
