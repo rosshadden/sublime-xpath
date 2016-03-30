@@ -136,11 +136,14 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     
     def element_start(self, tag, attrib=None, nsmap=None, location=None):
         self._flush()
-        LocationAwareElement.TAG = tag
-        self._appendNode(LocationAwareElement(attrib=attrib, nsmap=nsmap))
+        self._appendNode(self.create_element(tag, attrib, nsmap))
         self._element_stack.append(self._most_recent)
         self._most_recent.open_tag_pos = location
         self._in_tail = False
+    
+    def create_element(self, tag, attrib=None, nsmap=None):
+        LocationAwareElement.TAG = tag
+        return LocationAwareElement(attrib=attrib, nsmap=nsmap)
     
     def element_end(self, tag, location=None):
         self._flush()
@@ -154,9 +157,12 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     def comment(self, text, location=None):
         if self._most_recent is not None:
             self._flush()
-            self._appendNode(LocationAwareComment(text))
+            self._appendNode(self.create_comment(text))
             self._most_recent.tag_pos = location
             self._in_tail = True
+    
+    def create_comment(self, text):
+        return LocationAwareComment(text)
     
     def _appendNode(self, node):
         if self._element_stack: # if we have anything on the stack
@@ -165,11 +171,12 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
         self._most_recent = node
     
     def document_end(self):
+        """Return the root node and a list of all elements (and comments) found in the document, to keep their proxy alive."""
         return (self._most_recent, self._all_elements)
 
 
 def lxml_etree_parse_xml_string_with_location(xml_chunks, position_offset = 0, should_stop = None):
-    target = LocationAwareTreeBuilder(position_offset=position_offset, remove_pis=False, collect_ids=False, huge_tree=True, remove_blank_text=False) #remove_pis=True, strip_cdata=False,
+    target = LocationAwareTreeBuilder(position_offset=position_offset, collect_ids=False, huge_tree=True, remove_blank_text=False)
     
     if should_stop is None or not callable(should_stop):
         should_stop = lambda: False
