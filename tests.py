@@ -156,6 +156,10 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                     goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
                     goto_relative('prev', [(33, 38), (1199, 1203)])
                     goto_relative('parent', [(24, 28)])
+                    goto_xpath('/test/default3:more[1] | /test/default3:more[2]/an2:yet_another', 'open', None, [(1199, 1203), (1950, 1964)])
+                    goto_relative('parent', [(24, 28), (1576, 1580)])
+                    
+                    goto_relative('prev', [(24, 28), (1576, 1580)]) # prev should fail, so assert the position is the same as previously
                 
                 xpath_tests()
                 relative_tests()
