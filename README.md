@@ -83,9 +83,24 @@ The recommended way to install the Sublime Text XPath plugin is via [Package Con
 1. Restart Sublime Text to be sure everything is loaded properly.
 1. Enjoy!
 
-## Known issues
+## Troubleshooting
 
-Comment nodes are ignored by Python's built in sax xml parser, so are not processed as part of the document tree, and therefore cannot be referenced from within an XPath expression. (The built in sax parser is used to retrieve location information (line and column numbers) while parsing the document. There is no other way of doing it, as Python's xml support is quite poor and implementations don't otherwise expose this information.)
+### CDATA Nodes
+
+When working with XML documents, you are probably used to the Document Object Model (DOM), where CDATA nodes are separate to text nodes.  XPath sees `text()` nodes as all adjacent CDATA and text node siblings together.
+If you really need to work with separate text and CDATA nodes in XPath, you will need to ensure that an XML comment separates the nodes in the source document.
+
+Example:
+
+    <hello><![CDATA[world]]>foobar</hello>
+    <hello><![CDATA[world]]><!-- separator, so that the CDATA and text nodes are non-adjacent -->foobar</hello>
+
+The XPath `/hello[1]/text()` on the first example will return a single text node: `worldfoobar`.  On the second example, it will return two text nodes: `world` and `foobar`.
+
+### Namespaces
+
+XPath 1.0 does not have the concept of a default namespace.  Therefore, if a node in the XML document being queried defines a default namespace, that namespace should be mapped to a prefix in the XPath query expression for easier access.
+See the included `example_xml_ns.xml` file for more details.
 
 ## Potential future improvements:
 

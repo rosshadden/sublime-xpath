@@ -10,7 +10,7 @@ variables:
 contexts: # NOTE: these scope names don't represent what they should, they are set for best syntax highlighting
   main:
     - match: '#.*$'
-      scope: syntax_test.marker # needed to get syntax tests working properly, otherwise it treats the syntax test definition line as an xpath...
+      scope: syntax_test.marker # needed to get syntax tests working properly, otherwise it treats the syntax test definition line as an xpath... https://github.com/SublimeTextIssues/Core/issues/1152
     - match: '\]|\)'
       scope: invalid.illegal.stray-bracket-end.xpath
     - match: ''

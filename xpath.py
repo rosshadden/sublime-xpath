@@ -7,6 +7,7 @@ import re
 from .lxml_parser import *
 from .sublime_lxml import *
 from .sublime_input_quickpanel import QuickPanelFromInputCommand
+import traceback
 
 change_counters = {}
 xml_roots = {}
@@ -69,23 +70,21 @@ def buildTreesForView(view):
 
 def buildTreeForViewRegion(view, region_scope):
     """Create an xml tree for the XML in the specified view region."""
-    xml_string = view.substr(region_scope)
     tree = None
-    namespaces = None
     all_elements = None
-    line_number_offset = view.rowcol(region_scope.begin())[0]
     change_count = view.change_count()
     stop = lambda: change_count < view.change_count() # stop parsing if the document is modified
     if view.is_read_only():
         stop = None # no need to check for modifications if the view is read only
     try:
-        tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml_string, line_number_offset, stop)
-    except SAXParseException as e:
+        tree, all_elements = lxml_etree_parse_xml_string_with_location(region_chunks(view, region_scope, 8096), region_scope.begin(), stop)
+    except etree.XMLSyntaxError as e:
         global parse_error
-        text = 'line ' + str(e.getLineNumber() + line_number_offset) + ', column ' + str(e.getColumnNumber() + 1) + ' - ' + e.getMessage()
+        line_number_offset = view.rowcol(region_scope.begin())[0]
+        text = 'line ' + str(e.position[0] + line_number_offset) + ', column ' + str(e.position[1]) + ' - ' + e.msg # TODO: column is incorrect if there are tabs and the tab width is set > 1
         view.set_status('xpath_error', parse_error + text)
     
-    return (tree, namespaces, all_elements)
+    return (tree, all_elements)
 
 def ensureTreeCacheIsCurrent(view):
     """If the document has been modified since the xml was parsed, parse it again to recreate the trees."""
@@ -102,7 +101,7 @@ def ensureTreeCacheIsCurrent(view):
         
         xml_roots[view.id()] = []
         xml_elements[view.id()] = []
-        for tree, namespaces, all_elements in buildTreesForView(view):
+        for tree, all_elements in buildTreesForView(view):
             root = None
             if tree is not None:
                 root = tree.getroot()
@@ -213,6 +212,8 @@ def getXPathOfNodes(nodes, args):
         return output
     
     def getNodePathSegments(node, namespaces, root):
+        if isinstance(node, etree.CommentBase):
+            node = node.getparent()
         while node != root:
             yield getNodePathPart(node, namespaces)
             node = node.getparent()
@@ -732,7 +733,10 @@ def get_context_nodes_from_cursors(view):
     for result in getSGMLRegionsContainingCursors(view):
         if roots[result[1]] is None:
             invalid_trees.append(result[0])
-        regions_cursors.setdefault(result[1], []).append(result[2])
+        node = result[2]
+        if isinstance(node, etree.CommentBase):
+            node = node.getparent()
+        regions_cursors.setdefault(result[1], []).append(node)
     
     if len(invalid_trees) > 0:
         invalid_trees = [region_scope for region_scope in invalid_trees if view.match_selector(region_scope.begin(), 'text.html - text.html.markdown')]
@@ -843,9 +847,11 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 self.cache_context_nodes()
             
             try:
-                results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2]) if not isinstance(result, etree.CommentBase)))
-            except Exception as e:
-                status_text = str(e)
+                results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))# if not isinstance(result, etree.CommentBase)))
+            except etree.XPathError as e:
+                print('XPath: exception evaluating results for "' + query + '": ' + repr(e))
+                #traceback.print_tb(e.__traceback__)
+                status_text = e.__class__.__name__ + ': ' + str(e)
             
             if status_text is None: # if there was no error
                 status_text = str(len(results)) + ' result'
@@ -882,7 +888,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
         
         def show_preview(item):
-            if isinstance(item, etree._Element):
+            if isinstance(item, etree.ElementBase) and not isinstance(item, etree.CommentBase):
                 return show_element_preview(item)
             else:
                 show = show_text_preview(item)
@@ -932,8 +938,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
         return [(completion + '\taxis', completion + '::') for completion in completions]
 
     def completions_node_types():
-        completions = ['text', 'node']
-        #completions += ['comment', 'processing-instruction'] # commented out because these nodes are ignored during our xml parsing and tree building process
+        completions = ['text', 'node', 'comment'] # 'processing-instruction' is also a valid XPath node type, but not parsed into an ElementTree, so useless to show it in suggestions/completions
         return [(completion + '\tnode type', completion + '()') for completion in completions]
 
     def completions_functions():
