@@ -18,23 +18,23 @@
 		"caption": "XPath: Goto next sibling",
 		"command": "goto_relative", "args": { "direction": "next" }
 	}, {
-		"caption": "XPath: Goto parent open tag",
+		"caption": "XPath: Goto parent element",
 		"command": "goto_relative", "args": { "direction": "parent" }
 	}, {
 		"caption": "XPath: Goto open tag",
-		"command": "goto_relative", "args": { "direction": "open" }
+		"command": "goto_relative", "args": { "direction": "self", "goto_element": "open" }
 	}, {
 		"caption": "XPath: Goto close tag",
-		"command": "goto_relative", "args": { "direction": "close" }
+		"command": "goto_relative", "args": { "direction": "self", "goto_element": "close" }
 	}, {
 		"caption": "XPath: Goto open and close tag",
-		"command": "goto_relative", "args": { "direction": "names" }
+		"command": "goto_relative", "args": { "direction": "self", "goto_element": "names" }
 	}, {
 		"caption": "XPath: Goto content",
-		"command": "goto_relative", "args": { "direction": "content" }
+		"command": "goto_relative", "args": { "direction": "self", "goto_element": "content" }
 	}, {
 		"caption": "XPath: Select entire element",
-		"command": "goto_relative", "args": { "direction": "entire" }
+		"command": "goto_relative", "args": { "direction": "self", "goto_element": "entire" }
 	}, {
 		"caption": "XPath: Query document",
 		"command": "query_xpath"

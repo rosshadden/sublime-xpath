@@ -127,39 +127,43 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                     random_pos = random.randint(0, view.size())
                     view.sel().clear()
                     view.sel().add(sublime.Region(random_pos))
-                    goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) #  check that selection didn't move
-                    goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) #  check that selection didn't move
-                    goto_xpath('/test/text/@attr1', None, 'none', [(random_pos, random_pos)]) #  check that selection didn't move
+                    goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) # check that selection didn't move
+                    goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) # check that selection didn't move
+                    goto_xpath('/test/text/@attr1', None, 'none', [(random_pos, random_pos)]) # check that selection didn't move
                 
-                def goto_relative(direction, expected_cursors):
-                    view.run_command('goto_relative', { 'direction': direction })
+                def goto_relative(direction, element_type, expected_cursors):
+                    view.run_command('goto_relative', { 'direction': direction, 'goto_element': element_type })
                     assert_expected_cursors(expected_cursors, 'direction: "' + direction + '"\n')
                 
                 def relative_tests():
                     goto_xpath('/test', 'open', None, [(24, 28)])
-                    goto_relative('open', [(24, 28)])
-                    goto_relative('close', [(2846, 2850)])
-                    goto_relative('content', [(29, 2844)])
-                    goto_relative('entire', [(23, 2851)])
+                    goto_relative('self', 'open', [(24, 28)])
+                    goto_relative('self', 'close', [(2846, 2850)])
+                    goto_relative('self', 'content', [(29, 2844)])
+                    goto_relative('self', 'entire', [(23, 2851)])
                     
                     goto_xpath('/test/default1:hello/default2:world', 'open', None, [(987, 992)])
-                    goto_relative('close', [(1178, 1183)])
-                    goto_relative('names', [(987, 992), (1178, 1183)])
-                    goto_relative('close', [(1178, 1183)])
-                    goto_relative('parent', [(33, 38)])
+                    goto_relative('self', 'close', [(1178, 1183)])
+                    goto_relative('self', 'names', [(987, 992), (1178, 1183)])
+                    goto_relative('self', 'close', [(1178, 1183)])
+                    goto_relative('parent', 'open', [(33, 38)])
                     
                     goto_xpath('/test/default3:more[1]', 'open', None, [(1199, 1203)])
-                    goto_relative('prev', [(33, 38)])
-                    goto_relative('next', [(1199, 1203)])
-                    goto_relative('next', [(1576, 1580)])
-                    goto_relative('prev', [(1199, 1203)])
+                    goto_relative('prev', 'open', [(33, 38)])
+                    goto_relative('next', 'open', [(1199, 1203)])
+                    goto_relative('next', 'open', [(1576, 1580)])
+                    goto_relative('prev', 'names', [(1199, 1203), (1567, 1571)])
+                    goto_relative('next', 'content', [(1645, 2145)])
                     goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
-                    goto_relative('prev', [(33, 38), (1199, 1203)])
-                    goto_relative('parent', [(24, 28)])
+                    goto_relative('prev', 'open', [(33, 38), (1199, 1203)])
+                    goto_relative('next', 'content', [(1242, 1565), (1645, 2145)])
+                    goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
+                    goto_relative('self', 'close', [(1567, 1571), (2147, 2151)])
+                    goto_relative('parent', 'open', [(24, 28)])
                     goto_xpath('/test/default3:more[1] | /test/default3:more[2]/an2:yet_another', 'open', None, [(1199, 1203), (1950, 1964)])
-                    goto_relative('parent', [(24, 28), (1576, 1580)])
+                    goto_relative('parent', 'open', [(24, 28), (1576, 1580)])
                     
-                    goto_relative('prev', [(24, 28), (1576, 1580)]) # prev should fail, so assert the position is the same as previously
+                    goto_relative('prev', 'open', [(24, 28), (1576, 1580)]) # prev should fail, so assert the position is the same as previously
                 
                 xpath_tests()
                 relative_tests()

@@ -332,7 +332,7 @@ class XpathCommand(CopyXpathCommand):
     pass
 
 class GotoRelativeCommand(sublime_plugin.TextCommand):
-    def run(self, edit, **args): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', {'direction': 'prev'})
+    def run(self, edit, **kwargs): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', {'direction': 'prev', 'goto_element': 'names'})
         """Move cursor(s) to specified relative tag(s)."""
         view = self.view
         
@@ -347,7 +347,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             new_nodes_under_cursors = []
             for result in results:
                 allFound = True
-                desired_node = getRelativeNode(result[0], args['direction'])
+                desired_node = getRelativeNode(result[0], kwargs['direction'])
                 if desired_node is None:
                     allFound = False
                     break
@@ -355,25 +355,26 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                     new_nodes_under_cursors.append(desired_node)
             
             if not allFound:
-                message = args['direction'] + ' node not found'
+                message = kwargs['direction'] + ' node not found'
                 if len(cursors) > 1:
                     message += ' for at least one selection'
                 sublime.status_message(message)
             else:
-                non_open_positions = ['close', 'content', 'entire', 'names'] # TODO: change direction to an actual direction (and allow 'self'), and use goto_element setting/argument
-                position_type = 'open'
-                if args['direction'] in non_open_positions:
-                    position_type = args['direction']
-                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), position_type, None)
+                goto_element = settings.get('goto_element', 'open')
+                if goto_element == 'none':
+                    goto_element = 'open'
+                if 'goto_element' in kwargs:
+                    goto_element = kwargs['goto_element']
+                move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), goto_element, None)
     
-    def is_enabled(self, **args):
+    def is_enabled(self, **kwargs):
         return isCursorInsideSGML(self.view)
     
     def is_visible(self):
         return containsSGML(self.view)
     
     def description(self, args):
-        if args['direction'] in ('open', 'close'):
+        if args['direction'] == 'self':
             descr = 'tag'
         elif args['direction'] in ('prev', 'previous', 'next'):
             descr = 'sibling'
