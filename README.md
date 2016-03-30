@@ -5,7 +5,7 @@ Sublime Text - XPath Plugin
 
 - Updates status bar text to XPath of first selection.
 - [Copy XPath at cursor(s) to clipboard.](#copy_xpath_demo)
-- Jump selection to relative tag - previous or next sibling, parent, open or close tag. It is also possible to select the entire tag contents, optionally including the tag itself.  This works for multiple selections as well, of course.
+- Jump selection to relative tag - previous or next sibling, parent, or self. Why "self", you might ask? Because it is also possible to select the open tag, the close tag, both the opening and closing tag, the attributes in the open tag, and the entire tag contents - optionally including the tag itself.  This works for multiple selections as well, of course.
 - Query XML and (X)HTML documents by XPath 1.0 expression.
   - with syntax highlighting and [intelligent auto-completion](#autocomplete_demo).
   - with a custom `print` function that can be used as a debugging aid by logging nodesets etc. to the console.
