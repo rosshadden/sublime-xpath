@@ -360,7 +360,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                     message += ' for at least one selection'
                 sublime.status_message(message)
             else:
-                non_open_positions = ['close', 'content', 'entire', 'names']
+                non_open_positions = ['close', 'content', 'entire', 'names'] # TODO: change direction to an actual direction (and allow 'self'), and use goto_element setting/argument
                 position_type = 'open'
                 if args['direction'] in non_open_positions:
                     position_type = args['direction']
