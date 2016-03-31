@@ -850,7 +850,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             try:
                 results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))# if not isinstance(result, etree.CommentBase)))
             except etree.XPathError as e:
-                last_char = query.rstrip[-1]
+                last_char = query.rstrip()[-1]
                 if not last_char in ('/', ':'): # log exception to console only if might be useful
                     print('XPath: exception evaluating results for "' + query + '": ' + repr(e))
                 #traceback.print_tb(e.__traceback__)
