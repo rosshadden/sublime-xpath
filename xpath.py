@@ -927,6 +927,15 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             flags = 0
         return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2], settings.get('variables', {}), self.arguments['intelligent_auto_complete']), flags)
     
+    def on_completion_committed(self):
+        # show the auto complete popup again if the item that was autocompleted ended in a character that is an auto completion trigger
+        for cursor in self.input_panel.sel():
+            prev_char = self.input_panel.substr(cursor.begin() - 1)
+            if prev_char not in self.arguments['auto_completion_triggers']:
+                return
+        
+        self.input_panel.run_command('auto_complete')
+    
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
     
