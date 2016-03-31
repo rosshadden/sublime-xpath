@@ -117,11 +117,12 @@ class LocationAwareXMLParser:
 class LocationAwareTreeBuilder(LocationAwareXMLParser):
     def _reset(self):
         super()._reset()
-        self._all_elements = []
+        self._all_elements = [] # necessary to keep the "proxy" alive, so it will keep our custom class attributes - otherwise, when the class instance is recreated, it no longer has the position information - see http://lxml.de/element_classes.html#element-initialization
         self._element_stack = []
         self._text = []
         self._most_recent = None
         self._in_tail = None
+        self._all_namespaces = collections.OrderedDict()
     
     def _flush(self):
         if self._text:
@@ -135,6 +136,11 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
             self._text = []
     
     def element_start(self, tag, attrib=None, nsmap=None, location=None):
+        for prefix in nsmap:
+            namespaces = self._all_namespaces.setdefault(prefix, [])
+            if nsmap[prefix] not in namespaces:
+                namespaces.append(nsmap[prefix])
+        
         self._flush()
         self._appendNode(self.create_element(tag, attrib, nsmap))
         self._element_stack.append(self._most_recent)
@@ -172,7 +178,7 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     
     def document_end(self):
         """Return the root node and a list of all elements (and comments) found in the document, to keep their proxy alive."""
-        return (self._most_recent, self._all_elements)
+        return (self._most_recent, self._all_namespaces, self._all_elements)
 
 
 def lxml_etree_parse_xml_string_with_location(xml_chunks, position_offset = 0, should_stop = None):
@@ -186,8 +192,10 @@ def lxml_etree_parse_xml_string_with_location(xml_chunks, position_offset = 0, s
             break
         target.feed(chunk)
     
-    root, all_elements = target.close()
+    root, all_namespaces, all_elements = target.close()
     tree = etree.ElementTree(root)
+    
+    root.all_namespaces = all_namespaces
     
     return (tree, all_elements)
 
@@ -244,23 +252,19 @@ def collapseWhitespace(text, maxlen):
         return text[0:maxlen - len(append)] + append
 
 def unique_namespace_prefixes(namespaces, replaceNoneWith = 'default', start = 1):
-    """Given a list of unique namespace tuples in document order, make sure each prefix is unique and has a mapping back to the original prefix. Return a dictionary with the unique namespace prefixes and their mappings."""
-    flattened = collections.OrderedDict()
-    for item in namespaces:
-        flattened.setdefault(item[0], []).append(item[1])
-    
+    """Given an ordered dictionary of unique namespace prefixes and their URIs in document order, create a dictionary with unique namespace prefixes and their mappings."""
     unique = collections.OrderedDict()
-    for key in flattened.keys():
-        if len(flattened[key]) == 1:
+    for key in namespaces.keys():
+        if len(namespaces[key]) == 1:
             try_key = key or replaceNoneWith
-            unique[try_key] = (flattened[key][0], key)
+            unique[try_key] = (namespaces[key][0], key)
         else: # find next available number. we can't just append the number, because it is possible that the new numbered prefix already exists
             index = start - 1
-            for item in flattened[key]: # for each item that has the same prefix but a different namespace
+            for item in namespaces[key]: # for each item that has the same prefix but a different namespace
                 while True:
                     index += 1 # try with the next index
                     try_key = (key or replaceNoneWith) + str(index)
-                    if try_key not in unique.keys() and try_key not in flattened.keys():
+                    if try_key not in unique.keys() and try_key not in namespaces.keys():
                         break # the key we are trying is new
                 unique[try_key] = (item, key)
     

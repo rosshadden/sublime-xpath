@@ -508,13 +508,6 @@ def plugin_loaded():
     
     register_xpath_extensions()
 
-def get_all_namespaces_in_tree(tree):
-    # find all namespaces in the document, so that the same prefixes can be used for the xpath
-    # if the same prefix is used multiple times for different URIs, add a numeric suffix and increment it each time
-    # xpath 1.0 doesn't support the default namespace, it needs to be mapped to a prefix
-    getNamespaces = etree.XPath('//namespace::*')
-    return getUniqueItems(getNamespaces(tree))
-
 def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namespaces, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
@@ -637,10 +630,12 @@ def namespace_map_from_contexts(contexts):
     return root_namespaces
 
 def namespace_map_for_tree(tree):
-    global settings
-    defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
-    namespaces = unique_namespace_prefixes(get_all_namespaces_in_tree(tree), defaultNamespacePrefix)
-    return namespaces
+    root = tree.getroot()
+    if not hasattr(root, 'unique_namespaces'):
+        global settings
+        defaultNamespacePrefix = settings.get('default_namespace_prefix', 'default')
+        root.unique_namespaces = unique_namespace_prefixes(root.all_namespaces, defaultNamespacePrefix)
+    return root.unique_namespaces
 
 class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('select_results_from_xpath_query', { 'xpath': '//*', 'goto_element': 'names' })
     def run(self, edit, **kwargs):
