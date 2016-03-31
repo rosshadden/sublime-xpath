@@ -778,7 +778,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         for root in context_nodes:
             tree_count += 1
             
-            print('XPath context nodes: ', getExactXPathOfNodes(context_nodes[root]))
+            print('XPath: context nodes: ', getExactXPathOfNodes(context_nodes[root]))
         
         if tree_count == 1: # if there is exactly one xml tree
             tree = next(iter(context_nodes.keys())) # get the tree
@@ -1037,9 +1037,9 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                         try:
                             completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
                             # TODO: if result is not a node, break out as we can't offer any useful suggestions (currently we just get an exception: Non-Element values not supported at this point - got 'example string') when it tries $expression_contexts/*
-                        except Exception as e: # xpath query invalid, just show static contexts
+                        except etree.XPathError as e: # xpath query invalid, just show static contexts
                             completion_contexts = None
-                            print('XPath completions error.', 'query:', query, 'exception:', e)
+                            print('XPath: exception obtaining completions for subquery "' + query + '": ' + repr(e))
                             break
                 
                 if completion_contexts is not None:
