@@ -836,7 +836,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     def get_query_results(self, query):
         results = None
         status_text = None
-        if len(query) == 0:
+        if len(query.strip()) == 0:
             status_text = 'No query entered'
         else:
             if self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
