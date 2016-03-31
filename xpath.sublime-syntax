@@ -55,7 +55,7 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
   axis_step:
     - match: '\.{1,2}'
       scope: keyword.control.flow.xpath # AxisStep
-      set: operator_or_predicate_or_location_step
+      set: operator_or_location_step
   base_disallow_pop:
     - include: base_without_pop
     - match: '[,\]\)]'
@@ -77,6 +77,9 @@ contexts: # NOTE: these scope names don't represent what they should, they are s
   operator_or_predicate_or_location_step:
     - include: location_step
     - include: operator_or_predicate
+  operator_or_location_step:
+    - include: location_step
+    - include: operator
   inside_predicate:
     - meta_scope: xpath.predicate
     - match: '\]'
