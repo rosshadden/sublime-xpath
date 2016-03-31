@@ -1043,12 +1043,12 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                     for result in completion_contexts:
                         if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
                             ns, localname, fullname = getTagName(result)
-                            prefix = ''
+                            ns_prefix = ''
                             if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
                                 root = result.getroottree().getroot()
-                                prefix = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) # find the first prefix in the map that relates to this uri
-                                fullname = prefix + ':' + localname
-                            if not last_location_step.endswith(':') or last_location_step.endswith('::') or last_location_step.endswith(prefix + ':'): # ensure `prefix :` works correctly and also `different_prefix_to_suggestion:` (note that we don't do this for attributes - attributes are not allowed spaces before the colon, and if the prefix differs when there is no space, Sublime will replace it with the completion anyway)
+                                ns_prefix = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) # find the first prefix in the map that relates to this uri
+                                fullname = ns_prefix + ':' + localname
+                            if not last_location_step.endswith(':') or last_location_step.endswith('::') or last_location_step.endswith(ns_prefix + ':'): # ensure `prefix :` works correctly and also `different_prefix_to_suggestion:` (note that we don't do this for attributes - attributes are not allowed spaces before the colon, and if the prefix differs when there is no space, Sublime will replace it with the completion anyway)
                                 completion = fullname
                             else:
                                 completion = localname
