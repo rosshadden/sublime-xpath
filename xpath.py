@@ -920,7 +920,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
     
     def on_query_completions(self, prefix, locations): # moved from .sublime-completions file here - https://github.com/SublimeTextIssues/Core/issues/819
         flags = sublime.INHIBIT_WORD_COMPLETIONS
-        if self.arguments['intelligent_auto_complete']:
+        if not self.arguments['intelligent_auto_complete']:
             flags = 0
         return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2], settings.get('variables', {}), self.arguments['intelligent_auto_complete']), flags)
     
