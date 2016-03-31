@@ -993,6 +993,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
     
     if include_generics or include_xpath:
         subqueries = parse_xpath_query_for_completions(view, positions[0])
+        last_location_step = subqueries[-1].split('/')[-1]
         
         if include_xpath and intelligent:
             # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
@@ -1040,20 +1041,25 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 
                 if completion_contexts is not None:
                     for result in completion_contexts:
-                        # TODO: fix namespace prefixes being suggested when it has already been entered
                         if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
                             ns, localname, fullname = getTagName(result)
+                            prefix = ''
                             if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
                                 root = result.getroottree().getroot()
-                                fullname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
-                            completions.append((fullname + '\tElement', fullname))
+                                prefix = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) # find the first prefix in the map that relates to this uri
+                                fullname = prefix + ':' + localname
+                            if not last_location_step.endswith(':') or last_location_step.endswith(prefix + ':'): # ensure `prefix :` works correctly and also `different_prefix_to_suggestion:` (note that we don't do this for attributes - attributes are not allowed spaces before the colon, and if the prefix differs when there is no space, Sublime will replace it with the completion anyway)
+                                completion = fullname
+                            else:
+                                completion = localname
+                            completions.append((fullname + '\tElement', completion))
                         elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
                             if result.is_attribute:
-                                attrname = result.attrname
-                                if attrname.startswith('{'):
+                                q = etree.QName(result.attrname)
+                                attrname = q.localname
+                                if q.namespace is not None:
                                     root = result.getparent().getroottree().getroot()
-                                    ns, localname = attrname[len('{'):].split('}')
-                                    attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == ns)) + ':' + localname # find the first prefix in the map that relates to this uri
+                                    attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == q.namespace)) + ':' + attrname # find the first prefix in the map that relates to this uri
                                 completions.append((attrname + '\tAttribute', attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname) - in case we ever want to do something fancy like suggest possible values when doing `@attr = *autocomplete*` etc.
                         else: # debug, are we missing something we could suggest?
                             #completions.append((str(result) + '\t' + str(type(result)), str(result)))
@@ -1063,7 +1069,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
         
         if include_generics:
             generics = []
-            if ':' not in subqueries[-1].split('/')[-1]: # if no namespace or axis operator used in the last location step of the subquery
+            if ':' not in last_location_step: # if no namespace or axis operator used in the last location step of the subquery
                 generics += completions_axis_specifiers()
                 generics += completions_node_types()
             if subqueries[-1] == '': # XPath 1.0 functions and variables can only be used at the beginning of a sub-expression
