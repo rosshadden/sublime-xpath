@@ -931,7 +931,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if prev_char not in self.arguments['auto_completion_triggers']:
                 return
         
-        self.input_panel.run_command('auto_complete')
+        sublime.set_timeout_async(lambda: self.input_panel.run_command('auto_complete'), 10)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
@@ -1040,6 +1040,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 
                 if completion_contexts is not None:
                     for result in completion_contexts:
+                        # TODO: fix namespace prefixes being suggested when it has already been entered
                         if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
                             ns, localname, fullname = getTagName(result)
                             if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
@@ -1047,13 +1048,13 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                                 fullname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) + ':' + localname # find the first prefix in the map that relates to this uri
                             completions.append((fullname + '\tElement', fullname))
                         elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
-                            if prev_char == '@' or result.is_attribute:
+                            if result.is_attribute:
                                 attrname = result.attrname
                                 if attrname.startswith('{'):
                                     root = result.getparent().getroottree().getroot()
                                     ns, localname = attrname[len('{'):].split('}')
                                     attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == ns)) + ':' + localname # find the first prefix in the map that relates to this uri
-                                completions.append((attrname + '\tAttribute', attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname)
+                                completions.append((attrname + '\tAttribute', attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname) - in case we ever want to do something fancy like suggest possible values when doing `@attr = *autocomplete*` etc.
                         else: # debug, are we missing something we could suggest?
                             #completions.append((str(result) + '\t' + str(type(result)), str(result)))
                             pass
