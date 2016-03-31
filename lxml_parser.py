@@ -9,7 +9,7 @@ def clean_html(html_soup):
     return etree.tostring(root, encoding='unicode')
 
 
-class CommonEqualityMixin(object):
+class CommonEqualityMixin(object): # inspired by http://stackoverflow.com/questions/390250/elegant-ways-to-support-equivalence-equality-in-python-classes
     def __eq__(self, other):
         if type(other) is type(self):
             return self.__dict__ == other.__dict__
