@@ -931,7 +931,10 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if prev_char not in self.arguments['auto_completion_triggers']:
                 return
         
-        sublime.set_timeout_async(lambda: self.input_panel.run_command('auto_complete'), 10)
+        def after_timeout():
+            self.input_panel.window().focus_view(self.input_panel)
+            self.input_panel.run_command('auto_complete')
+        sublime.set_timeout_async(after_timeout, 10)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
@@ -1076,6 +1079,6 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 generics += list(completions_functions())
                 generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
             
-            completions += [completion for completion in generics if completion[0].startswith(prefix)]
+            completions += [completion for completion in generics if completion[0].startswith(last_location_step)]
         
     return completions
