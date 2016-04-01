@@ -931,10 +931,8 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if prev_char not in self.arguments['auto_completion_triggers']:
                 return
         
-        def after_timeout():
-            self.input_panel.window().focus_view(self.input_panel)
-            self.input_panel.run_command('auto_complete')
-        sublime.set_timeout_async(after_timeout, 10)
+        self.input_panel.run_command('auto_complete')
+        self.input_panel.window().focus_view(self.input_panel)
     
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
