@@ -1,0 +1,28 @@
+# SYNTAX TEST "xpath.sublime-syntax"
+(/hello/descendant::world)[1]
+# <- meta.block.query.xpath punctuation.definition.arguments.begin.xpath.subexpression comment
+#^ meta.block.query.xpath punctuation.separator.xpath.location_step
+# ^^^^^ meta.block.query.xpath variable.parameter.xpath
+#       ^^^^^^^^^^^^ meta.block.query.xpath constant.language.xpath.axis_name
+#                   ^^^^^ meta.block.query.xpath variable.parameter.xpath
+#                        ^ meta.block.query.xpath punctuation.definition.arguments.end.xpath.subexpression comment
+#                         ^ xpath.predicate punctuation.definition.arguments.begin.xpath.predicate
+#                          ^ xpath.predicate constant.numeric.xpath
+#                           ^ xpath.predicate punctuation.definition.arguments.end.xpath.predicate
+
+/ @ hello/ text () / ancestor :: test :*
+# ^ keyword.control.flow.xpath
+#   ^^^^^ keyword.control.flow.xpath
+#          ^^^^ storage.type.xpath.node_type
+#               ^^ storage.type.xpath.node_type
+#                    ^^^^^^^^ constant.language.xpath.axis_name
+#                             ^^ constant.language.xpath.axis_name
+#                                ^^^^ variable.parameter.xpath
+#                                     ^^ variable.parameter.xpath
+ -3.div--(-.2)
+# ^^ query.xml.xpath constant.numeric.xpath
+#   ^^^ query.xml.xpath keyword.operator.xpath
+#         ^^^ query.xml.xpath constant.numeric.xpath
+/*[following::(bar)]
+# .^^^^^^^^^^^ constant.language.xpath.axis_name
+#             ^^^^^ query.xml.xpath invalid.illegal.unexpected_token.xpath

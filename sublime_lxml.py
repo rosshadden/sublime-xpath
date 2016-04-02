@@ -3,15 +3,13 @@ from .lxml_parser import *
 from .sublime_helper import get_scopes
 import re
 
+RE_TAG_NAME_END_POS = re.compile('[>\s/]')
+RE_TAG_ATTRIBUTES = re.compile('\s+((\w+(?::\w+)?)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'))')
+
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getNodeTagRegion(view, node, position_type):
     """Given a view, a node and a position type (open or close), return the region that relates to the node's position."""
-    begin, end = getNodeTagRange(node, position_type)
-    
-    begin = view.text_point(begin[0], begin[1])
-    end = view.text_point(end[0], end[1])
-    
-    return sublime.Region(begin, end)
+    return sublime.Region(*getNodeTagRange(node, position_type))
 
 def getNodePosition(view, node):
     """Given a view and a node, return the regions that represent the positions of the open and close tags."""
@@ -108,7 +106,7 @@ def get_nodes_from_document(nodes):
             if element is None: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
                 continue
         elif isinstance(node, etree.CommentBase):
-            continue
+            element = node
         elif isinstance(node, etree.ElementBase):
             element = node
         else:
@@ -117,6 +115,15 @@ def get_nodes_from_document(nodes):
         yield node
 
 def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_type):
+    global TAG_NAME_END_POS
+    global RE_TAG_ATTRIBUTES
+    
+    def ensureTagNameEndPosIsSet(node, open_pos):
+        try:
+            pos = node.tag_name_end_pos
+        except AttributeError:
+            node.tag_name_end_pos = open_pos.begin() + RE_TAG_NAME_END_POS.search(view.substr(open_pos)).start()
+    
     for node in nodes:
         attr_name = None
         is_text = None
@@ -147,6 +154,8 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             if next_node is not None:
                 text_end_pos = getNodeTagRegion(view, next_node, 'open').begin()
             yield sublime.Region(text_begin_pos, text_end_pos)
+        elif isinstance(node, etree.CommentBase):
+            yield open_pos
         elif attr_name is None or attribute_position_type is None or attribute_position_type in ('element', 'parent'):
             # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
             # position type 'close' <name attr1="test"></|name|> "Goto name in close tag"
@@ -156,22 +165,26 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             # position type 'open_attributes' <name| attr1="test" attr2="hello" |/>
             
             if element_position_type in ('open', 'close', 'names', 'open_attributes'):
-                tag = getTagName(node)[2]
                 # select only the tag name with the prefix
-                chars_before_tag = len('<')
+                ensureTagNameEndPosIsSet(node, open_pos)
+                
                 if element_position_type == 'open_attributes':
-                    chars_before = '>'
-                    if isTagSelfClosing(node):
-                        chars_before += '/'
-                    yield sublime.Region(open_pos.begin() + chars_before_tag + len(tag), open_pos.end() - len(chars_before))
+                    chars_before_end = len('>')
+                    if node.is_self_closing():
+                        chars_before_end += len('/')
+                    yield sublime.Region(node.tag_name_end_pos, open_pos.end() - chars_before_end)
                 else:
-                    if element_position_type in ('open', 'names') or isTagSelfClosing(node):
-                        yield sublime.Region(open_pos.begin() + chars_before_tag, open_pos.begin() + chars_before_tag + len(tag))
-                    if element_position_type in ('close', 'names') and not isTagSelfClosing(node):
+                    chars_before_tag = len('<')
+                    if element_position_type in ('open', 'names') or node.is_self_closing():
+                        yield sublime.Region(open_pos.begin() + chars_before_tag, node.tag_name_end_pos)
+                    if element_position_type in ('close', 'names') and not node.is_self_closing():
                         chars_before_tag += len('/')
-                        yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + chars_before_tag + len(tag))
+                        yield sublime.Region(close_pos.begin() + chars_before_tag, close_pos.begin() + len('/') + (node.tag_name_end_pos - open_pos.begin()))
             elif element_position_type == 'content':
-                yield sublime.Region(open_pos.end(), close_pos.begin())
+                if node.is_self_closing():
+                    yield sublime.Region(open_pos.end(), open_pos.end())
+                else:
+                    yield sublime.Region(open_pos.end(), close_pos.begin())
             elif element_position_type == 'entire':
                 yield sublime.Region(open_pos.begin(), close_pos.end())
         elif attribute_position_type != 'none':
@@ -179,23 +192,19 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             # position type 'content' <element attr1="|test|"></element> "Goto attribute value in open tag"
             # position type 'entire' <element |attr1="test"|></element> "Goto attribute declaration in open tag"
             
-            tag = getTagName(node)[2]
+            ensureTagNameEndPosIsSet(node, open_pos)
+            attrs = view.substr(sublime.Region(node.tag_name_end_pos, open_pos.end()))
+            q = etree.QName(attr_name)
             
-            attr = get_namespace_details_for_qualified_name(node, attr_name)
-            attr_check = next(attr)
-            
-            chars_before = len('<' + tag)
-            attrs = ' ' + view.substr(sublime.Region(open_pos.begin() + chars_before, open_pos.end()))
-            chars_before -= len(' ')
-            
-            for match in re.finditer('\s+((\w+(?::\w+)?)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'))', attrs):
-                is_this_one = False
-                if attr_check[2] == '': # if there is no prefix
-                    is_this_one = match.group(2) == attr_check[1] # do a simple comparison
-                elif match.group(2) == attr_check[3]: # if the full name matches
-                    is_this_one = True
+            for match in RE_TAG_ATTRIBUTES.finditer(attrs):
+                is_this = False
+                prefixed_name = match.group(2).split(':')
+                if len(prefixed_name) == 2 and prefixed_name[0] != 'xmlns':
+                    if prefixed_name[1] == q.localname and q.namespace == node.nsmap[prefixed_name[0]]:
+                        is_this = True
+                is_this = is_this or match.group(2) == attr_name
                 
-                if is_this_one:
+                if is_this:
                     group = (1, None)
                     if attribute_position_type in ('name'):
                         group = (2, None)
@@ -203,7 +212,7 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
                         group = (3, 4)
                     
                     group = next(g for g in group if match.group(g) is not None) # find first value match group (i.e. if double quotes, group 3, if single quotes, group 4)
-                    yield sublime.Region(open_pos.begin() + chars_before + match.start(group), open_pos.begin() + chars_before + match.end(group))
+                    yield sublime.Region(node.tag_name_end_pos + match.start(group), node.tag_name_end_pos + match.end(group))
                     break
 
 def move_cursors_to_nodes(view, nodes, element_position_type, attribute_position_type):
@@ -246,7 +255,7 @@ def parse_xpath_query_for_completions(view, completion_position):
     selector_regions.append((None, sublime.Region(pos, completion_position)))
     
     query_parts = [(selector_region[0], selector_region[1], view.substr(selector_region[1])) for selector_region in selector_regions if not selector_region[1].empty()]
-    #print(query_parts)
+    
     # parse the xpath expression into a tree
     tree = {
         'open': '',
@@ -331,10 +340,7 @@ def parse_xpath_query_for_completions(view, completion_position):
             else:
                 subqueries[level] += child[list(child.keys())[0]]
     
-    #print(tree)
-    #print(flattened)
     split(flattened, 0)
-    #print(subqueries)
     
     queries = []
     levels = sorted(subqueries.keys())
@@ -343,3 +349,11 @@ def parse_xpath_query_for_completions(view, completion_position):
         if subquery != '' or key == levels[-1]:
             queries.append(subquery)
     return queries
+
+def chunks(start, end, chunk_size): # inspired by http://stackoverflow.com/a/18854817/4473405
+    """Return a generator that will split the range into chunks of the specified size."""
+    return ((i, i + chunk_size) for i in range(start, end, chunk_size))
+
+def region_chunks(view, region, chunk_size):
+    """Return a generator that will split the region into chunks of the specified size."""
+    return (view.substr(sublime.Region(begin, end)) for begin, end in chunks(region.begin(), region.end(), chunk_size))

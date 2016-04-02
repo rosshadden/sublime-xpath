@@ -5,7 +5,7 @@ Sublime Text - XPath Plugin
 
 - Updates status bar text to XPath of first selection.
 - [Copy XPath at cursor(s) to clipboard.](#copy_xpath_demo)
-- Jump selection to relative tag - previous or next sibling, parent, open or close tag. It is also possible to select the entire tag contents, optionally including the tag itself.  This works for multiple selections as well, of course.
+- Jump selection to relative tag - previous or next sibling, parent, or self. Why "self", you might ask? Because it is also possible to select the open tag, the close tag, both the opening and closing tag, the attributes in the open tag, and the entire tag contents - optionally including the tag itself.  This works for multiple selections as well, of course.
 - Query XML and (X)HTML documents by XPath 1.0 expression.
   - with syntax highlighting and [intelligent auto-completion](#autocomplete_demo).
   - with a custom `print` function that can be used as a debugging aid by logging nodesets etc. to the console.
@@ -83,9 +83,28 @@ The recommended way to install the Sublime Text XPath plugin is via [Package Con
 1. Restart Sublime Text to be sure everything is loaded properly.
 1. Enjoy!
 
-## Known issues
+## Troubleshooting
 
-Comment nodes are ignored by Python's built in sax xml parser, so are not processed as part of the document tree, and therefore cannot be referenced from within an XPath expression. (The built in sax parser is used to retrieve location information (line and column numbers) while parsing the document. There is no other way of doing it, as Python's xml support is quite poor and implementations don't otherwise expose this information.)
+### CDATA Nodes
+
+When working with XML documents, you are probably used to the Document Object Model (DOM), where CDATA nodes are separate to text nodes.  XPath sees `text()` nodes as all adjacent CDATA and text node siblings together.
+If you really need to work with separate text and CDATA nodes in XPath, you will need to ensure that an XML comment separates the nodes in the source document.
+
+Example:
+
+    <hello><![CDATA[world]]>foobar</hello>
+    <hello><![CDATA[world]]><!-- separator, so that the CDATA and text nodes are non-adjacent -->foobar</hello>
+
+The XPath `/hello[1]/text()` on the first example will return a single text node: `worldfoobar`.  On the second example, it will return two text nodes: `world` and `foobar`.
+
+### Namespaces
+
+XPath 1.0 does not have the concept of a default namespace.  Therefore, if a node in the XML document being queried defines a default namespace, that namespace should be mapped to a prefix in the XPath query expression for easier access.  This plugin will do that for you automatically.
+See the included `example_xml_ns.xml` file for more details.
+
+### Nodes before the root element
+
+Note that due to the way ElementTree (the Python XML module) works, comments, processing instructions or doctypes that come before the root node of the document won't be navigatable by this plugin.
 
 ## Potential future improvements:
 
@@ -93,7 +112,6 @@ Feature requests, bug reports/fixes and usability suggestions are always welcome
 
 In no particular order, here are some ideas of how this plugin could be made even more awesome:
 
-- Improve syntax highlighting (and therefore also auto completion) accuracy.
 - Optimize for when modifications to the underlying XML document are made by the user, especially changes that don't alter the document structure. Currently, the whole document is re-parsed on every tiny little change (i.e. every character press while typing). (although many changes in quick succession means it will abort an in-progress parse to start again with the latest changes included.)
 - Integrate with the awesome [BracketHighlighter plugin](https://packagecontrol.io/packages/BracketHighlighter)? For efficiency - as we have already stored the location of each tag - and it will get round the large distance between tags limitation that BH has.  It could also remove some duplicate navigation functionality when both plugins are installed.
 - Allow defining custom XPath functions in the sublime-settings file.

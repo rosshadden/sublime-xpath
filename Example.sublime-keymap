@@ -39,7 +39,8 @@
         "keys": ["ctrl+alt+super+g"],
         "command": "goto_relative",
         "args": {
-            "direction": "previous", // options are: 'next', 'prev'(ious), 'parent', and also 'open' tag, 'close' tag, 'names' (both open and closing tag), 'open_attributes', 'entire', 'content'
+            "direction": "previous", // options are: 'self', 'next', 'prev'(ious), 'parent'
+            "goto_element": "open" // options are 'open' tag, 'close' tag, 'names' (both open and closing tag), 'open_attributes', 'entire', 'content'
         }
     },
     

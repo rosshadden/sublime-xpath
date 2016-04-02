@@ -10,37 +10,7 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
     def run(self, edit):
         try:
             xml = sublime.load_resource(sublime.find_resources('example_xml_ns.xml')[0])
-            tree, namespaces, all_elements = lxml_etree_parse_xml_string_with_location(xml, 1)
-            
-            def lxml_parser_tests():
-                def TestLocation(element, positions):
-                    position_map = ['open_tag_start_pos', 'open_tag_end_pos', 'close_tag_start_pos', 'close_tag_end_pos']
-                    
-                    for index, position_type in enumerate(position_map):
-                        actual_pos = getattr(element, position_type)
-                        assert actual_pos == positions[index], position_type + ' expected: ' + repr(positions[index]) + ' actual: ' + repr(actual_pos)
-                    
-                    assert getNodeTagRange(element, 'open') == (positions[0], positions[1])
-                    assert getNodeTagRange(element, 'close') == (positions[2], positions[3])
-                
-                element = tree.getroot()[0]
-                assert element.tag == '{hello_ns}hello' # ensure it is the element we want
-                assert getTagName(element) == ('hello_ns', 'hello', 'hello')
-                assert isTagSelfClosing(element) is False
-                TestLocation(element, [(3, 1), (3, 25), (13, 1), (13, 9)])
-                
-                element = next(tree.getroot().iter(tag = 'text')) # "text" element, contains text
-                TestLocation(element, [(28, 1), (28, 35), (30, 96), (30, 103)])
-                element = element[0] # "more" element, self-closing
-                assert isTagSelfClosing(element) is True
-                TestLocation(element, [(28, 46), (30, 79), (28, 46), (30, 79)])
-                
-                ns = [ns for ns in tree.xpath('//namespace::*') if ns[1] not in ('lxml') and ns[0] not in (None, 'xml')][0]
-                element = tree.xpath('//a:*[1]', namespaces = { 'a': ns[1] })[0]
-                assert getTagName(element) == (ns[1], element.xpath('local-name(.)'), ns[0] + ':' + element.xpath('local-name(.)'))
-                assert isTagSelfClosing(element) is False
-                
-                assert getRelativeNode(element, 'parent') == element.getparent()
+            tree, all_elements = lxml_etree_parse_xml_string_with_location(xml)
             
             def sublime_lxml_completion_tests():
                 def test_xpath_completion(xpath, expectation):
@@ -84,8 +54,8 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 test_xpath_completion('//*[starts-with( name(), "foobar") or ', ['//*', ''])
                 test_xpath_completion('//*[starts-with(name(), "foobar") or ', ['//*', ''])
                 test_xpath_completion('/and/', ['/and/'])
-                #test_xpath_completion('and/', ['and/'])
-                #test_xpath_completion('*/', ['*/'])
+                test_xpath_completion('and/', ['and/'])
+                test_xpath_completion('*/', ['*/'])
                 test_xpath_completion('//*[starts-with(name(), "foobar")]/', ['//*[starts-with(name(), "foobar")]/'])
                 test_xpath_completion('//*[starts-with (name (), "foobar")]/', ['//*[starts-with (name (), "foobar")]/'])
                 test_xpath_completion('//*[number(text())*2=246]/', ['//*[number(text())*2=246]/'])
@@ -114,54 +84,94 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 # - value
                 # - entire
                 # - none
-                 
+                def assert_expected_cursors(expected_cursors, details):
+                    for index, actual_cursor in enumerate(view.sel()):
+                        assert len(expected_cursors) > index, details + 'unexpected cursor: ' + repr(actual_cursor)
+                        assert expected_cursors[index] == (actual_cursor.begin(), actual_cursor.end()), details + 'expected: ' + repr(expected_cursors[index]) + '\nactual: ' + repr(actual_cursor)
+                    assert len(expected_cursors) == len(view.sel()), details + 'expected cursors missing: ' + repr(expected_cursors[len(view.sel()):])
+                
                 def goto_xpath(xpath, element_type, attribute_type, expected_cursors):
                     view.run_command('select_results_from_xpath_query', { 'xpath': xpath, 'goto_element': element_type, 'goto_attribute': attribute_type })
-                    for index, actual_cursor in enumerate(view.sel()):
-                        assert len(expected_cursors) > index, 'xpath: ' + xpath + '\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\nunexpected cursor: ' + repr(actual_cursor)
-                        assert expected_cursors[index] == (actual_cursor.begin(), actual_cursor.end()), 'xpath: ' + xpath + '\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\nexpected: ' + repr(expected_cursors[index]) + '\nactual: ' + repr(actual_cursor)
-                    assert len(expected_cursors) == len(view.sel()), 'xpath: ' + xpath + '\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\nexpected cursors missing: ' + repr(expected_cursors[len(view.sel()):])
+                    assert_expected_cursors(expected_cursors, 'xpath: "' + xpath + '"\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\n')
+                    
+                def xpath_tests():
+                    goto_xpath('/test/default1:hello', 'open', None, [(33, 38)])
+                    goto_xpath('/test/default1:hello', 'names', None, [(33, 38), (1189, 1194)])
+                    goto_xpath('/test/default1:hello', 'entire', None, [(32, 1195)])
+                    goto_xpath('/test/default1:hello/default2:world', 'close', None, [(1178, 1183)])
+                    goto_xpath('/test/default1:hello/default2:world', 'content', None, [(1010, 1176)])
+                    goto_xpath('/test/default1:hello/default2:world', 'open_attributes', None, [(992, 1009)])
+                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'content', None, [(1096, 1096)])
+                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'open_attributes', None, [(1093, 1094)])
+                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'names', None, [(1086, 1093)])
+                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1086, 1093)])
+                    goto_xpath('//hij', 'open_attributes', None, [(2805, 2805)])
+                    
+                    goto_xpath('(//text())[1]', None, None, [(29, 32)])
+                    goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
+                    goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2801), (2806, 2821), (2827, 2844)]) # text nodes including CDATA
+                    goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
+                    goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2846, 2850)]) # multiple elements
+                    goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
+                    # relative nodes from context node
+                    goto_xpath('../preceding-sibling::default3:more/descendant-or-self::*', 'open', None, [(1199, 1203), (1480, 1490)])
+                    # multiple contexts
+                    goto_xpath('$contexts/..', 'open', None, [(24, 28), (1199, 1203)])
+                    
+                    # attributes
+                    goto_xpath('/test/text/@attr1', None, 'value', [(2622, 2627)])
+                    goto_xpath('/test/text/@*', None, 'name', [(2615, 2620), (2629, 2634)])
+                    goto_xpath('/test/text/@*', None, 'entire', [(2615, 2628), (2629, 2642)])
+                    goto_xpath('//@abc:another_value', None, 'entire', [(2728, 2753)]) # attribute with namespace prefix
+                    
+                    random_pos = random.randint(0, view.size())
+                    view.sel().clear()
+                    view.sel().add(sublime.Region(random_pos))
+                    goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) # check that selection didn't move
+                    goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) # check that selection didn't move
+                    goto_xpath('/test/text/@attr1', None, 'none', [(random_pos, random_pos)]) # check that selection didn't move
                 
-                goto_xpath('/test/default1:hello', 'open', None, [(33, 38)])
-                goto_xpath('/test/default1:hello', 'names', None, [(33, 38), (1189, 1194)])
-                goto_xpath('/test/default1:hello', 'entire', None, [(32, 1195)])
-                goto_xpath('/test/default1:hello/default2:world', 'close', None, [(1178, 1183)])
-                goto_xpath('/test/default1:hello/default2:world', 'content', None, [(1080, 1176)])
-                goto_xpath('/test/default1:hello/default2:world', 'open_attributes', None, [(992, 1079)])
-                goto_xpath('/test/default1:hello/default2:world/default2:example', 'content', None, [(1096, 1096)])
-                goto_xpath('/test/default1:hello/default2:world/default2:example', 'open_attributes', None, [(1093, 1095)])
-                goto_xpath('/test/default1:hello/default2:world/default2:example', 'names', None, [(1086, 1093), (1098, 1105)])
-                goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1098, 1105)])
+                def goto_relative(direction, element_type, expected_cursors):
+                    view.run_command('goto_relative', { 'direction': direction, 'goto_element': element_type })
+                    assert_expected_cursors(expected_cursors, 'direction: "' + direction + '"\n')
                 
-                goto_xpath('(//text())[1]', None, None, [(29, 32)])
-                goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
-                goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2783), (2792, 2795), (2798, 2801), (2815, 2818), (2836, 2839), (2842, 2844)]) # CDATA etc.
-                goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
-                goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2846, 2850)]) # multiple elements
-                goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
-                # relative nodes from context node
-                goto_xpath('../preceding-sibling::default3:more/descendant-or-self::*', 'open', None, [(1199, 1203), (1480, 1490)])
-                # multiple contexts
-                goto_xpath('$contexts/..', 'open', None, [(24, 28), (1199, 1203)])
+                def relative_tests():
+                    goto_xpath('/test', 'open', None, [(24, 28)])
+                    goto_relative('self', 'open', [(24, 28)])
+                    goto_relative('self', 'close', [(2846, 2850)])
+                    goto_relative('self', 'content', [(29, 2844)])
+                    goto_relative('self', 'entire', [(23, 2851)])
+                    
+                    goto_xpath('/test/default1:hello/default2:world', 'open', None, [(987, 992)])
+                    goto_relative('self', 'close', [(1178, 1183)])
+                    goto_relative('self', 'names', [(987, 992), (1178, 1183)])
+                    goto_relative('self', 'close', [(1178, 1183)])
+                    goto_relative('parent', 'open', [(33, 38)])
+                    
+                    goto_xpath('/test/default3:more[1]', 'open', None, [(1199, 1203)])
+                    goto_relative('prev', 'open', [(33, 38)])
+                    goto_relative('next', 'open', [(1199, 1203)])
+                    goto_relative('next', 'open', [(1576, 1580)])
+                    goto_relative('prev', 'names', [(1199, 1203), (1567, 1571)])
+                    goto_relative('next', 'content', [(1645, 2145)])
+                    goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
+                    goto_relative('prev', 'open', [(33, 38), (1199, 1203)])
+                    goto_relative('next', 'content', [(1242, 1565), (1645, 2145)])
+                    goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
+                    goto_relative('self', 'close', [(1567, 1571), (2147, 2151)])
+                    goto_relative('parent', 'open', [(24, 28)])
+                    goto_xpath('/test/default3:more[1] | /test/default3:more[2]/an2:yet_another', 'open', None, [(1199, 1203), (1950, 1964)])
+                    goto_relative('parent', 'open', [(24, 28), (1576, 1580)])
+                    
+                    goto_relative('prev', 'open', [(24, 28), (1576, 1580)]) # prev should fail, so assert the position is the same as previously
                 
-                # attributes
-                goto_xpath('/test/text/@attr1', None, 'value', [(2622, 2627)])
-                goto_xpath('/test/text/@*', None, 'name', [(2615, 2620), (2629, 2634)])
-                goto_xpath('/test/text/@*', None, 'entire', [(2615, 2628), (2629, 2642)])
-                goto_xpath('//@abc:another_value', None, 'entire', [(2728, 2753)]) # attribute with namespace prefix
-                
-                random_pos = random.randint(0, view.size())
-                view.sel().clear()
-                view.sel().add(sublime.Region(random_pos))
-                goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) #  check that selection didn't move
-                goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) #  check that selection didn't move
-                goto_xpath('/test/text/@attr1', None, 'none', [(random_pos, random_pos)]) #  check that selection didn't move
+                xpath_tests()
+                relative_tests()
                 
                 # close the view we opened for testing
                 view.window().run_command('close')
                 
             
-            lxml_parser_tests()
             sublime_lxml_completion_tests()
             sublime_lxml_goto_node_tests()
             

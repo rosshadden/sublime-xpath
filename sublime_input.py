@@ -2,6 +2,7 @@ import sublime
 import sublime_plugin
 
 on_query_completions_callbacks = {}
+on_completion_committed_callbacks = {}
 
 class RequestInputCommand(sublime_plugin.TextCommand): # this command should be overidden, and not used directly
     input_panel = None
@@ -30,6 +31,8 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
         
         global on_query_completions_callbacks
         on_query_completions_callbacks[self.input_panel.id()] = lambda prefix, locations: self.on_query_completions(prefix, locations)
+        global on_completion_committed_callbacks
+        on_completion_committed_callbacks[self.input_panel.id()] = lambda: self.on_completion_committed()
     
     def set_args(self, **args):
         self.arguments = args or {}
@@ -74,6 +77,8 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
         if self.input_panel is not None:
             global on_query_completions_callbacks
             on_query_completions_callbacks.pop(self.input_panel.id(), None) # remove callback if present
+            global on_completion_committed_callbacks
+            on_completion_committed_callbacks.pop(self.input_panel.id(), None) # remove callback if present
         self.input_panel = None
     
     def input_cancelled(self):
@@ -89,6 +94,9 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
         pass
     
     def on_query_completions(self, prefix, locations): # http://docs.sublimetext.info/en/latest/reference/api.html#sublime_plugin.EventListener.on_query_completions
+        pass
+    
+    def on_completion_committed(self):
         pass
     
     def refresh_selection_bug_work_around(self):
@@ -120,3 +128,9 @@ class InputCompletionsListener(sublime_plugin.EventListener):
     def on_pre_close(self, view):
         global on_query_completions_callbacks
         on_query_completions_callbacks.pop(view.id(), None) # remove callback if present
+    
+    def on_post_text_command(self, view, command_name, args):
+        global on_completion_committed_callbacks
+        if command_name in ('commit_completion', 'insert_best_completion'):
+            if view.id() in on_completion_committed_callbacks.keys():
+                on_completion_committed_callbacks[view.id()]()
