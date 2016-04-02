@@ -99,7 +99,7 @@ The XPath `/hello[1]/text()` on the first example will return a single text node
 
 ### Namespaces
 
-XPath 1.0 does not have the concept of a default namespace.  Therefore, if a node in the XML document being queried defines a default namespace, that namespace should be mapped to a prefix in the XPath query expression for easier access.
+XPath 1.0 does not have the concept of a default namespace.  Therefore, if a node in the XML document being queried defines a default namespace, that namespace should be mapped to a prefix in the XPath query expression for easier access.  This plugin will do that for you automatically.
 See the included `example_xml_ns.xml` file for more details.
 
 ### Nodes before the root element
