@@ -24,6 +24,7 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
     
     def show_input_panel(self, initial_value):
         self.input_panel = self.view.window().show_input_panel(self.get_value_from_args('label', ''), initial_value, self.input_done, self.input_changed, self.input_cancelled)
+        self.input_panel.set_name('input_panel: ' + self.get_value_from_args('label', ''))
         syntax = self.get_value_from_args('syntax', None)
         if syntax is not None:
             self.input_panel.assign_syntax(syntax)
