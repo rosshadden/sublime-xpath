@@ -98,6 +98,7 @@ Example:
     <hello><![CDATA[world]]><!-- separator, so that the CDATA and text nodes are non-adjacent -->foobar</hello>
 
 The XPath `/hello[1]/text()` on the first example will return a single text node: `worldfoobar`.  On the second example, it will return two text nodes: `world` and `foobar`.
+More information can be found at [this Stack Overflow Q&A](http://stackoverflow.com/questions/36493024/why-does-xpath-not-find-adjacent-text-and-cdata-nodes).
 
 ### Namespaces
 
