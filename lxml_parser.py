@@ -77,17 +77,20 @@ class LocationAwareXMLParser:
         
         for result in self.RE_SPLIT_XML.finditer(chunk, start_search_at): # find the next sigificant XML control char, so we can manually know the location
             self._positions.append((self._position_offset + chunk_offset, self._position_offset + result.start()))
-            self._parser.feed(chunk[chunk_offset:result.start()])
+            self._feed(chunk[chunk_offset:result.start()])
             
             self._positions.append((self._position_offset + result.start(), self._position_offset + result.end()))
-            self._parser.feed(chunk[result.start():result.end()])
+            self._feed(chunk[result.start():result.end()])
             chunk_offset = result.end()
         self._remainder = chunk[chunk_offset:]
         self._position_offset += chunk_offset
     
+    def _feed(self, text):
+        self._parser.feed(bytes(text, 'UTF-8'))
+    
     def close(self):
         self._positions.append((self._position_offset, self._position_offset + len(self._remainder)))
-        self._parser.feed(self._remainder)
+        self._feed(self._remainder)
         result = self._parser.close()
         self._reset()
         return result
