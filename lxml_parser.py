@@ -86,7 +86,7 @@ class LocationAwareXMLParser:
         self._position_offset += chunk_offset
     
     def _feed(self, text):
-        self._parser.feed(bytes(text, 'UTF-8'))
+        self._parser.feed(bytes(text, 'UTF-8')) # feed as bytes, otherwise doesn't work on OSX, and encoding declarations in the prolog can cause exceptions
     
     def close(self):
         self._positions.append((self._position_offset, self._position_offset + len(self._remainder)))
