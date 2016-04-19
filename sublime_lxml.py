@@ -352,7 +352,7 @@ def parse_xpath_query_for_completions(view, completion_position):
 
 def chunks(start, end, chunk_size): # inspired by http://stackoverflow.com/a/18854817/4473405
     """Return a generator that will split the range into chunks of the specified size."""
-    return ((i, i + chunk_size) for i in range(start, end, chunk_size))
+    return ((i, min(i + chunk_size, end)) for i in range(start, end, chunk_size))
 
 def region_chunks(view, region, chunk_size):
     """Return a generator that will split the region into chunks of the specified size."""
