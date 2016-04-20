@@ -28,6 +28,7 @@ class RequestInputCommand(sublime_plugin.TextCommand): # this command should be 
         if syntax is not None:
             self.input_panel.assign_syntax(syntax)
         self.input_panel.settings().set('gutter', False)
+        self.input_panel.settings().set('highlight_line', False) # in case this bug is ever fixed: https://github.com/SublimeTextIssues/Core/issues/586
         
         global on_query_completions_callbacks
         on_query_completions_callbacks[self.input_panel.id()] = lambda prefix, locations: self.on_query_completions(prefix, locations)
