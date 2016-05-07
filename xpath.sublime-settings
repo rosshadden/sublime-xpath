@@ -41,5 +41,7 @@
 	// when an element is selected via an XPath query, what aspect of it should the cursor move to? possible values: open, close, names, open_attributes, content, entire
 	"goto_element": "open",
 	// when an attribute is selected via an XPath query, what aspect of it should the cursor move to? possible values: name, value, entire
-	"goto_attribute": "value"
+	"goto_attribute": "value",
+	// which scopes to parse, show XPath at cursors for, and allow XPath queries on
+	"sgml_selector": "text.xml, text.html.basic - embedding.php"
 }
