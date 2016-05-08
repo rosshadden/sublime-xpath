@@ -31,7 +31,8 @@ def settingsChanged():
 
 def getSGMLRegions(view):
     """Find all xml and html scopes in the specified view."""
-    return view.find_by_selector('text.xml, text.html - text.html.markdown') # TODO: include html or xml code regions in markdown, maybe using scope 'markup.raw.block.fenced.markdown' and checking for a language after the ```
+    global settings
+    return view.find_by_selector(settings.get('sgml_selector'))
 
 def containsSGML(view):
     """Return True if the view contains XML or HTML syntax."""

@@ -52,6 +52,7 @@ See [default settings](https://github.com/rosshadden/sublime-xpath/blob/master/x
   - `entire` - Select the name and the value of the attribute.
   - `element` - Select the element that the attribute belongs to, using the `goto_element` rules.
   - `none` - Do not move the cursor.
+- `sgml_selector` - a scope selector to determine what to parse as XML and enable XPath functions for. Defaults to HTML and XML, excluding things like ASP and PHP.
 
 No key bindings are set by default, but an example sublime-keymap file is included, to show the available commands and arguments. [See this documentation](http://docs.sublimetext.info/en/latest/customization/key_bindings.html) for more details about keybindings in ST3.
 
