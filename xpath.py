@@ -513,6 +513,11 @@ def plugin_loaded():
     
     register_xpath_extensions()
 
+def plugin_unloaded():
+    for view in sublime.active_window().views():
+        view.erase_status('xpath')
+        view.erase_status('xpath_error')
+
 def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namespaces, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
     matches = []
