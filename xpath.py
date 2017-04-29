@@ -346,8 +346,8 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             results = getNodesAtPositions(view, roots, cursors)
             
             new_nodes_under_cursors = []
+            allFound = True
             for result in results:
-                allFound = True
                 desired_node = getRelativeNode(result[0], kwargs['direction'])
                 if desired_node is None:
                     allFound = False
