@@ -80,10 +80,14 @@ def buildTreeForViewRegion(view, region_scope):
     try:
         tree, all_elements = lxml_etree_parse_xml_string_with_location(region_chunks(view, region_scope, 8096), region_scope.begin(), stop)
     except etree.XMLSyntaxError as e:
-        global parse_error
-        line_number_offset = view.rowcol(region_scope.begin())[0]
-        text = 'line ' + str(e.position[0] + line_number_offset) + ', column ' + str(e.position[1]) + ' - ' + e.msg # TODO: column is incorrect if there are tabs and the tab width is set > 1
-        view.set_status('xpath_error', parse_error + text)
+        global settings
+        show_parse_errors = settings.get('show_xml_parser_errors', True)
+        if show_parse_errors:
+            global parse_error
+            offset = view.rowcol(region_scope.begin())
+            log_entry = e.error_log[0]
+            text = 'line ' + str(log_entry.line + offset[0]) + ', column ' + str(log_entry.column + offset[1]) + ' - ' + log_entry.message
+            view.set_status('xpath_error', parse_error + text)
     
     return (tree, all_elements)
 
@@ -508,6 +512,11 @@ def plugin_loaded():
     sublime.set_timeout_async(settingsChanged, 10)
     
     register_xpath_extensions()
+
+def plugin_unloaded():
+    for view in sublime.active_window().views():
+        view.erase_status('xpath')
+        view.erase_status('xpath_error')
 
 def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namespaces, **additional_variables):
     """Given a query string and a dictionary of document trees and their context elements, compile the xpath query and execute it for each document."""
