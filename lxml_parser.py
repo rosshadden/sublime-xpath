@@ -278,7 +278,8 @@ def get_results_for_xpath_query(query, tree, context = None, namespaces = None, 
     nsmap = {}
     if namespaces is not None:
         for prefix in namespaces.keys():
-            nsmap[prefix] = namespaces[prefix][0]
+            if namespaces[prefix][0] != '':
+                nsmap[prefix] = namespaces[prefix][0]
     
     xpath = etree.XPath(query, namespaces = nsmap)
     
