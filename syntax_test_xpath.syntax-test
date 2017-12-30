@@ -1,42 +1,37 @@
-# SYNTAX TEST "xpath.sublime-syntax"
+(: SYNTAX TEST "xpath.sublime-syntax" :)
 /element1/ns:element2/child::*[position() > 1  and substring-after(., 'hello world') = "test(123)"]/text()
-# <- punctuation.separator.xpath.location_step
-#^^^^^^^^ variable.parameter.xpath
-#        ^ punctuation.separator.xpath.location_step
-#         ^^^^^^^^^^^ variable.parameter.xpath
-#                     ^^^^^^^ constant.language.xpath.axis_name
-#                            ^ variable.parameter.xpath
-#                             ^ xpath.predicate punctuation.definition.arguments.begin.xpath.predicate
-#                              ^^^^^^^^^ meta.function-call.xpath entity.name.function.xpath
-#                                      ^ punctuation.definition.arguments.begin.xpath.subexpression comment
-#                                       ^ meta.function-call.xpath punctuation.definition.arguments.end.xpath.subexpression comment
-#                                        ^ xpath.predicate
-#                                         ^ xpath.predicate keyword.operator.xpath
-#                                          ^ xpath.predicate
-#                                           ^ constant.numeric.xpath
-#                                            ^^ xpath.predicate
-#                                              ^^^ xpath.predicate keyword.operator.xpath
-#                                                  ^^^^^^^^^^^^^^^^ xpath.predicate meta.function-call.xpath entity.name.function.xpath
-#                                                                  ^ xpath.predicate meta.function-call.xpath keyword.control.flow.xpath
-#                                                                   ^ xpath.predicate meta.function-call.xpath punctuation.separator.xpath.arguments
-#                                                                    ^ xpath.predicate meta.function-call.xpath
-#                                                                     ^^^^^^^^^^^^^ xpath.predicate meta.function-call.xpath string.quoted.single.xpath
-#                                                                     ^ xpath.predicate meta.function-call.xpath punctuation.definition.string.begin.xpath
-#                                                                                 ^ xpath.predicate meta.function-call.xpath punctuation.definition.string.end.xpath
-#                                                                                  ^ punctuation.definition.arguments.end.xpath.subexpression comment
-#                                                                                   ^ xpath.predicate
-#                                                                                    ^ xpath.predicate keyword.operator.xpath
-#                                                                                     ^ xpath.predicate
-#                                                                                      ^^^^^^^^^^^ xpath.predicate string.quoted.double.xpath
-#                                                                                      ^^^^ xpath.predicate string.quoted.double.xpath - meta.function-call.xpath
-#                                                                                           ^^^^ xpath.predicate string.quoted.double.xpath - meta.function-call.xpath punctuation.definition.arguments
-#                                                                                      ^ xpath.predicate string.quoted.double.xpath punctuation.definition.string.begin.xpath
-#                                                                                                ^ xpath.predicate string.quoted.double.xpath punctuation.definition.string.end.xpath
-#                                                                                                 ^ xpath.predicate punctuation.definition.arguments.end.xpath.predicate comment
-#                                                                                                  ^ punctuation.separator.xpath.location_step
-#                                                                                                   ^^^^^^ storage.type.xpath.node_type
-#                                                                                                       ^^ storage.type.xpath.node_type - punctuation.definition.arguments
-#                                                                                                   ^^^^^^ storage.type.xpath.node_type - meta.function-call.xpath
+(: <- punctuation.accessor.location_step :)
+(:^^^^^^^ variable.parameter :)
+(:       ^ punctuation.accessor.location_step :)
+(:        ^^^^^^^^^^^ variable.parameter :)
+(:                    ^^^^^^^ constant.language.axis_name :)
+(:                           ^ variable.parameter :)
+(:                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ meta.predicate :)
+(:                                                                                                 ^ - meta.predicate :)
+(:                            ^ punctuation.section.arguments.begin.xpath.predicate :)
+(:                             ^^^^^^^^^^ meta.function-call :)
+(:                             ^^^^^^^^ variable.function :)
+(:                                     ^ punctuation.section.arguments.begin.xpath.subexpression :)
+(:                                      ^ punctuation.section.arguments.end.xpath.subexpression :)
+(:                                        ^ keyword.operator :)
+(:                                          ^ constant.numeric :)
+(:                                             ^^^ keyword.operator :)
+(:                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ meta.function-call :)
+(:                                                                                  ^ - meta.function-call :)
+(:                                                                 ^ keyword.control.flow :)
+(:                                                                  ^ punctuation.separator.arguments :)
+(:                                                                    ^^^^^^^^^^^^^ string.quoted.single :)
+(:                                                                    ^ punctuation.definition.string.begin :)
+(:                                                                                ^ punctuation.definition.string.end :)
+(:                                                                                 ^ punctuation.section.arguments.end.xpath.subexpression :)
+(:                                                                                   ^ keyword.operator :)
+(:                                                                                     ^^^^^^^^^^^ string.quoted.double - meta.function-call :)
+(:                                                                                          ^^^^^ - punctuation :)
+(:                                                                                     ^ punctuation.definition.string.begin :)
+(:                                                                                               ^ punctuation.definition.string.end :)
+(:                                                                                                ^ punctuation.section.arguments.end.xpath.predicate :)
+(:                                                                                                 ^ punctuation.accessor.location_step :)
+(:                                                                                                  ^^^^^^ storage.type.node_type - punctuation - meta.function-call :)
 
- )]
-#^ invalid.illegal.stray-bracket-end.xpath
+  )]
+(:^^ invalid.illegal.stray-bracket-end :)
