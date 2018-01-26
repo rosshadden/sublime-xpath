@@ -105,6 +105,8 @@ def get_nodes_from_document(nodes):
             element = node.getparent() # get the parent
             if element is None: # some nodes are not actually part of the original document we parsed, for example when using the substring function. so there is no way to find the original node, and therefore the location
                 continue
+        elif isinstance(node, etree.PIBase):
+            element = node
         elif isinstance(node, etree.CommentBase):
             element = node
         elif isinstance(node, etree.ElementBase):
@@ -154,7 +156,7 @@ def get_regions_of_nodes(view, nodes, element_position_type, attribute_position_
             if next_node is not None:
                 text_end_pos = getNodeTagRegion(view, next_node, 'open').begin()
             yield sublime.Region(text_begin_pos, text_end_pos)
-        elif isinstance(node, etree.CommentBase):
+        elif isinstance(node, etree.CommentBase) or isinstance(node, etree.PIBase):
             yield open_pos
         elif attr_name is None or attribute_position_type is None or attribute_position_type in ('element', 'parent'):
             # position type 'open' <|name| attr1="test"></name> "Goto name in open tag"
