@@ -41,9 +41,13 @@ class LocationAwareComment(etree.CommentBase):
     tag_pos = None
 
 
+class LocationAwareProcessingInstruction(etree.PIBase):
+    tag_pos = None
+
+
 # http://stackoverflow.com/questions/36246014/lxml-use-default-class-element-lookup-and-treebuilder-parser-target-at-the-sam
 class LocationAwareXMLParser:
-    RE_SPLIT_XML = re.compile('<!\[CDATA\[|\]\]>|[<>]')
+    RE_SPLIT_XML = re.compile(r'<!\[CDATA\[|\]\]>|[<>]')
     
     def __init__(self, position_offset = 0, **parser_options):
         def getLocation(index=None):
@@ -163,6 +167,13 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     def text_data(self, data, location=None):
         self._text.append(data)
     
+    def pi(self, target, data, location=None):
+        if self._most_recent is not None:
+            self._flush()
+            self._appendNode(self.create_pi(target, data))
+            self._most_recent.tag_pos = location
+            self._in_tail = True
+    
     def comment(self, text, location=None):
         if self._most_recent is not None:
             self._flush()
@@ -172,6 +183,9 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     
     def create_comment(self, text):
         return LocationAwareComment(text)
+    
+    def create_pi(self, target, data):
+        return LocationAwareProcessingInstruction(target, data)
     
     def _appendNode(self, node):
         if self._element_stack: # if we have anything on the stack
@@ -206,7 +220,7 @@ def lxml_etree_parse_xml_string_with_location(xml_chunks, position_offset = 0, s
 def getNodeTagRange(node, position_type):
     """Given a node and position type (open or close), return the node's position."""
     pos = None
-    if isinstance(node, LocationAwareComment):
+    if isinstance(node, LocationAwareComment) or isinstance(node, LocationAwareProcessingInstruction):
         pos = node.tag_pos
     else:
         pos = getattr(node, position_type + '_tag_pos')

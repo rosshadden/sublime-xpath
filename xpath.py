@@ -958,7 +958,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
         return [(completion + '\taxis', completion + '::') for completion in completions]
 
     def completions_node_types():
-        completions = ['text', 'node', 'comment'] # 'processing-instruction' is also a valid XPath node type, but not parsed into an ElementTree, so useless to show it in suggestions/completions
+        completions = ['text', 'node', 'comment', 'processing-instruction']
         return [(completion + '\tnode type', completion + '()') for completion in completions]
 
     def completions_functions():
