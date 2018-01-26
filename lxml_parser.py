@@ -130,6 +130,8 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
         self._most_recent = None
         self._in_tail = None
         self._all_namespaces = collections.OrderedDict()
+        self._addprevious = []
+        self._root = None
     
     def _flush(self):
         if self._text:
@@ -168,18 +170,16 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
         self._text.append(data)
     
     def pi(self, target, data, location=None):
-        if self._most_recent is not None:
-            self._flush()
-            self._appendNode(self.create_pi(target, data))
-            self._most_recent.tag_pos = location
-            self._in_tail = True
+        self._flush()
+        self._appendNode(self.create_pi(target, data))
+        self._most_recent.tag_pos = location
+        self._in_tail = True
     
     def comment(self, text, location=None):
-        if self._most_recent is not None:
-            self._flush()
-            self._appendNode(self.create_comment(text))
-            self._most_recent.tag_pos = location
-            self._in_tail = True
+        self._flush()
+        self._appendNode(self.create_comment(text))
+        self._most_recent.tag_pos = location
+        self._in_tail = True
     
     def create_comment(self, text):
         return LocationAwareComment(text)
@@ -190,12 +190,22 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     def _appendNode(self, node):
         if self._element_stack: # if we have anything on the stack
             self._element_stack[-1].append(node) # append the node as a child to the last/top element on the stack
+        elif self._root is None and isinstance(node, etree.ElementBase):
+            self._root = node
+            for item in self._addprevious:
+                node.addprevious(item)
+        elif self._most_recent is not None and self._root is not None:
+            # after the root element
+            self._most_recent.addnext(node)
+        else:
+            # store this element to add before the root node when we encounter it
+            self._addprevious.append(node)
         self._all_elements.append(node)
         self._most_recent = node
     
     def document_end(self):
         """Return the root node and a list of all elements (and comments) found in the document, to keep their proxy alive."""
-        return (self._most_recent, self._all_namespaces, self._all_elements)
+        return (self._root, self._all_namespaces, self._all_elements)
 
 
 def lxml_etree_parse_xml_string_with_location(xml_chunks, position_offset = 0, should_stop = None):
