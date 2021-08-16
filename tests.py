@@ -6,24 +6,26 @@ import random
 from .lxml_parser import *
 from .sublime_lxml import parse_xpath_query_for_completions
 
-class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window().active_view().run_command('run_xpath_tests')
-    def run(self, edit):
+class RunXpathTestsCommand(sublime_plugin.WindowCommand): # sublime.active_window().run_command('run_xpath_tests')
+    def run(self):
         try:
             xml = sublime.load_resource(sublime.find_resources('example_xml_ns.xml')[0])
             tree, all_elements = lxml_etree_parse_xml_string_with_location(xml)
-            
+
             def sublime_lxml_completion_tests():
                 def test_xpath_completion(xpath, expectation):
-                    view = self.view.window().create_output_panel('xpath_test')
-                    
+                    view = self.window.create_output_panel('xpath_test')
+
                     view.assign_syntax('xpath.sublime-syntax')
-                    
-                    view.erase(edit, sublime.Region(0, view.size()))
-                    view.insert(edit, 0, xpath)
+
+                    view.run_command('select_all')
+                    view.run_command('insert', { 'characters': xpath })
+                    #view.erase(edit, sublime.Region(0, view.size()))
+                    #view.insert(edit, 0, xpath)
                     result = parse_xpath_query_for_completions(view, view.size())
-                    
+
                     assert result == expectation, 'xpath: ' + repr(xpath) + '\nexpected: ' + repr(expectation) + '\nactual: ' + repr(result)
-                
+
                 test_xpath_completion('', [''])
                 test_xpath_completion('/', ['/'])
                 test_xpath_completion('/root/', ['/root/'])
@@ -60,16 +62,19 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 test_xpath_completion('//*[starts-with (name (), "foobar")]/', ['//*[starts-with (name (), "foobar")]/'])
                 test_xpath_completion('//*[number(text())*2=246]/', ['//*[number(text())*2=246]/'])
                 test_xpath_completion('//*[number(text())*', ['//*', ''])
-            
+
             def sublime_lxml_goto_node_tests():
-                self.view.window().run_command('new_file')
-                view = self.view.window().active_view()
-                
-                view.insert(edit, 0, xml)
-                view.set_syntax_file('xml.sublime-syntax')
+                self.window.run_command('new_file')
+                view = self.window.active_view()
+
+                view.run_command('select_all')
+                view.settings().set('auto_indent', False)
+                view.settings().set('xpath_test_file', True)
+                view.run_command('insert', { 'characters': xml })
+                view.set_syntax_file('XML.sublime-syntax')
                 view.set_read_only(True)
                 view.set_scratch(True) # so we don't get a message asking to save when we close the view
-                
+
                 # check that going to a text node works
                 # check that going to an element node works
                 # - names
@@ -86,101 +91,102 @@ class RunXpathTestsCommand(sublime_plugin.TextCommand): # sublime.active_window(
                 # - none
                 def assert_expected_cursors(expected_cursors, details):
                     for index, actual_cursor in enumerate(view.sel()):
-                        assert len(expected_cursors) > index, details + 'unexpected cursor: ' + repr(actual_cursor)
-                        assert expected_cursors[index] == (actual_cursor.begin(), actual_cursor.end()), details + 'expected: ' + repr(expected_cursors[index]) + '\nactual: ' + repr(actual_cursor)
-                    assert len(expected_cursors) == len(view.sel()), details + 'expected cursors missing: ' + repr(expected_cursors[len(view.sel()):])
-                
-                def goto_xpath(xpath, element_type, attribute_type, expected_cursors):
+                        actual_cursor_begin = view.rowcol(actual_cursor.begin())
+                        actual_cursor_end = view.rowcol(actual_cursor.end())
+
+                        assert len(expected_cursors) > index, details + '\nunexpected cursor: ' + repr((actual_cursor_begin, actual_cursor_end))
+                        assert expected_cursors[index] == (actual_cursor_begin, actual_cursor_end), details + '\nexpected: ' + repr(expected_cursors[index]) + '\nactual: ' + repr((actual_cursor_begin, actual_cursor_end))
+                    assert len(expected_cursors) == len(view.sel()), details + '\nexpected cursors missing: ' + repr(expected_cursors[len(view.sel()):])
+
+                def goto_xpath(xpath, element_type, attribute_type, expected_cursors, test_line_number=-1):
                     view.run_command('select_results_from_xpath_query', { 'xpath': xpath, 'goto_element': element_type, 'goto_attribute': attribute_type })
-                    assert_expected_cursors(expected_cursors, 'xpath: "' + xpath + '"\nelement_type: ' + repr(element_type) + '\nattribute_type: ' + repr(attribute_type) + '\n')
-                    
+                    #assert_expected_cursors(expected_cursors, f'xpath: "{xpath}"\nelement_type: {repr(element_type)}\nattribute_type: {repr(attribute_type)}\ntest line number: {test_line_number}')
+                    assert_expected_cursors(expected_cursors, 'xpath: "{xpath}"\nelement_type: {element_type}\nattribute_type: {attribute_type}\ntest line number: {test_line_number}'.format(
+                        **{
+                            'xpath': xpath,
+                            'element_type': element_type,
+                            'attribute_type': attribute_type,
+                            'test_line_number': test_line_number
+                        }) # TODO: use locals()?
+                    )
+
                 def xpath_tests():
-                    goto_xpath('/test/default1:hello', 'open', None, [(33, 38)])
-                    goto_xpath('/test/default1:hello', 'names', None, [(33, 38), (1189, 1194)])
-                    goto_xpath('/test/default1:hello', 'entire', None, [(32, 1195)])
-                    goto_xpath('/test/default1:hello/default2:world', 'close', None, [(1178, 1183)])
-                    goto_xpath('/test/default1:hello/default2:world', 'content', None, [(1010, 1176)])
-                    goto_xpath('/test/default1:hello/default2:world', 'open_attributes', None, [(992, 1009)])
-                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'content', None, [(1096, 1096)])
-                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'open_attributes', None, [(1093, 1094)])
-                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'names', None, [(1086, 1093)])
-                    goto_xpath('/test/default1:hello/default2:world/default2:example', 'close', None, [(1086, 1093)])
-                    goto_xpath('//hij', 'open_attributes', None, [(2805, 2805)])
-                    
-                    goto_xpath('(//text())[1]', None, None, [(29, 32)])
-                    goto_xpath("//text()[contains(., 'text')]", None, None, [(2643, 2654)])
-                    goto_xpath("/test/text/following-sibling::text() | /test/text/following-sibling::*/text()", None, None, [(2780, 2801), (2806, 2821), (2827, 2844)]) # text nodes including CDATA
-                    goto_xpath('(//*)[position() < 3]', 'open', None, [(24, 28), (33, 38)]) # multiple elements
-                    goto_xpath('(//*)[position() < 3]', 'names', None, [(24, 28), (33, 38), (1189, 1194), (2846, 2850)]) # multiple elements
-                    goto_xpath('/test/default3:more[2]/an2:yet_another', 'open', None, [(1950, 1964)])
-                    # relative nodes from context node
-                    goto_xpath('../preceding-sibling::default3:more/descendant-or-self::*', 'open', None, [(1199, 1203), (1480, 1490)])
-                    # multiple contexts
-                    goto_xpath('$contexts/..', 'open', None, [(24, 28), (1199, 1203)])
-                    
-                    # attributes
-                    goto_xpath('/test/text/@attr1', None, 'value', [(2622, 2627)])
-                    goto_xpath('/test/text/@*', None, 'name', [(2615, 2620), (2629, 2634)])
-                    goto_xpath('/test/text/@*', None, 'entire', [(2615, 2628), (2629, 2642)])
-                    goto_xpath('//@abc:another_value', None, 'entire', [(2728, 2753)]) # attribute with namespace prefix
-                    
-                    random_pos = random.randint(0, view.size())
-                    view.sel().clear()
-                    view.sel().add(sublime.Region(random_pos))
-                    goto_xpath('substring-before(//text()[contains(., ''text'')][1], ''text'')', None, None, [(random_pos, random_pos)]) # check that selection didn't move
-                    goto_xpath('//*', 'none', None, [(random_pos, random_pos)]) # check that selection didn't move
-                    goto_xpath('/test/text/@attr1', None, 'none', [(random_pos, random_pos)]) # check that selection didn't move
-                
+                    test_lines = sublime.load_resource(sublime.find_resources('xpath_tests.txt')[0]).split('\n')
+                    index = 0
+                    while index < len(test_lines):
+                        xpath = test_lines[index]
+                        if xpath.strip() == '' or xpath.startswith('#'):
+                            index += 1
+                            continue
+
+                        element_type, _, attribute_type = test_lines[index + 1].partition(' ')
+                        expected_cursor_count = int(test_lines[index + 2])
+                        expected_cursors = list() #set()
+
+                        if expected_cursor_count:
+                            for index in range(index + 3, index + 3 + expected_cursor_count):
+                                expected_cursors.append(eval(test_lines[index])) # TODO: don't rely on eval to parse the tuple
+                        else:
+                            index += 2
+                            random_pos = random.randint(0, view.size())
+                            view.sel().clear()
+                            view.sel().add(sublime.Region(random_pos))
+                            rowcol = view.rowcol(random_pos)
+                            expected_cursors.append((rowcol, rowcol))
+
+                        goto_xpath(xpath, element_type, attribute_type, expected_cursors, index)
+                        index += 1
+
                 def goto_relative(direction, element_type, expected_cursors):
                     view.run_command('goto_relative', { 'direction': direction, 'goto_element': element_type })
                     assert_expected_cursors(expected_cursors, 'direction: "' + direction + '"\n')
-                
+
                 def relative_tests():
-                    goto_xpath('/test', 'open', None, [(24, 28)])
-                    goto_relative('self', 'open', [(24, 28)])
-                    goto_relative('self', 'close', [(2846, 2850)])
-                    goto_relative('self', 'content', [(29, 2844)])
-                    goto_relative('self', 'entire', [(23, 2851)])
-                    
-                    goto_xpath('/test/default1:hello/default2:world', 'open', None, [(987, 992)])
-                    goto_relative('self', 'close', [(1178, 1183)])
-                    goto_relative('self', 'names', [(987, 992), (1178, 1183)])
-                    goto_relative('self', 'close', [(1178, 1183)])
-                    goto_relative('parent', 'open', [(33, 38)])
-                    
-                    goto_xpath('/test/default3:more[1]', 'open', None, [(1199, 1203)])
-                    goto_relative('prev', 'open', [(33, 38)])
-                    goto_relative('next', 'open', [(1199, 1203)])
-                    goto_relative('next', 'open', [(1576, 1580)])
-                    goto_relative('prev', 'names', [(1199, 1203), (1567, 1571)])
-                    goto_relative('next', 'content', [(1645, 2145)])
-                    goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
-                    goto_relative('prev', 'open', [(33, 38), (1199, 1203)])
-                    goto_relative('next', 'content', [(1242, 1565), (1645, 2145)])
-                    goto_xpath('/test/default3:more', 'open', None, [(1199, 1203), (1576, 1580)])
-                    goto_relative('self', 'close', [(1567, 1571), (2147, 2151)])
-                    goto_relative('parent', 'open', [(24, 28)])
-                    goto_xpath('/test/default3:more[1] | /test/default3:more[2]/an2:yet_another', 'open', None, [(1199, 1203), (1950, 1964)])
-                    goto_relative('parent', 'open', [(24, 28), (1576, 1580)])
-                    
-                    goto_relative('prev', 'open', [(24, 28), (1576, 1580)]) # prev should fail, so assert the position is the same as previously
-                
+                    goto_xpath('/test', 'open', None, [((1, 1), (1, 5))])
+                    goto_relative('self', 'open', [((1, 1), (1, 5))])
+                    goto_relative('self', 'close', [((30, 2), (30, 6))])
+                    goto_relative('self', 'content', [((1, 6), (30, 0))])
+                    goto_relative('self', 'entire', [((1, 0), (30, 7))])
+
+                    goto_xpath('/test/default1:hello/default2:world', 'open', None, [((9, 9), (9, 14))])
+                    goto_relative('self', 'close', [((11, 10), (11, 15))])
+                    goto_relative('self', 'names', [((9, 9), (9, 14)), ((11, 10), (11, 15))])
+                    goto_relative('self', 'close', [((11, 10), (11, 15))])
+                    goto_relative('parent', 'open', [((2, 5), (2, 10))])
+
+                    goto_xpath('/test/default3:more[1]', 'open', None, [((13, 5), (13, 9))])
+                    goto_relative('prev', 'open', [((2, 5), (2, 10))])
+                    goto_relative('next', 'open', [((13, 5), (13, 9))])
+                    goto_relative('next', 'open', [((16, 5), (16, 9))])
+                    goto_relative('prev', 'names', [((13, 5), (13, 9)), ((15, 6), (15, 10))])
+                    goto_relative('next', 'content', [((16, 74), (19, 4))])
+                    goto_xpath('/test/default3:more', 'open', None, [((13, 5), (13, 9)), ((16, 5), (16, 9))])
+                    goto_relative('prev', 'open', [((2, 5), (2, 10)), ((13, 5), (13, 9))])
+                    goto_relative('next', 'content', [((13, 48), (15, 4)), ((16, 74), (19, 4))])
+                    goto_xpath('/test/default3:more', 'open', None, [((13, 5), (13, 9)), ((16, 5), (16, 9))])
+                    goto_relative('self', 'close', [((15, 6), (15, 10)), ((19, 6), (19, 10))])
+                    goto_relative('parent', 'open', [((1, 1), (1, 5))])
+                    goto_xpath('/test/default3:more[1] | /test/default3:more[2]/an2:yet_another', 'open', None, [((13, 5), (13, 9)), ((17, 9), (17, 23))])
+                    goto_relative('parent', 'open', [((1, 1), (1, 5)), ((16, 5), (16, 9))])
+
+                    goto_relative('prev', 'open', [((1, 1), (1, 5)), ((16, 5), (16, 9))]) # prev should fail, so assert the position is the same as previously
+
                 xpath_tests()
                 relative_tests()
-                
+
                 # close the view we opened for testing
                 view.window().run_command('close')
-                
-            
+
+
             sublime_lxml_completion_tests()
             sublime_lxml_goto_node_tests()
-            
+
             # TODO: check the results of an xpath query
             #        e.g. `count(//@*)`
-            
+
             print('all XPath tests passed')
         except Exception as e:
             print('XPath tests failed')
             print(repr(e))
             traceback.print_tb(e.__traceback__)
-            
+

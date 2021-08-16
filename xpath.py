@@ -428,6 +428,8 @@ class XpathListener(sublime_plugin.EventListener):
         previous_first_selection.pop(view.id(), None)
         
         if view.file_name() is None: # if the file has no filename associated with it
+            if view.settings().get('xpath_test_file', None):
+                return
             #if not getBoolValueFromArgsOrSettings('global_query_history', None, True): # if global history isn't enabled
             #    remove_key_from_xpath_query_history(get_history_key_for_view(view))
             #else:
