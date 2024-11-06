@@ -304,16 +304,12 @@ def unique_namespace_prefixes(namespaces, replaceNoneWith = 'default', start = 1
 
 def get_results_for_xpath_query(query, tree, context = None, namespaces = None, **variables):
     """Given a query string and a document trees and optionally some context elements, compile the xpath query and execute it."""
-    nsmap = {}
-    if namespaces is not None:
+    nsmap = dict()
+    if namespaces:
         for prefix in namespaces.keys():
-            if namespaces[prefix][0] != '':
-                nsmap[prefix] = namespaces[prefix][0]
+            nsmap[prefix] = namespaces[prefix][0]
     
-    try:
-        xpath = etree.XPath(query, namespaces = nsmap)
-    except Exception as e:
-        raise ValueError(query) from e
+    xpath = etree.XPath(query, namespaces = nsmap)
     
     results = execute_xpath_query(tree, xpath, context, **variables)
     return results

@@ -142,7 +142,7 @@ def getXPathOfNodes(nodes, args):
     include_indexes = not getBoolValueFromArgsOrSettings('show_hierarchy_only', args, False)
     unique = getBoolValueFromArgsOrSettings('copy_unique_path_only', args, True)
     include_attributes = include_indexes or getBoolValueFromArgsOrSettings('show_attributes_in_hierarchy', args, False)
-    show_namespace_prefixes_from_query = getBoolValueFromArgsOrSettings('show_namespace_prefixes_from_query', args, False)
+    show_namespace_prefixes_from_query = getBoolValueFromArgsOrSettings('show_namespace_prefixes_from_query', args, True)
     case_sensitive = getBoolValueFromArgsOrSettings('case_sensitive', args, True)
     all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
 
@@ -154,7 +154,7 @@ def getXPathOfNodes(nodes, args):
     def getTagNameWithMappedPrefix(node, namespaces):
         tag = getTagName(node)
         if show_namespace_prefixes_from_query and tag[0] is not None: # if the element belongs to a namespace
-            unique_prefix = next((prefix for prefix in namespaces.keys() if namespaces[prefix] == (tag[0], node.prefix)), None) # find the first prefix in the map that relates to this uri
+            unique_prefix = next((prefix for prefix in namespaces.keys() if namespaces[prefix] == (tag[0], node.prefix or '')), None) # find the first prefix in the map that relates to this uri
             if unique_prefix is not None:
                 tag = (tag[0], tag[1], unique_prefix + ':' + tag[1]) # ensure that the path we display can be used to query the element
 
@@ -858,10 +858,11 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
 
             try:
                 results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))# if not isinstance(result, etree.CommentBase)))
-            except etree.XPathError as e:
+            except (ValueError, etree.XPathError) as e:
                 last_char = query.rstrip()[-1]
                 if not last_char in ('/', ':', '@', '[', '(', ','): # log exception to console only if might be useful
                     print('XPath: exception evaluating results for "' + query + '": ' + repr(e))
+                    #print(e.error_log)
                 #traceback.print_tb(e.__traceback__)
                 status_text = e.__class__.__name__ + ': ' + str(e)
 
@@ -1075,7 +1076,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                         try:
                             completion_contexts = get_results_for_xpath_query(query, tree, None, namespaces[tree.getroot()], **xpath_variables)
                             # TODO: if result is not a node, break out as we can't offer any useful suggestions (currently we just get an exception: Non-Element values not supported at this point - got 'example string') when it tries $expression_contexts/*
-                        except etree.XPathError as e: # xpath query invalid, just show static contexts
+                        except (ValueError, etree.XPathError) as e: # xpath query invalid, just show static contexts
                             completion_contexts = None
                             print('XPath: exception obtaining completions for subquery "' + query + '": ' + repr(e))
                             break
@@ -1087,8 +1088,11 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             ns_prefix = ''
                             if ns is not None: # ensure we get the prefix that we have mapped to the namespace for the query
                                 root = result.getroottree().getroot()
-                                ns_prefix = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix))) # find the first prefix in the map that relates to this uri
-                                fullname = ns_prefix + ':' + localname
+                                ns_prefix = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix] == (ns, result.prefix or '')), None) # find the first prefix in the map that relates to this uri
+                                if ns_prefix:
+                                    fullname = ns_prefix + ':' + localname
+                                else:
+                                    print('XPath warning: unable to find', ns, result.prefix, ' in root namespaces', namespaces[root], 'while generating completions')
                             if not last_location_step.endswith(':') or last_location_step.endswith('::') or last_location_step.endswith(ns_prefix + ':'): # ensure `prefix :` works correctly and also `different_prefix_to_suggestion:` (note that we don't do this for attributes - attributes are not allowed spaces before the colon, and if the prefix differs when there is no space, Sublime will replace it with the completion anyway)
                                 completion = fullname
                             else:
