@@ -310,7 +310,10 @@ def get_results_for_xpath_query(query, tree, context = None, namespaces = None, 
             if namespaces[prefix][0] != '':
                 nsmap[prefix] = namespaces[prefix][0]
     
-    xpath = etree.XPath(query, namespaces = nsmap)
+    try:
+        xpath = etree.XPath(query, namespaces = nsmap)
+    except Exception as e:
+        raise ValueError(query) from e
     
     results = execute_xpath_query(tree, xpath, context, **variables)
     return results

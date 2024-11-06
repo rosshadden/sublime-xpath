@@ -3,8 +3,8 @@ from .lxml_parser import *
 from .sublime_helper import get_scopes
 import re
 
-RE_TAG_NAME_END_POS = re.compile('[>\s/]')
-RE_TAG_ATTRIBUTES = re.compile('\s+((\w+(?::\w+)?)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'))')
+RE_TAG_NAME_END_POS = re.compile(r'[>\s/]')
+RE_TAG_ATTRIBUTES = re.compile(r'\s+((\w+(?::\w+)?)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'))')
 
 # TODO: consider subclassing etree.ElementBase and adding as methods to that
 def getNodeTagRegion(view, node, position_type):

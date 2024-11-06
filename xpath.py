@@ -88,7 +88,7 @@ def buildTreeForViewRegion(view, region_scope):
             log_entry = e.error_log[0]
             text = 'line ' + str(log_entry.line + offset[0]) + ', column ' + str(log_entry.column + offset[1]) + ' - ' + log_entry.message
             view.set_status('xpath_error', parse_error + text)
-    
+
     return (tree, all_elements)
 
 def ensureTreeCacheIsCurrent(view):
@@ -96,14 +96,14 @@ def ensureTreeCacheIsCurrent(view):
     global change_counters
     new_count = view.change_count()
     old_count = change_counters.get(view.id(), None)
-    
+
     global xml_roots
     global xml_elements
     if old_count is None or new_count > old_count:
         change_counters[view.id()] = new_count
         view.set_status('xpath', 'XML being parsed...')
         view.erase_status('xpath_error')
-        
+
         xml_roots[view.id()] = []
         xml_elements[view.id()] = []
         for tree, all_elements in buildTreesForView(view):
@@ -112,7 +112,7 @@ def ensureTreeCacheIsCurrent(view):
                 root = tree.getroot()
             xml_roots[view.id()].append(root)
             xml_elements[view.id()].append(all_elements)
-        
+
         view.erase_status('xpath')
         global previous_first_selection
         previous_first_selection[view.id()] = None
@@ -121,20 +121,20 @@ def ensureTreeCacheIsCurrent(view):
 class GotoXmlParseErrorCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
         view = self.view
-        
+
         global parse_error
         detail = view.get_status('xpath_error')[len(parse_error + 'line '):].split(' - ')[0].split(', column ')
         point = view.text_point(int(detail[0]) - 1, int(detail[1]) - 1)
-        
+
         view.sel().clear()
         view.sel().add(point)
-        
+
         view.show_at_center(point)
-    
+
     def is_enabled(self, **args):
         global parse_error
         return containsSGML(self.view) and self.view.get_status('xpath_error').startswith(parse_error)
-    
+
     def is_visible(self, **args):
         return containsSGML(self.view)
 
@@ -145,43 +145,43 @@ def getXPathOfNodes(nodes, args):
     show_namespace_prefixes_from_query = getBoolValueFromArgsOrSettings('show_namespace_prefixes_from_query', args, False)
     case_sensitive = getBoolValueFromArgsOrSettings('case_sensitive', args, True)
     all_attributes = getBoolValueFromArgsOrSettings('show_all_attributes', args, False)
-    
+
     global settings
     wanted_attributes = settings.get('attributes_to_include', [])
     if not case_sensitive:
         wanted_attributes = [attrib.lower() for attrib in wanted_attributes]
-    
+
     def getTagNameWithMappedPrefix(node, namespaces):
         tag = getTagName(node)
         if show_namespace_prefixes_from_query and tag[0] is not None: # if the element belongs to a namespace
             unique_prefix = next((prefix for prefix in namespaces.keys() if namespaces[prefix] == (tag[0], node.prefix)), None) # find the first prefix in the map that relates to this uri
             if unique_prefix is not None:
                 tag = (tag[0], tag[1], unique_prefix + ':' + tag[1]) # ensure that the path we display can be used to query the element
-        
+
         if not case_sensitive:
             tag = (tag[0], tag[1].lower(), tag[2].lower())
-        
+
         return tag
-    
+
     def getNodePathPart(node, namespaces):
         tag = getTagNameWithMappedPrefix(node, namespaces)
-        
+
         output = tag[2]
-        
+
         if include_indexes:
             siblings = node.itersiblings(preceding = True)
             index = 1
-            
+
             def compare(sibling):
                 if not isinstance(sibling, LocationAwareElement): # skip comments
                     return False
                 sibling_tag = getTagNameWithMappedPrefix(sibling, namespaces)
                 return sibling_tag == tag # namespace uri, prefix and tag name must all match
-            
+
             for sibling in siblings:
                 if compare(sibling):
                     index += 1
-            
+
             # if there are no previous sibling matches, check next siblings to see if we should index this node
             multiple = index > 1
             if not multiple:
@@ -190,10 +190,10 @@ def getXPathOfNodes(nodes, args):
                     if compare(sibling):
                         multiple = True
                         break
-            
+
             if multiple:
                 output += '[' + str(index) + ']'
-        
+
         if include_attributes:
             attributes_to_show = []
             for attr_name in node.attrib:
@@ -207,15 +207,15 @@ def getXPathOfNodes(nodes, args):
                     include_attribute = attr_name in wanted_attributes
                     if not include_attribue and len(attr) == 2:
                         include_attribue = attr[0] + ':*' in wanted_attributes or '*:' + attr[1] in wanted_attributes
-                
+
                 if include_attribute:
                     attributes_to_show.append('@' + attr_name + ' = "' + node.get(attr_name) + '"')
-            
+
             if len(attributes_to_show) > 0:
                 output += '[' + ' and '.join(attributes_to_show) + ']'
-        
+
         return output
-    
+
     def getNodePathSegments(node, namespaces, root):
         if isinstance(node, etree.CommentBase):
             node = node.getparent()
@@ -224,28 +224,28 @@ def getXPathOfNodes(nodes, args):
             node = node.getparent()
         yield getNodePathPart(node, namespaces)
         yield ''
-    
+
     def getNodePath(node, namespaces, root):
         return '/'.join(reversed(list(getNodePathSegments(node, namespaces, root))))
-    
+
     roots = {}
     for node in nodes:
         tree = node.getroottree()
         root = tree.getroot()
         roots.setdefault(root, []).append(node)
-    
+
     paths = []
     for root in roots.keys():
         for node in roots[root]:
             namespaces = None
             if show_namespace_prefixes_from_query:
                 namespaces = namespace_map_for_tree(root.getroottree())
-            
+
             paths.append(getNodePath(node, namespaces, root))
-    
+
     if unique:
         paths = list(getUniqueItems(paths))
-    
+
     return paths
 
 def getExactXPathOfNodes(nodes):
@@ -275,7 +275,7 @@ def updateStatusToCurrentXPathIfSGML(view):
                         result = results[0]
                         previous_first_selection[view.id()] = (sublime.Region(result[2], result[3]), result[0]) # cache node and xpath region
                         nodes.append(result[0])
-                
+
                 # calculate xpath of node
                 xpaths = getXPathOfNodes(nodes, None)
                 if len(xpaths) == 1:
@@ -283,14 +283,14 @@ def updateStatusToCurrentXPathIfSGML(view):
                     intro = 'XPath'
                     if len(view.sel()) > 1:
                         intro = intro + ' (at first selection)'
-                    
+
                     text = intro + ': ' + xpath
                     maxLength = 234 # if status message is longer than this, sublime text 3 shows nothing in the status bar at all, so unfortunately we have to truncate it...
                     if len(text) > maxLength:
                         append = ' (truncated)'
                         text = text[0:maxLength - len(append)] + append
                     status = text
-    
+
     if status is None:
         view.erase_status('xpath')
     else:
@@ -301,13 +301,13 @@ def copyXPathsToClipboard(view, args):
     if isCursorInsideSGML(view):
         roots = ensureTreeCacheIsCurrent(view)
         if roots is not None:
-            
+
             cursors = []
             for result in getSGMLRegionsContainingCursors(view):
                 cursors.append(result[2])
             results = getNodesAtPositions(view, roots, cursors)
             paths = getXPathOfNodes([result[0] for result in results], args)
-            
+
             if len(paths) > 0:
                 sublime.set_clipboard(os.linesep.join(paths))
                 message = str(len(paths)) + ' xpath(s) copied to clipboard'
@@ -323,12 +323,12 @@ class CopyXpathCommand(sublime_plugin.TextCommand): # example usage from python 
     def run(self, edit, **args):
         """Copy XPath(s) at cursor(s) to clipboard."""
         view = self.view
-        
+
         copyXPathsToClipboard(view, args)
-    
+
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
-    
+
     def is_visible(self, **args):
         return containsSGML(self.view)
 
@@ -340,15 +340,15 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
     def run(self, edit, **kwargs): # example usage from python console: sublime.active_window().active_view().run_command('goto_relative', {'direction': 'prev', 'goto_element': 'names'})
         """Move cursor(s) to specified relative tag(s)."""
         view = self.view
-        
+
         roots = ensureTreeCacheIsCurrent(view)
         if roots is not None:
-            
+
             cursors = []
             for result in getSGMLRegionsContainingCursors(view):
                 cursors.append(result[2])
             results = getNodesAtPositions(view, roots, cursors)
-            
+
             new_nodes_under_cursors = []
             allFound = True
             for result in results:
@@ -358,7 +358,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                     break
                 else:
                     new_nodes_under_cursors.append(desired_node)
-            
+
             if not allFound:
                 message = kwargs['direction'] + ' node not found'
                 if len(cursors) > 1:
@@ -371,13 +371,13 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
                 if 'goto_element' in kwargs:
                     goto_element = kwargs['goto_element']
                 move_cursors_to_nodes(view, getUniqueItems(new_nodes_under_cursors), goto_element, None)
-    
+
     def is_enabled(self, **kwargs):
         return isCursorInsideSGML(self.view)
-    
+
     def is_visible(self):
         return containsSGML(self.view)
-    
+
     def description(self, args):
         if args['direction'] == 'self':
             descr = 'tag'
@@ -387,7 +387,7 @@ class GotoRelativeCommand(sublime_plugin.TextCommand):
             descr = 'element'
         else:
             return None
-        
+
         return 'Goto ' + args['direction'] + ' ' + descr
 
 def getBoolValueFromArgsOrSettings(key, args, default):
@@ -409,14 +409,14 @@ def getUniqueItems(items):
 class XpathListener(sublime_plugin.EventListener):
     def on_selection_modified_async(self, view):
         updateStatusToCurrentXPathIfSGML(view)
-    
+
     def on_activated_async(self, view):
         updateStatusToCurrentXPathIfSGML(view)
-    
+
     def on_post_save_async(self, view):
         if getBoolValueFromArgsOrSettings('only_show_xpath_if_saved', None, False):
             updateStatusToCurrentXPathIfSGML(view)
-    
+
     def on_pre_close(self, view):
         global change_counters
         global xml_roots
@@ -426,8 +426,10 @@ class XpathListener(sublime_plugin.EventListener):
         xml_roots.pop(view.id(), None)
         xml_elements.pop(view.id(), None)
         previous_first_selection.pop(view.id(), None)
-        
+
         if view.file_name() is None: # if the file has no filename associated with it
+            if view.settings().get('xpath_test_file', None):
+                return
             #if not getBoolValueFromArgsOrSettings('global_query_history', None, True): # if global history isn't enabled
             #    remove_key_from_xpath_query_history(get_history_key_for_view(view))
             #else:
@@ -436,13 +438,13 @@ class XpathListener(sublime_plugin.EventListener):
 def register_xpath_extensions():
     # http://lxml.de/extensions.html
     ns = etree.FunctionNamespace(None)
-    
+
     def applyFuncToTextForItem(item, func):
         if isinstance(item, etree._Element):
             return func(item.xpath('string(.)'))
         else:
             return func(str(item))
-    
+
     # TODO: xpath 1 functions deal with lists by just taking the first node
     #     - maybe we can provide optional arg to return nodeset by applying to all
     def applyTransformFuncToTextForItems(nodes, func):
@@ -451,34 +453,34 @@ def register_xpath_extensions():
             return [applyFuncToTextForItem(item, func) for item in nodes]
         else:
             return applyFuncToTextForItem(nodes, func)
-    
+
     def applyFilterFuncToTextForItems(nodes, func):
         """If a nodeset is given, filter out items whose transformation function returns False.  Otherwise, return the value from the predicate."""
         if isinstance(nodes, list):
             return [item for item in nodes if applyFuncToTextForItem(item, func)]
         else:
             return applyFuncToTextForItem(nodes, func)
-    
+
     def printValueAndReturnUnchanged(context, nodes, title = None):
         print_value = nodes
         if isinstance(nodes, list):
             if len(nodes) > 0 and isinstance(nodes[0], etree._Element):
                 paths = getExactXPathOfNodes(nodes)
                 print_value = paths
-        
+
         if title is None:
             title = ''
         else:
             title = title + ':'
         print('XPath:', title, 'context_node', getExactXPathOfNodes([context.context_node])[0], 'eval_context', context.eval_context, 'values', print_value)
         return nodes
-    
+
     ns['upper-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.upper)
     ns['lower-case'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.lower)
     ns['ends-with'] = lambda context, nodes, ending: applyFilterFuncToTextForItems(nodes, lambda item: item.endswith(ending))
     #ns['trim'] = lambda context, nodes: applyTransformFuncToTextForItems(nodes, str.strip) # according to the XPath 1.0 spec, the built in normalize-space function will trim the text on both sides, making this unnecessary http://www.w3.org/TR/xpath/#function-normalize-space
     ns['print'] = printValueAndReturnUnchanged
-    
+
     def xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags):
         flags = 0
         if 's' in xpath_regex_flags:
@@ -489,9 +491,9 @@ def register_xpath_extensions():
             flags = flags | re.IGNORECASE
         if 'x' in xpath_regex_flags:
             flags = flags | re.VERBOSE
-        
+
         return flags
-    
+
     ns['tokenize'] = lambda context, item, pattern, xpath_regex_flags = None: applyFuncToTextForItem(item, lambda text: re.split(pattern, text, maxsplit = 0, flags = xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags)))
     ns['matches'] = lambda context, item, pattern, xpath_regex_flags = None: applyFuncToTextForItem(item, lambda text: re.search(pattern, text, flags = xpathRegexFlagsToPythonRegexFlags(xpath_regex_flags)) is not None)
     # replace
@@ -501,7 +503,7 @@ def register_xpath_extensions():
     # abs
     # ? adjust-dateTime-to-timezone, current-dateTime, day-from-dateTime, month-from-dateTime, days-from-duration, months-from-duration, etc.
     # insert-before, remove, subsequence, index-of, distinct-values, reverse, unordered, empty, exists
-    
+
 
 def plugin_loaded():
     """When the plugin is loaded, clear all variables and cache xpaths for current view if applicable."""
@@ -510,7 +512,7 @@ def plugin_loaded():
     settings.clear_on_change('reparse')
     settings.add_on_change('reparse', settingsChanged)
     sublime.set_timeout_async(settingsChanged, 10)
-    
+
     register_xpath_extensions()
 
 def plugin_unloaded():
@@ -527,7 +529,7 @@ def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namesp
     variables = settings.get('variables', {})
     for key in additional_variables:
         variables[key] = additional_variables[key]
-    
+
     for tree in tree_contexts.keys():
         namespaces = root_namespaces.get(tree.getroot(), {})
         variables['contexts'] = tree_contexts[tree]
@@ -535,9 +537,9 @@ def get_results_for_xpath_query_multiple_trees(query, tree_contexts, root_namesp
         if len(tree_contexts[tree]) > 0:
             context = tree_contexts[tree][0]
         matches += get_results_for_xpath_query(query, tree, context, namespaces, **variables)
-        
+
     return matches
-    
+
 def get_xpath_query_history_for_keys(keys):
     """Return all previously used xpath queries with any of the given keys, in order.  If keys is None, return history across all keys."""
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
@@ -553,7 +555,7 @@ def remove_item_from_xpath_query_history(key, query):
         history.remove(item)
         history_settings.set('history', history)
         #sublime.save_settings('xpath_query_history.sublime-settings')
-   
+
 # def remove_key_from_xpath_query_history(key):
 #     view_history = get_xpath_query_history_for_keys([key])
 #     for item in view_history:
@@ -564,16 +566,16 @@ def add_to_xpath_query_history_for_key(key, query):
     """Add the specified query to the history for the given key."""
     # if it exists in the history for the view already, move the item to the bottom (i.e. make it the most recent item in the history) by removing and re-adding it
     remove_item_from_xpath_query_history(key, query)
-    
+
     history_settings = sublime.load_settings('xpath_query_history.sublime-settings')
     history = history_settings.get('history', [])
     history.append([query, key])
-    
+
     # if there are more than the specified maximum number of history items, remove the excess
     global settings
     max_history = settings.get('max_query_history', 100)
     history = history[-max_history:]
-    
+
     history_settings.set('history', history)
     sublime.save_settings('xpath_query_history.sublime-settings')
 
@@ -599,32 +601,32 @@ def get_history_key_for_view(view):
 
 class ShowXpathQueryHistoryCommand(sublime_plugin.TextCommand):
     history = None
-    
+
     def run(self, edit, **args):
         global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
-        
+
         keys = None
         if not global_history:
             keys = [get_history_key_for_view(self.view)]
-        
+
         self.history = get_xpath_query_history_for_keys(keys)
         if len(self.history) == 0:
             sublime.status_message('no query history to show')
         else:
             self.view.window().show_quick_panel(self.history, self.history_selection_done, 0, len(self.history) - 1, self.history_selection_changed)
-    
+
     def history_selection_done(self, selected_index):
         if selected_index > -1:
             #add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.history[selected_index])
             sublime.active_window().active_view().run_command('query_xpath', { 'prefill_path_at_cursor': False, 'prefill_query': self.history[selected_index] })
-    
+
     def history_selection_changed(self, selected_index):
         if not getBoolValueFromArgsOrSettings('live_mode', None, True):
             self.history_selection_done(selected_index)
-    
+
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
-    
+
     def is_visible(self):
         return containsSGML(self.view)
 
@@ -638,7 +640,7 @@ def namespace_map_from_contexts(contexts):
             root = node.getroottree().getroot()
         if root not in root_namespaces.keys():
             root_namespaces[root] = namespace_map_for_tree(root.getroottree())
-    
+
     return root_namespaces
 
 def namespace_map_for_tree(tree):
@@ -653,7 +655,7 @@ class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example 
     def run(self, edit, **kwargs):
         contexts = get_context_nodes_from_cursors(self.view)
         nodes = get_results_for_xpath_query_multiple_trees(kwargs['xpath'], contexts, namespace_map_from_contexts(contexts))
-        
+
         global settings
         goto_element = settings.get('goto_element', 'open')
         goto_attribute = settings.get('goto_attribute', 'value')
@@ -661,12 +663,12 @@ class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example 
             goto_element = 'open'
         if goto_attribute == 'none':
             goto_attribute = 'value'
-        
+
         if 'goto_element' in kwargs:
             goto_element = kwargs['goto_element']
         if 'goto_attribute' in kwargs:
             goto_attribute = kwargs['goto_attribute']
-        
+
         total_selectable_results, total_results = move_cursors_to_nodes(self.view, nodes, goto_element, goto_attribute)
         if total_selectable_results == total_results:
             sublime.status_message(str(total_results) + ' nodes selected')
@@ -677,11 +679,11 @@ class SelectResultsFromXpathQueryCommand(sublime_plugin.TextCommand): # example 
 class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # example usage from python console: sublime.active_window().active_view().run_command('rerun_last_xpath_query_and_select_results', { 'global_query_history': False })
     def run(self, edit, **args):
         global_history = getBoolValueFromArgsOrSettings('global_query_history', args, True)
-        
+
         keys = [get_history_key_for_view(self.view)]
         if global_history:
             keys = None
-        
+
         # TODO: preserve original $contexts variable (xpaths of all context nodes) with history, and restore here?
         history = get_xpath_query_history_for_keys(keys)
         if len(history) == 0:
@@ -691,10 +693,10 @@ class RerunLastXpathQueryAndSelectResultsCommand(sublime_plugin.TextCommand): # 
                 args = dict()
             args['xpath'] = history[-1]
             self.view.run_command('select_results_from_xpath_query', args)
-    
+
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
-    
+
     def is_visible(self):
         return containsSGML(self.view)
 
@@ -714,29 +716,29 @@ class CleanTagSoupCommand(sublime_plugin.TextCommand):
                 self.view.erase_status('xpath_clean')
                 sublime.status_message('Unable to find any SGML tag soup regions to fix.')
                 return
-        
+
         # clean all html regions specified, in reverse order, because otherwise the offsets will change after tidying the region before it! i.e. args['regions'] must be in ascending position order
         for region_tuple in reversed(args['regions']):
             region_scope = sublime.Region(region_tuple[0], region_tuple[1])
             tag_soup = self.view.substr(region_scope)
             xml_string = clean_html(tag_soup)
             self.view.replace(edit, region_scope, xml_string)
-        
+
         self.view.erase_status('xpath_clean')
         sublime.status_message('Tag soup cleaned successfully.')
-    
+
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
-    
+
     def is_visible(self):
         return containsSGML(self.view)
 
 def get_context_nodes_from_cursors(view):
     """Get nodes under the cursors for the specified view."""
     roots = ensureTreeCacheIsCurrent(view)
-    
+
     invalid_trees = []
-    
+
     regions_cursors = {}
     for result in getSGMLRegionsContainingCursors(view):
         if roots[result[1]] is None:
@@ -745,7 +747,7 @@ def get_context_nodes_from_cursors(view):
         if isinstance(node, etree.CommentBase):
             node = node.getparent()
         regions_cursors.setdefault(result[1], []).append(node)
-    
+
     if len(invalid_trees) > 0:
         invalid_trees = [region_scope for region_scope in invalid_trees if view.match_selector(region_scope.begin(), 'text.html - text.html.markdown')]
         if len(invalid_trees) > 0:
@@ -755,9 +757,9 @@ def get_context_nodes_from_cursors(view):
                 roots = ensureTreeCacheIsCurrent(view)
                 updateStatusToCurrentXPathIfSGML(view)
                 invalid_trees = []
-    
+
     contexts = {}
-    
+
     if len(invalid_trees) > 0: # show error if any of the XML regions containing the cursor is invalid
         sublime.error_message('The XML cannot be parsed, therefore it is not currently possible to execute XPath queries on the document.  Please see the status bar for parsing errors.')
     else:
@@ -765,28 +767,28 @@ def get_context_nodes_from_cursors(view):
             root = roots[region_index]
             if root is not None:
                 contexts[root.getroottree()] = [item[0] for item in getNodesAtPositions(view, [root], regions_cursors[region_index])]
-        
+
     return contexts
 
 class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python console: sublime.active_window().active_view().run_command('query_xpath', { 'prefill_query': '//prefix:LocalName', 'live_mode': True })
     max_results_to_show = None
     contexts = None
     previous_input = None # remember previous query so that when the user next runs this command, it will be prepopulated
-    
+
     def cache_context_nodes(self):
         """Cache context nodes to allow live mode to work with them."""
         context_nodes = get_context_nodes_from_cursors(self.view)
         change_count = self.view.change_count()
-        
+
         different_tree = self.contexts is None or self.contexts[0] != change_count # if the document has changed since the context nodes were cached
         self.contexts = (change_count, context_nodes, namespace_map_from_contexts(context_nodes))
-        
+
         tree_count = 0
         for root in context_nodes:
             tree_count += 1
-            
+
             print('XPath: context nodes: ', getExactXPathOfNodes(context_nodes[root]))
-        
+
         if tree_count == 1: # if there is exactly one xml tree
             tree = next(iter(context_nodes.keys())) # get the tree
             if len(context_nodes[tree]) == 0: # if there are no context nodes
@@ -797,13 +799,13 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if different_tree and isinstance(self.highlighted_result, LocationAwareElement):
                 self.highlighted_result = context_nodes[tree][0]
                 self.highlighted_index = 0
-        
+
     def run(self, edit, **args):
         self.cache_context_nodes()
         if len(self.contexts[1].keys()) == 0: # if there are no context nodes, don't proceed to show the xpath input panel
             return
         super().run(edit, **args)
-    
+
     def parse_args(self):
         self.arguments['initial_value'] = self.get_value_from_args('prefill_query', self.previous_input)
         if self.arguments['initial_value'] is None:
@@ -812,7 +814,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if global_history:
                 keys = None
             history = get_xpath_query_history_for_keys(keys)
-            
+
             if len(history) > 0:
                 self.arguments['initial_value'] = history[-1]
         # if previous input is blank, or specifically told to, use path of first cursor. even if live mode enabled, cursor won't move much when activating this command
@@ -822,29 +824,29 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             if prev is not None:
                 xpaths = getExactXPathOfNodes([prev[1]]) # ensure the path matches this node and only this node
                 self.arguments['initial_value'] = xpaths[0]
-        
+
         self.arguments['label'] = 'enter xpath'
         self.arguments['syntax'] = 'xpath.sublime-syntax'
-        
+
         global settings
         self.max_results_to_show = int(self.get_value_from_args('max_results_to_show', settings.get('max_results_to_show', 1000)))
-        
+
         self.arguments['async'] = getBoolValueFromArgsOrSettings('live_query_async', self.arguments, True)
         self.arguments['delay'] = int(settings.get('live_query_delay', 0))
         self.arguments['live_mode'] = getBoolValueFromArgsOrSettings('live_mode', self.arguments, True)
-        
+
         self.arguments['normalize_whitespace_in_preview'] = getBoolValueFromArgsOrSettings('normalize_whitespace_in_preview', self.arguments, False)
         self.arguments['auto_completion_triggers'] = settings.get('auto_completion_triggers', '/')
         self.arguments['intelligent_auto_complete'] = getBoolValueFromArgsOrSettings('intelligent_auto_complete', self.arguments, True)
-        
-        
+
+
         if 'goto_element' not in self.arguments:
             self.arguments['goto_element'] = settings.get('goto_element', 'open')
         if 'goto_attribute' not in self.arguments:
             self.arguments['goto_attribute'] = settings.get('goto_attribute', 'value')
-        
+
         super().parse_args()
-    
+
     def get_query_results(self, query):
         results = None
         status_text = None
@@ -853,7 +855,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
         else:
             if self.contexts[0] != self.view.change_count(): # if the document has changed since the context nodes were cached
                 self.cache_context_nodes()
-            
+
             try:
                 results = list((result for result in get_results_for_xpath_query_multiple_trees(query, self.contexts[1], self.contexts[2])))# if not isinstance(result, etree.CommentBase)))
             except etree.XPathError as e:
@@ -862,7 +864,7 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                     print('XPath: exception evaluating results for "' + query + '": ' + repr(e))
                 #traceback.print_tb(e.__traceback__)
                 status_text = e.__class__.__name__ + ': ' + str(e)
-            
+
             if status_text is None: # if there was no error
                 status_text = str(len(results)) + ' result'
                 if len(results) != 1:
@@ -873,30 +875,30 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                     results = results[0:self.max_results_to_show]
         self.view.set_status('xpath_query', status_text or '')
         return results
-    
+
     def get_items_from_input(self):
         return self.get_query_results(self.current_value)
-    
+
     def get_items_to_show_in_quickpanel(self):
         results = self.items
         if results is None:
             return None
-        
+
         # truncate each xml result at 70 chars so that it appears (more) correctly in the quick panel
         maxlen = 70
-        
+
         show_text_preview = None
         if self.arguments['normalize_whitespace_in_preview']:
             show_text_preview = lambda result: collapseWhitespace(str(result), maxlen)
         else:
             show_text_preview = lambda result: str(result)[0:maxlen]
-        
+
         unique_types_in_result = getUniqueItems((type(item) for item in results))
         next(unique_types_in_result, None)
         muliple_types_in_result = next(unique_types_in_result, None) is not None
-        
+
         show_element_preview = lambda e: [getTagName(e)[2], collapseWhitespace(e.text, maxlen), getElementXMLPreview(self.view, e, maxlen)]
-        
+
         def show_preview(item):
             if isinstance(item, etree.ElementBase) and not isinstance(item, etree.CommentBase):
                 return show_element_preview(item)
@@ -905,9 +907,9 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
                 if muliple_types_in_result: # if some items are elements (where we show 3 lines) and some are other node types (where we show 1 line), we need to return 3 lines to ensure Sublime will show the results correctly
                     show = [show, '', '']
                 return show
-        
+
         return [show_preview(item) for item in results]
-        
+
     def quickpanel_selection_changed(self, selected_index):
         super().quickpanel_selection_changed(selected_index)
         if selected_index > -1: # quick panel wasn't cancelled
@@ -916,50 +918,65 @@ class QueryXpathCommand(QuickPanelFromInputCommand): # example usage from python
             #self.view.window().focus_view(self.view) # focus the view to try getting the cursor positions to update while the quick panel is open
             #if self.input_panel is not None:
             #    self.input_panel.window().focus_view(self.input_panel)
-    
+
     def commit_input(self):
         self.previous_input = self.current_value
         add_to_xpath_query_history_for_key(get_history_key_for_view(self.view), self.current_value)
-    
+
     def command_complete(self, cancelled):
         self.view.erase_status('xpath_query')
         super().command_complete(cancelled)
-    
+
     def show_input_panel(self, initial_value):
         super().show_input_panel(initial_value)
+        settings = self.input_panel.settings()
+        settings.set('auto_complete', True)
+        settings.set('auto_complete_include_snippets_when_typing', False)
         if len(self.arguments['auto_completion_triggers'] or '') > 0:
-            self.input_panel.settings().set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': self.arguments['auto_completion_triggers']} ])
-    
+            settings.set('auto_complete_triggers', [ {'selector': 'query.xml.xpath - string', 'characters': self.arguments['auto_completion_triggers']} ])
+
     def on_query_completions(self, prefix, locations): # moved from .sublime-completions file here - https://github.com/SublimeTextIssues/Core/issues/819
         flags = sublime.INHIBIT_WORD_COMPLETIONS
         if not self.arguments['intelligent_auto_complete']:
             flags = 0
         return (completions_for_xpath_query(self.input_panel, prefix, locations, self.contexts[1], self.contexts[2], settings.get('variables', {}), self.arguments['intelligent_auto_complete']), flags)
-    
+
     def on_completion_committed(self):
         # show the auto complete popup again if the item that was autocompleted ended in a character that is an auto completion trigger
         for cursor in self.input_panel.sel():
             prev_char = self.input_panel.substr(cursor.begin() - 1)
             if prev_char not in self.arguments['auto_completion_triggers']:
                 return
-        
+
         self.input_panel.run_command('auto_complete')
         self.input_panel.window().focus_view(self.input_panel)
-    
+
     def is_enabled(self, **args):
         return isCursorInsideSGML(self.view)
-    
+
     def is_visible(self):
         return containsSGML(self.view)
 
 def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, variables, intelligent):
     def completions_axis_specifiers():
         completions = ['ancestor', 'ancestor-or-self', 'attribute', 'child', 'descendant', 'descendant-or-self', 'following', 'following-sibling', 'namespace', 'parent', 'preceding', 'preceding-sibling', 'self']
-        return [(completion + '\taxis', completion + '::') for completion in completions]
+        return [
+            sublime.CompletionItem.snippet_completion(
+                completion,
+                completion + '::',
+                annotation='axis',
+                kind=sublime.KIND_NAVIGATION
+            ) for completion in completions]
 
     def completions_node_types():
         completions = ['text', 'node', 'comment', 'processing-instruction']
-        return [(completion + '\tnode type', completion + '()') for completion in completions]
+        return [
+            sublime.CompletionItem.snippet_completion(
+                completion,
+                completion + '()',
+                annotation='node type',
+                kind=sublime.KIND_TYPE
+            ) for completion in completions]
 
     def completions_functions():
         funcs = {
@@ -972,13 +989,24 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
         }
         for key in funcs.keys():
             for completion in funcs[key]:
-                yield (completion + '\t' + key + ' functions', completion + '($1)')
-    
+                yield sublime.CompletionItem.snippet_completion(
+                    completion,
+                    completion + '($1)',
+                    annotation=key,
+                    kind=sublime.KIND_FUNCTION
+                )
+
     completions = []
-    
+
     variables['contexts'] = None
-    variable_completions = [[key + '\tvariable', key] for key in sorted(variables.keys()) if key.startswith(prefix)]
-    
+    variable_completions = [
+        sublime.CompletionItem.snippet_completion(
+            key,
+            key,
+            annotation='variable',
+            kind=sublime.KIND_VARIABLE
+        ) for key in sorted(variables.keys()) if key.startswith(prefix)]
+
     prev_chars = []
     positions = []
     for location in locations:
@@ -989,10 +1017,10 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
         prev_char = view.substr(pos - 1)
         if prev_char not in prev_chars:
             prev_chars.append(prev_char)
-    
+
     if len(positions) == 0:
         return None # no locations suitable for suggestions
-    
+
     include_generics = False
     include_xpath = False
     if len(prev_chars) == 1:
@@ -1003,42 +1031,42 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
             include_generics = True
             if prev_chars[0] == '@': # if user is typing an attribute
                 include_generics = False
-    
+
     if include_generics or include_xpath:
         subqueries = parse_xpath_query_for_completions(view, positions[0])
         last_location_step = subqueries[-1].split('/')[-1]
-        
+
         if include_xpath and intelligent:
             # analyse relevant part of xpath query, and guess what user might want to type, i.e. suggest attributes that are present on the relevant elements when prefix starts with '@' etc.
             # execute previous complete query parts, so that we have the right context nodes for the current sub-expression
-            
+
             if contexts is not None:
                 # execute an xpath query to get all possible values
                 exec_query = subqueries[-1] + '*'
                 if prefix != '':
                     exec_query += '[starts-with(name(), $_prefix)]'
-                
+
                 # determine if any queries can be skipped, due to using an absolute path
                 relevant_queries = 0
                 for subquery in reversed(subqueries[0:-1]):
                     relevant_queries += 1
                     if subquery != '' and subquery[0] in ('/', '$'):
                         break
-                
+
                 start_index = len(subqueries) - relevant_queries - 1
                 subqueries = subqueries[start_index:]
-                
+
                 #print('XPath: completion context queries:', subqueries[0:-1], 'completion query:', exec_query, 'prefix:', prefix)
-                
+
                 # TODO: check all trees, not just the first one
                 tree = list(contexts.keys())[0]
                 completion_contexts = contexts[tree]
-                
+
                 xpath_variables = variables.copy()
                 xpath_variables['contexts'] = contexts[tree]
                 xpath_variables['expression_contexts'] = None
                 xpath_variables['_prefix'] = prefix
-                
+
                 for query in subqueries[0:-1] + [exec_query]:
                     if query != '':
                         if query[0] not in ('$', '/', '('):
@@ -1051,7 +1079,7 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                             completion_contexts = None
                             print('XPath: exception obtaining completions for subquery "' + query + '": ' + repr(e))
                             break
-                
+
                 if completion_contexts is not None:
                     for result in completion_contexts:
                         if isinstance(result, etree._Element): # if it is an Element, add a completion with the full name of the element
@@ -1065,7 +1093,14 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                                 completion = fullname
                             else:
                                 completion = localname
-                            completions.append((fullname + '\tElement', completion))
+                            completions.append(
+                                sublime.CompletionItem.snippet_completion(
+                                    fullname,
+                                    fullname,
+                                    annotation='Element',
+                                    kind=sublime.KIND_MARKUP
+                                )
+                            )
                         elif isinstance(result, etree._ElementUnicodeResult): # if it is an attribute, add a completion with the name of the attribute
                             if result.is_attribute:
                                 q = etree.QName(result.attrname)
@@ -1073,13 +1108,20 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                                 if q.namespace is not None:
                                     root = result.getparent().getroottree().getroot()
                                     attrname = next((nsprefix for nsprefix in namespaces[root].keys() if namespaces[root][nsprefix][0] == q.namespace)) + ':' + attrname # find the first prefix in the map that relates to this uri
-                                completions.append((attrname + '\tAttribute', attrname)) # NOTE: can get the value with: result.getparent().get(result.attrname) - in case we ever want to do something fancy like suggest possible values when doing `@attr = *autocomplete*` etc.
+                                completions.append(
+                                    sublime.CompletionItem.snippet_completion(
+                                        attrname,
+                                        attrname,
+                                        annotation='Attribute',
+                                        kind=sublime.KIND_MARKUP
+                                    )
+                                ) # NOTE: can get the value with: result.getparent().get(result.attrname) - in case we ever want to do something fancy like suggest possible values when doing `@attr = *autocomplete*` etc.
                         else: # debug, are we missing something we could suggest?
                             #completions.append((str(result) + '\t' + str(type(result)), str(result)))
                             pass
-                    
+
                     completions = list(getUniqueItems(completions))
-        
+
         if include_generics:
             generics = []
             if ':' not in last_location_step: # if no namespace or axis operator used in the last location step of the subquery
@@ -1087,8 +1129,14 @@ def completions_for_xpath_query(view, prefix, locations, contexts, namespaces, v
                 generics += completions_node_types()
             if subqueries[-1] == '': # XPath 1.0 functions and variables can only be used at the beginning of a sub-expression
                 generics += list(completions_functions())
-                generics += [('$' + item[0], '\\$' + item[1]) for item in variable_completions] # add possible variables
-            
-            completions += [completion for completion in generics if completion[0].startswith(last_location_step)]
-        
+                generics += [
+                    sublime.CompletionItem.snippet_completion(
+                        '$' + item[0],
+                        '\\$' + item[1],
+                        annotation='variable',
+                        kind=sublime.KIND_VARIABLE
+                    ) for item in variable_completions] # add possible variables
+
+            completions += [completion for completion in generics if completion.trigger.startswith(last_location_step)]
+
     return completions
