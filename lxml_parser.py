@@ -158,6 +158,11 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     
     def create_element(self, tag, attrib=None, nsmap=None):
         LocationAwareElement.TAG = tag
+        if nsmap: # a change made in lxml 3.8.0 / 3.5.0b1 requires us to pass None instead of an empty prefix string
+            if '' in nsmap:
+                nsmap[None] = nsmap['']
+                del nsmap['']
+        
         return LocationAwareElement(attrib=attrib, nsmap=nsmap)
     
     def element_end(self, tag, location=None):

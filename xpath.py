@@ -32,7 +32,7 @@ def settingsChanged():
 def getSGMLRegions(view):
     """Find all xml and html scopes in the specified view."""
     global settings
-    return view.find_by_selector(settings.get('sgml_selector'))
+    return view.find_by_selector(settings.get('sgml_selector', 'text.xml'))
 
 def containsSGML(view):
     """Return True if the view contains XML or HTML syntax."""
@@ -263,7 +263,7 @@ def updateStatusToCurrentXPathIfSGML(view):
             else:
                 # use cache of previous first selection if it exists
                 global previous_first_selection
-                prev = previous_first_selection[view.id()]
+                prev = previous_first_selection.get(view.id(), None)
                 
                 current_first_sel = view.sel()[0]
                 nodes = []
