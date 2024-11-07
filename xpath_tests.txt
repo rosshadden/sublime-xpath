@@ -1,0 +1,129 @@
+/test/default1:hello
+open
+1
+(2, 5), (2, 10)
+/test/default1:hello
+names
+2
+(2, 5), (2, 10)
+(12, 6), (12, 11)
+/test/default1:hello
+entire
+1
+(2, 4), (12, 12)
+/test/default1:hello/default2:world
+close
+1
+(11, 10), (11, 15)
+/test/default1:hello/default2:world
+content
+1
+(9, 32), (11, 8)
+/test/default1:hello/default2:world
+open_attributes
+1
+(9, 14), (9, 31)
+/test/default1:hello/default2:world/default2:example
+content
+1
+(10, 23), (10, 23)
+/test/default1:hello/default2:world/default2:example
+open_attributes
+1
+(10, 20), (10, 21)
+/test/default1:hello/default2:world/default2:example
+names
+1
+(10, 13), (10, 20)
+/test/default1:hello/default2:world/default2:example
+close
+1
+(10, 13), (10, 20)
+//hij
+open_attributes
+1
+(29, 134), (29, 134)
+(//text())[1]
+open
+1
+(1, 6), (2, 4)
+//text()[contains(., 'text')]
+open
+1
+(27, 38), (27, 49)
+
+# text nodes including CDATA
+/test/text/following-sibling::text() | /test/text/following-sibling::*/text()
+N/A
+3
+(29, 109), (29, 130)
+(29, 135), (29, 150)
+(29, 156), (30, 0)
+
+# multiple elements
+(//*)[position() < 3]
+open
+2
+(1, 1), (1, 5)
+(2, 5), (2, 10)
+
+(//*)[position() < 3]
+names
+4
+(1, 1), (1, 5)
+(2, 5), (2, 10)
+(12, 6), (12, 11)
+(30, 2), (30, 6)
+
+/test/default3:more[2]/an2:yet_another
+open
+1
+(17, 9), (17, 23)
+
+# relative nodes from context node
+../preceding-sibling::default3:more/descendant-or-self::*
+open
+2
+(13, 5), (13, 9)
+(14, 9), (14, 19)
+
+# multiple contexts
+$contexts/..
+open
+2
+(1, 1), (1, 5)
+(13, 5), (13, 9)
+
+# attributes
+/test/text/@attr1
+None value
+1
+(27, 17), (27, 22)
+/test/text/@*
+None name
+2
+(27, 10), (27, 15)
+(27, 24), (27, 29)
+
+/test/text/@*
+None entire
+2
+(27, 10), (27, 23)
+(27, 24), (27, 37)
+
+# attribute with namespace prefix
+//@abc:another_value
+None entire
+1
+(29, 57), (29, 82)
+
+# check that selection didn't move for no matches
+substring-before(//text()[contains(., 'text')][1], 'text')
+open
+0
+//*
+none
+0
+/test/text/@attr1
+none none
+0

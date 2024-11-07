@@ -87,6 +87,37 @@ The recommended way to install the Sublime Text XPath plugin is via [Package Con
 
 ## Troubleshooting
 
+## Context menu items disabled
+
+This can happen if the `lxml` dependency didn't load properly. You'll see errors in the ST console.
+
+### Mac
+On a Mac with Apple silicon, the version of lxml installed by Package Control 4 doesn't seem to work.
+In ST console, we can see that ST build 4180 is using Python 3.8.12:
+```python
+import sys; sys.version_info
+```
+So you can build lxml manually using this version of Python. You will need to download the source code release asset, as lxml's git repository doesn't contain some `.c` files which are required to build. lxml v5.1.1 for sure works:
+- Navigate to https://github.com/lxml/lxml/releases/tag/lxml-5.1.1
+- Download `lxml-5.1.1.tar.gz`
+- extract it
+
+```sh
+brew install pyenv
+pyenv init # follow instructions
+
+pyenv install 3.8.12
+pyenv shell 3.8.12
+
+cd ~/Downloads/lxml-5.1.1
+python setup.py build
+```
+
+- then copy `~/Downloads/lxml-5.1.1/build/lib.macosx-15.1-arm64-3.8/lxml` into `~/Library/Application Support/Sublime Text/Lib/python38/lxml`, overwriting anything already there.
+- Restart ST.
+
+(If you were to try downloading `lxml-5.1.1-cp38-cp38-macosx_10_9_universal2.whl` for example, and extracting that into ST's lib folder mentioned above, when you restart ST, you would be told that an `.so` file in `Lib/python38/lxml/` folder isn't trusted, and there would be no option to "allow". You could go in Mac Settings -> Privacy and Security and it should show up there with an option to allow it. But you'd still see that the `lxml` dependency fails to load in ST, and the only solution seems to be building from source on the Mac.)
+
 ### CDATA Nodes
 
 When working with XML documents, you are probably used to the Document Object Model (DOM), where CDATA nodes are separate to text nodes.  XPath sees `text()` nodes as all adjacent CDATA and text node siblings together.

@@ -158,6 +158,11 @@ class LocationAwareTreeBuilder(LocationAwareXMLParser):
     
     def create_element(self, tag, attrib=None, nsmap=None):
         LocationAwareElement.TAG = tag
+        if nsmap: # a change made in lxml 3.8.0 / 3.5.0b1 requires us to pass None instead of an empty prefix string
+            if '' in nsmap:
+                nsmap[None] = nsmap['']
+                del nsmap['']
+        
         return LocationAwareElement(attrib=attrib, nsmap=nsmap)
     
     def element_end(self, tag, location=None):
@@ -299,11 +304,10 @@ def unique_namespace_prefixes(namespaces, replaceNoneWith = 'default', start = 1
 
 def get_results_for_xpath_query(query, tree, context = None, namespaces = None, **variables):
     """Given a query string and a document trees and optionally some context elements, compile the xpath query and execute it."""
-    nsmap = {}
-    if namespaces is not None:
+    nsmap = dict()
+    if namespaces:
         for prefix in namespaces.keys():
-            if namespaces[prefix][0] != '':
-                nsmap[prefix] = namespaces[prefix][0]
+            nsmap[prefix] = namespaces[prefix][0]
     
     xpath = etree.XPath(query, namespaces = nsmap)
     
